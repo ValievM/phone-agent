@@ -1,0 +1,30 @@
+# Android / Gradle
+.gradle/
+build/
+*.iml
+.idea/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+
+# Signing and secrets (never commit)
+*.jks
+*.keystore
+*.pem
+.env
+.env.*
+
+# Stage 0 spike: tokens and local environment
+spike/auth*.json
+spike/.venv/
+__pycache__/
+
+# Serena
+.serena/cache/
+
+# OS
+.DS_Store
