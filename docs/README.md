@@ -19,7 +19,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Работа над этапом | [stages/README.md](stages/README.md) → файл этапа |
 | Что входит в MVP, критерии приёмки, риски | [product/overview.md](product/overview.md) |
 | Требования: вход, клиент модели, цикл агента, инструменты, экраны | [product/requirements.md](product/requirements.md) |
-| Факты о входе через подписку и бэкенде | [research/backend-facts.md](research/backend-facts.md) (позже `backend-notes.md`) |
+| Константы входа и бэкенда (источник истины) | [backend-notes.md](backend-notes.md) |
 | Модули, куда класть код | [architecture/overview.md](architecture/overview.md) |
 | Порты, `AgentLoop`, инструменты, ошибки | [architecture/core.md](architecture/core.md) |
 | Клиент модели, вход, инструменты Android, мост диалогов, хранилище | [architecture/adapters.md](architecture/adapters.md) |
@@ -40,18 +40,17 @@ Android-приложение: чат с Codex + узкие инструмент�
 
 ## Карта документов
 - `product/`: что строим. [overview](product/overview.md), [requirements](product/requirements.md).
-- `research/`: исходные факты. [backend-facts](research/backend-facts.md).
+- `research/`: исходные гипотезы. [backend-facts](research/backend-facts.md). Проверенные значения: [backend-notes](backend-notes.md).
 - `architecture/`: как устроено. [overview](architecture/overview.md), [core](architecture/core.md), [adapters](architecture/adapters.md), [ui](architecture/ui.md), [patterns](architecture/patterns.md), [testing](architecture/testing.md), [recipes](architecture/recipes.md), [decisions](architecture/decisions.md).
 - `design/`: как выглядит. [overview](design/overview.md), [style](design/style.md), [icons-motion-copy](design/icons-motion-copy.md), [components](design/components.md), [layout-rules](design/layout-rules.md), [a11y-security](design/a11y-security.md), [libraries](design/libraries.md), [qa](design/qa.md).
 - `stages/`: в каком порядке делаем. [README](stages/README.md), [A](stages/a-environment.md), [0](stages/0-spike.md), [1](stages/1-skeleton.md), [2](stages/2-auth.md), [3](stages/3-model-client.md), [4](stages/4-tools.md), [5](stages/5-hardening.md), [6](stages/6-release.md).
 - `tooling/`: инструменты агента. [serena-context7](tooling/serena-context7.md).
-- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md).
+- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md).
 
 **Появятся по ходу работы:**
 
 | Документ | Когда | Что внутри |
 |---|---|---|
-| `backend-notes.md` | этап 0 | проверенные константы входа и бэкенда, решение GO/NO-GO. **Источник истины для значений** |
 | `measurements.md` | этап 6 | замеры памяти и батареи |
 | `INSTALL.md` | этап 6 | инструкция для пользователя: скачать, установить, войти, что умеет |
 

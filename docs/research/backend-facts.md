@@ -13,8 +13,8 @@
 | Условие device code | Для личного аккаунта переключатель «Device code authorization» в Settings → Security должен быть включён | [факт] по сторонним гайдам, [проверить] |
 | Токены | `id_token`, `access_token`, `refresh_token`, `account_id` (claim `chatgpt_account_id` в JWT). Обновление за ~30 с до истечения или после 401. Без обновления ~8 дней сессия протухает | [факт] частично, [проверить] |
 | Эндпоинт модели | `POST https://chatgpt.com/backend-api/codex/responses`, формат Responses API, ответ — SSE | неофициальные SDK, [проверить] |
-| Заголовки бэкенда | `Authorization: Bearer`, `chatgpt-account-id`, `OpenAI-Beta: responses=experimental`, `originator`, `Accept: text/event-stream`. Бэкенд проверяет `originator` по белому списку, чужое значение даёт 403 | неофициальные источники, [проверить] |
-| Тело запроса | `instructions` обязателен, `store=false` обязателен, `content.type = input_text`, `prompt_cache_key` + `session_id` = UUID для кэша | неофициальные источники, [проверить] |
+| Заголовки бэкенда | `Authorization: Bearer`, `chatgpt-account-id`, `originator`, `Accept: text/event-stream`. **Опровергнуто 22.09.2026:** `OpenAI-Beta` не нужен, чужой `originator` принят (HTTP 200), см. [backend-notes.md](../backend-notes.md) | проверено запуском |
+| Тело запроса | `instructions` обязателен, `store=false` обязателен, `content.type = input_text`, `prompt_cache_key` + `session_id` = UUID для кэша | проверено запуском, см. [backend-notes.md](../backend-notes.md) |
 | События SSE | `response.output_text.delta`, `response.output_item.done` (в т.ч. `function_call` с `call_id`, `name`, `arguments`), `response.completed` | [проверить] |
 | Доступность | Работа бэкенда зависит от плана, workspace и ревизии бэкенда | неофициальные источники |
 | Официальный путь для «богатых» клиентов | `codex app-server` (JSON-RPC, stdio/WebSocket), сторонние клиенты явно не гарантируются, WebSocket помечен как experimental | [факт] из docs |
