@@ -1,0 +1,22 @@
+build:
+  maxIssues: 0
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - Composable
+  MatchingDeclarationName:
+    active: false
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreNamedArgument: true
+    ignoreAnnotation: true
+  MaxLineLength:
+    maxLineLength: 140
+  UnusedPrivateMember:
+    ignoreAnnotated:
+      - Preview
+      - PreviewLightDark
+      - PreviewFontScale

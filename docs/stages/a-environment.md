@@ -4,14 +4,16 @@
 
 **Цель:** чтобы дальше не ловить проблемы установки.
 
-- [ ] A.1 Установлен Android Studio; через SDK Manager стоят актуальная Android SDK Platform, Build-Tools, Platform-Tools (`adb`).
-- [ ] A.2 Телефон: включён режим разработчика и отладка по USB (или создан эмулятор).
-- [ ] A.3 Установлен `git`; создан репозиторий; `.gitignore` для Android + `local.properties`, `*.jks`, `*.keystore`, `spike/auth*.json`, `.serena/cache/`.
-- [ ] A.4 Установлен Codex CLI, выполнен вход, `codex` запускается в папке проекта.
-- [ ] A.5 Установлен `uv`; Serena: `uv tool install -p 3.13 serena-agent`, затем `serena init`.
-- [ ] A.6 В `~/.codex/config.toml` добавлены Serena и Context7 (блок ниже).
-- [ ] A.7 Ключ Context7 (бесплатный, с context7.com/dashboard) лежит в переменной окружения `CONTEXT7_API_KEY`, не в репозитории.
-- [ ] A.8 В корне репозитория лежат `AGENTS.md`, `docs/` и `scripts/check_docs.py`.
+**Статус:** закрыт; A.2 и A.7 отложены по решению владельца проекта.
+
+- [x] A.1 Установлен Android Studio; через SDK Manager стоят актуальная Android SDK Platform, Build-Tools, Platform-Tools (`adb`).
+- [x] A.2 Телефон: включён режим разработчика и отладка по USB (или создан эмулятор). **Отложено:** проверка устройства; этап 1 выполняется на эмуляторе.
+- [x] A.3 Установлен `git`; создан репозиторий; `.gitignore` для Android + `local.properties`, `*.jks`, `*.keystore`, `spike/auth*.json`, `.serena/cache/`.
+- [x] A.4 Установлен Codex CLI, выполнен вход, `codex` запускается в папке проекта.
+- [x] A.5 Установлен `uv`; Serena: `uv tool install -p 3.13 serena-agent`, затем `serena init`.
+- [x] A.6 В `~/.codex/config.toml` добавлены Serena и Context7 (блок ниже).
+- [x] A.7 Ключ Context7 (бесплатный, с context7.com/dashboard) лежит в переменной окружения `CONTEXT7_API_KEY`, не в репозитории. **Отложено:** ключ не задан; до его добавления работаем без Context7.
+- [x] A.8 В корне репозитория лежат `AGENTS.md`, `docs/` и `scripts/check_docs.py`.
 
 Блок для `~/.codex/config.toml`:
 ```toml

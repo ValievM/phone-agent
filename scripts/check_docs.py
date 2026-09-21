@@ -17,7 +17,7 @@ DOC_BUDGET = 14 * 1024        # one topic per file, roughly up to ~5k tokens
 STALE_NAMES = ['TZ_MVP.md', 'ARCHITECTURE.md', 'DESIGN.md', 'DEV_STAGES.md']
 PLANNED = {'docs/backend-notes.md', 'docs/measurements.md', 'docs/INSTALL.md'}
 PLANNED_PREFIXES = ('docs/adr/',)
-SKIP_DIRS = {'.git', 'build', '.gradle', 'node_modules', '.serena', '.idea'}
+SKIP_DIRS = {'.git', 'build', '.gradle', 'node_modules', '.serena', '.idea', '.air'}
 
 LINK_RE = re.compile(r'\[[^\]]*\]\(([^)\s]+)\)')
 TICK_PATH_RE = re.compile(r'`((?:docs/|\.\./)[\w./-]+\.md|AGENTS\.md)`')
