@@ -5,7 +5,7 @@
 **Цель:** пользователь входит, токен хранится безопасно и обновляется сам.
 
 - [ ] 2.1 Интерфейс `AuthProvider` и модель состояния (`SignedOut`, `SigningIn`, `SignedIn`, `Error`).
-- [ ] 2.2 `TokenStore`: DataStore + AES-GCM, ключ в Android Keystore (не `EncryptedSharedPreferences`).
+- [x] 2.2 `TokenStore`: DataStore + AES-GCM, ключ в Android Keystore (не `EncryptedSharedPreferences`).
 - [ ] 2.3 PKCE: генерация `code_verifier` и `code_challenge` (S256), `state`; unit-тесты.
 - [ ] 2.4 `ChatGptBrowserAuth`: Custom Tab + приёмник на `127.0.0.1:1455`, проверка `state`, обмен кода на токены, закрытие приёмника, таймаут.
 - [ ] 2.5 `ChatGptDeviceCodeAuth`: показ кода, опрос по `interval`, лимит 15 минут; подсказка про переключатель Device code authorization.

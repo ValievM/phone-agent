@@ -1,0 +1,104 @@
+package com.example.phoneagent.data.auth
+
+public enum class AuthMethod {
+    CHATGPT_BROWSER,
+    API_KEY,
+    CHATGPT_DEVICE_CODE,
+}
+
+public sealed interface AuthState {
+    public data object SignedOut : AuthState
+
+    public data class SigningIn(
+        public val method: AuthMethod,
+    ) : AuthState
+
+    public data class SignedIn(
+        public val method: AuthMethod,
+        public val accountId: String?,
+    ) : AuthState
+
+    public data class Error(
+        public val method: AuthMethod?,
+        public val failure: AuthFailure,
+    ) : AuthState
+}
+
+public sealed interface AuthFailure {
+    public data object InvalidGrant : AuthFailure
+
+    public data object StateMismatch : AuthFailure
+
+    public data object MissingAuthorizationCode : AuthFailure
+
+    public data object TimedOut : AuthFailure
+
+    public data object MalformedToken : AuthFailure
+
+    public class Network(
+        message: String?,
+    ) : AuthFailure {
+        public val message: String? = message?.takeUnless(String::isBlank)?.let { SAFE_MESSAGE }
+
+        override fun equals(other: Any?): Boolean = other is Network && message == other.message
+
+        override fun hashCode(): Int = message.hashCode()
+
+        override fun toString(): String = "Network(message=$message)"
+
+        private companion object {
+            private const val SAFE_MESSAGE = "Network request failed"
+        }
+    }
+}
+
+public data class AuthTokens(
+    public val accessToken: String,
+    public val idToken: String?,
+    public val refreshToken: String?,
+    public val accessTokenExpiresAtEpochSeconds: Long?,
+    public val earliestRefreshAtEpochSeconds: Long?,
+) {
+    override fun toString(): String =
+        "AuthTokens(accessToken=<redacted>, idToken=<redacted>, refreshToken=<redacted>, " +
+            "accessTokenExpiresAtEpochSeconds=$accessTokenExpiresAtEpochSeconds, " +
+            "earliestRefreshAtEpochSeconds=$earliestRefreshAtEpochSeconds)"
+}
+
+public sealed interface AuthResult {
+    public data class Success(
+        public val tokens: AuthTokens,
+    ) : AuthResult
+
+    public data class Failure(
+        public val failure: AuthFailure,
+    ) : AuthResult
+}
+
+public interface AuthProvider {
+    public val method: AuthMethod
+
+    public suspend fun signIn(): AuthResult
+}
+
+public sealed interface RefreshResult {
+    public data class Success(
+        public val tokens: AuthTokens,
+    ) : RefreshResult
+
+    public data class Failure(
+        public val failure: AuthFailure,
+    ) : RefreshResult
+}
+
+public interface TokenRefreshGateway {
+    public suspend fun refresh(refreshToken: String): RefreshResult
+}
+
+public interface TokenStore {
+    public suspend fun read(): AuthTokens?
+
+    public suspend fun write(tokens: AuthTokens)
+
+    public suspend fun clear()
+}
