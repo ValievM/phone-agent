@@ -15,6 +15,7 @@ internal data class OutputItemDoneDto(
 
 @Serializable
 internal data class OutputItemDto(
+    val id: String? = null,
     val type: String,
     @SerialName("call_id") val callId: String? = null,
     val name: String? = null,

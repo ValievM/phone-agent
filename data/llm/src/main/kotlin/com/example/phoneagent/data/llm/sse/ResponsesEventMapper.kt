@@ -2,6 +2,7 @@ package com.example.phoneagent.data.llm.sse
 
 import com.example.phoneagent.data.llm.dto.ErrorEventDto
 import com.example.phoneagent.data.llm.dto.OutputItemDoneDto
+import com.example.phoneagent.data.llm.dto.OutputItemDto
 import com.example.phoneagent.data.llm.dto.OutputTextDeltaDto
 import com.example.phoneagent.data.llm.dto.ResponseCompletedDto
 import com.example.phoneagent.domain.agent.AgentError
@@ -41,14 +42,18 @@ internal fun RawSseEvent.toModelEvent(): ModelEvent? =
 private fun RawSseEvent.functionCallOrNull(): ModelEvent? {
     val item = relaxedJson.decodeFromString(OutputItemDoneDto.serializer(), data).item
     if (item.type != ITEM_TYPE_FUNCTION_CALL) return null
-    return item.callId?.let { callId ->
-        item.name?.let { name ->
-            item.arguments?.let { rawArguments ->
-                val arguments = relaxedJson.parseToJsonElement(rawArguments).jsonObject
-                ModelEvent.ToolCallRequested(ToolCall(id = callId, name = name, arguments = arguments))
-            }
-        }
-    }
+    return item.toToolCallOrNull()?.let(ModelEvent::ToolCallRequested) ?: ModelEvent.Failed(AgentError.ProtocolChanged)
+}
+
+private fun OutputItemDto.toToolCallOrNull(): ToolCall? {
+    if (listOf(id, callId, name, arguments).any { it == null }) return null
+    val parsedArguments = relaxedJson.parseToJsonElement(requireNotNull(arguments)).jsonObject
+    return ToolCall(
+        id = requireNotNull(callId),
+        name = requireNotNull(name),
+        arguments = parsedArguments,
+        itemId = requireNotNull(id),
+    )
 }
 
 private fun RawSseEvent.completed(): ModelEvent {

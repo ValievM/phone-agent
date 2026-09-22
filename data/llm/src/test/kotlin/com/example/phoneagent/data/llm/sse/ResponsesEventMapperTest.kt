@@ -22,6 +22,7 @@ class ResponsesEventMapperTest {
                         id = "call_lc67V6YnD8BFjY08ck8WFDSy",
                         name = "get_local_time",
                         arguments = Json.parseToJsonElement("""{"city":"Москва"}""").jsonObject,
+                        itemId = "fc_01aa497345b1cc25016ab1a1767a2487d2a9e6bb5666a9d3f3",
                     ),
                 ),
                 ModelEvent.Completed(Usage(inputTokens = 160, outputTokens = 19)),

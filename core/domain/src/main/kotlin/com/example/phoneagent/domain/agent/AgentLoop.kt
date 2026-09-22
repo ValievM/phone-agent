@@ -56,7 +56,7 @@ public class AgentLoop(
                     return@flow
                 }
                 for (call in turn.toolCalls) {
-                    newItems += HistoryItem.ToolCallItem(idGenerator.newId(), call.id, call.name, call.arguments)
+                    newItems += HistoryItem.ToolCallItem(call.itemId, call.id, call.name, call.arguments)
                     newItems += runToolCall(call)
                 }
             }

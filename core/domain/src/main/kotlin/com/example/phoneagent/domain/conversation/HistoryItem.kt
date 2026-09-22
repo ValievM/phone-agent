@@ -40,4 +40,6 @@ public data class ToolCall(
     public val id: String,
     public val name: String,
     public val arguments: JsonObject,
+    /** Provider-issued ID of the function-call item, required when echoing it in the next turn. */
+    public val itemId: String = id,
 )

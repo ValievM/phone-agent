@@ -63,7 +63,7 @@ class AgentLoopTest {
     @Test
     fun `a single tool call is executed and its output feeds the next model step`() =
         runTest {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall("call-1", "get_time", buildJsonObject {}, itemId = "fc-1")
             gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
             gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("It's noon"), ModelEvent.Completed()))
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
@@ -79,9 +79,9 @@ class AgentLoopTest {
                     AgentEvent.TurnCompleted(
                         listOf(
                             HistoryItem.UserMessage("id-1", "what time is it"),
-                            HistoryItem.ToolCallItem("id-2", "call-1", "get_time", buildJsonObject {}),
-                            HistoryItem.ToolOutput("id-3", "call-1", "noon"),
-                            HistoryItem.AssistantMessage("id-4", "It's noon"),
+                            HistoryItem.ToolCallItem("fc-1", "call-1", "get_time", buildJsonObject {}),
+                            HistoryItem.ToolOutput("id-2", "call-1", "noon"),
+                            HistoryItem.AssistantMessage("id-3", "It's noon"),
                         ),
                     ),
                 ),
