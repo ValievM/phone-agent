@@ -30,8 +30,9 @@ internal class AlarmTool
             )
 
         override fun describe(args: JsonObject): CallDescription {
-            val alarmArgs = decodeArgs(args)
-                ?: return CallDescription(title = "Поставить будильник", summary = "С неверными параметрами")
+            val alarmArgs =
+                decodeArgs(args)
+                    ?: return CallDescription(title = "Поставить будильник", summary = "С неверными параметрами")
             val label = alarmArgs.message?.let { ". Название: $it" }.orEmpty()
             return CallDescription(
                 title = "Поставить будильник",
@@ -42,18 +43,21 @@ internal class AlarmTool
         override suspend fun execute(
             args: JsonObject,
             context: ToolContext,
-        ): ToolResult =
-            decodeArgs(args)?.let(::executeAlarm) ?: ToolResult.Failed("Неверные параметры будильника")
+        ): ToolResult = decodeArgs(args)?.let(::executeAlarm) ?: ToolResult.Failed("Неверные параметры будильника")
 
         private fun executeAlarm(alarmArgs: AlarmArgs): ToolResult =
             when (val validation = validateAlarmArgs(alarmArgs)) {
-                is AlarmValidationResult.Invalid -> ToolResult.Failed(validation.reason)
-                AlarmValidationResult.Valid ->
+                is AlarmValidationResult.Invalid -> {
+                    ToolResult.Failed(validation.reason)
+                }
+
+                AlarmValidationResult.Valid -> {
                     when (intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))) {
                         AlarmLaunchResult.Started -> ToolResult.Success("Запрос на будильник отправлен")
                         AlarmLaunchResult.NoClockApp -> ToolResult.Failed("Не найдено приложение «Часы»")
                         AlarmLaunchResult.Failed -> ToolResult.Failed("Не удалось отправить запрос на будильник")
                     }
+                }
             }
     }
 
@@ -75,7 +79,13 @@ private val alarmInputSchema: JsonObject =
                 put("type", JsonPrimitive("string"))
             }
         }
-        put("required", buildJsonArray { add(JsonPrimitive("hour")); add(JsonPrimitive("minute")) })
+        put(
+            "required",
+            buildJsonArray {
+                add(JsonPrimitive("hour"))
+                add(JsonPrimitive("minute"))
+            },
+        )
         put("additionalProperties", JsonPrimitive(false))
     }
 
