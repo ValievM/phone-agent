@@ -1,9 +1,9 @@
 package com.example.phoneagent.tools.notify
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -14,6 +14,9 @@ internal class AndroidNotifier
     constructor(
         @param:ApplicationContext private val applicationContext: Context,
     ) : Notifier {
+        // POST_NOTIFICATIONS is gated by NotifyTool calling UserInteraction.ensure(NOTIFICATIONS)
+        // before this is ever invoked; lint can't see across that call, hence the suppression.
+        @SuppressLint("MissingPermission")
         override fun notify(
             title: String,
             message: String,
@@ -32,9 +35,8 @@ internal class AndroidNotifier
             NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, notification)
         }
 
+        // minSdk is already 26 (O); no version gate needed to create a notification channel.
         private fun createChannelIfNeeded() {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-
             val channel =
                 NotificationChannel(
                     NOTIFICATION_CHANNEL_ID,
