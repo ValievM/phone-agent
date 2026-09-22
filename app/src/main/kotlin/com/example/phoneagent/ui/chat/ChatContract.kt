@@ -1,6 +1,9 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
+import kotlinx.serialization.json.JsonObject
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -12,13 +15,20 @@ data class ChatMessage(
     val id: String,
     val role: ChatRole,
     val text: String,
+    /** Non-null only for [ChatRole.TOOL]; drives [com.example.phoneagent.ui.designsystem.components.ToolCallCard]. */
+    val toolCall: ToolCallMessage? = null,
+)
+
+data class ToolCallMessage(
+    val status: ToolCallStatus,
+    val description: CallDescription,
+    val arguments: JsonObject,
+    val expanded: Boolean = false,
 )
 
 enum class ChatRole {
     USER,
     ASSISTANT,
-
-    /** Renders as a plain line for now; stage-4/tool-call-ui's ToolCallCard will replace this rendering. */
     TOOL,
 }
 
@@ -28,6 +38,10 @@ sealed interface ChatUiEvent {
     ) : ChatUiEvent
 
     data object Stop : ChatUiEvent
+
+    data class ToggleToolCallDetails(
+        val messageId: String,
+    ) : ChatUiEvent
 
     data object DismissError : ChatUiEvent
 }

@@ -48,6 +48,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.ui.designsystem.components.ToolCallCard
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
@@ -130,6 +131,7 @@ private fun ChatBody(
             }
             MessageList(
                 messages = state.messages,
+                onEvent = onEvent,
                 modifier =
                     Modifier
                         .weight(1f)
@@ -147,6 +149,7 @@ private fun ChatBody(
 @Composable
 private fun MessageList(
     messages: List<ChatMessage>,
+    onEvent: (ChatUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (messages.isEmpty()) {
@@ -181,7 +184,7 @@ private fun MessageList(
                 key = ChatMessage::id,
                 contentType = ChatMessage::role,
             ) { message ->
-                Message(message)
+                Message(message, onEvent)
             }
         }
     }
@@ -190,11 +193,21 @@ private fun MessageList(
 @Composable
 private fun Message(
     message: ChatMessage,
+    onEvent: (ChatUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (message.role) {
-        ChatRole.TOOL -> ToolMessage(message, modifier)
-        else -> BubbleMessage(message, modifier)
+    val toolCall = message.toolCall
+    if (toolCall != null) {
+        ToolCallCard(
+            state = toolCall.status,
+            description = toolCall.description,
+            arguments = toolCall.arguments,
+            expanded = toolCall.expanded,
+            onExpandToggle = { onEvent(ChatUiEvent.ToggleToolCallDetails(message.id)) },
+            modifier = modifier,
+        )
+    } else {
+        BubbleMessage(message, modifier)
     }
 }
 
@@ -241,25 +254,6 @@ private fun BubbleMessage(
             }
         }
     }
-}
-
-// Temporary until stage-4/tool-call-ui's real ToolCallCard (design/components.md) is wired in.
-@Composable
-private fun ToolMessage(
-    message: ChatMessage,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = message.text,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = AppTheme.spacing.medium, vertical = AppTheme.spacing.small),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodyMedium,
-    )
 }
 
 @Composable

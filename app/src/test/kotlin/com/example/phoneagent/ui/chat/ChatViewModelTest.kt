@@ -3,6 +3,7 @@ package com.example.phoneagent.ui.chat
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
+import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
@@ -11,8 +12,15 @@ import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
+import com.example.phoneagent.domain.tools.ToolResult
+import com.example.phoneagent.domain.tools.ToolSpec
+import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -23,8 +31,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +46,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private val interaction = FakeUserInteraction()
 
     @Before
     fun setUp() {
@@ -116,19 +128,128 @@ class ChatViewModelTest {
             )
         }
 
-    private fun agentLoop(gateway: ModelGateway): AgentLoop =
+    @Test
+    fun `a SAFE tool call renders as a card that goes from running to done`() =
+        runTest(dispatcher.scheduler) {
+            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
+            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+
+            viewModel.onEvent(ChatUiEvent.Submit("который час"))
+            advanceUntilIdle()
+
+            val toolMessage =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+            assertEquals(ToolCallStatus.Done("noon"), toolMessage.toolCall?.status)
+        }
+
+    @Test
+    fun `a CONFIRM tool call shows awaiting approval before the user decides`() =
+        runTest(dispatcher.scheduler) {
+            interaction.approvalResult = false
+            val call = ToolCall("call-1", "set_alarm", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val registry = ToolRegistry(setOf(fakeTool("set_alarm", risk = Risk.CONFIRM) { ToolResult.Success("set") }))
+            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+
+            viewModel.onEvent(ChatUiEvent.Submit("поставь будильник"))
+            advanceUntilIdle()
+
+            val toolMessage =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+            assertEquals(ToolCallStatus.Rejected, toolMessage.toolCall?.status)
+        }
+
+    @Test
+    fun `toggling a tool call flips its expanded state`() =
+        runTest(dispatcher.scheduler) {
+            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
+            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            viewModel.onEvent(ChatUiEvent.Submit("который час"))
+            advanceUntilIdle()
+            val id =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .id
+
+            viewModel.onEvent(ChatUiEvent.ToggleToolCallDetails(id))
+
+            assertTrue(
+                viewModel.state.value.messages
+                    .first { it.id == id }
+                    .toolCall
+                    ?.expanded == true,
+            )
+        }
+
+    @Test
+    fun `stopping while a tool call is pending marks its card cancelled`() =
+        runTest(dispatcher.scheduler) {
+            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val gateway = HangingAfterToolCallGateway(call)
+            val registry = ToolRegistry(setOf(fakeTool("get_time") { awaitCancellation() }))
+            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+
+            viewModel.onEvent(ChatUiEvent.Submit("который час"))
+            // Not advanceUntilIdle(): ToolPipeline wraps execute() in a 5s withTimeout, and
+            // advanceUntilIdle() would fast-forward straight past it before Stop ever runs.
+            runCurrent()
+
+            viewModel.onEvent(ChatUiEvent.Stop)
+            advanceUntilIdle()
+
+            val toolMessage =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+            assertEquals(ToolCallStatus.Cancelled, toolMessage.toolCall?.status)
+        }
+
+    private fun agentLoop(
+        gateway: ModelGateway,
+        registry: ToolRegistry = ToolRegistry(emptySet()),
+    ): AgentLoop =
         AgentLoop(
             modelGateway = gateway,
             toolPipeline =
                 ToolPipeline(
-                    registry = ToolRegistry(emptySet()),
-                    userInteraction = FakeUserInteraction(),
+                    registry = registry,
+                    userInteraction = interaction,
                     clock = FakeClock(),
                     logger = FakeAppLogger(),
                 ),
             contextWindowPolicy = ContextWindowPolicy { it },
             idGenerator = FakeIdGenerator(),
         )
+
+    private fun fakeTool(
+        name: String,
+        risk: Risk = Risk.SAFE,
+        execute: suspend () -> ToolResult,
+    ): Tool =
+        object : Tool {
+            override val spec = ToolSpec(name, "does $name", buildJsonObject {}, risk)
+
+            override fun describe(args: JsonObject): CallDescription = CallDescription(name, "calling $name")
+
+            override suspend fun execute(
+                args: JsonObject,
+                context: ToolContext,
+            ): ToolResult = execute()
+        }
 
     private class HangingModelGateway : ModelGateway {
         var wasCancelled: Boolean = false
@@ -141,6 +262,17 @@ class ChatViewModelTest {
                 } finally {
                     wasCancelled = true
                 }
+            }
+    }
+
+    /** First call requests a tool (that itself never returns); a second call would hang forever if made. */
+    private class HangingAfterToolCallGateway(
+        private val call: ToolCall,
+    ) : ModelGateway {
+        override fun stream(request: ModelRequest): Flow<ModelEvent> =
+            flow {
+                emit(ModelEvent.ToolCallRequested(call))
+                emit(ModelEvent.Completed())
             }
     }
 }

@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.tools.ToolOutcome
+import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,12 +32,17 @@ class ChatViewModel
         private var history: List<HistoryItem> = emptyList()
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
+        // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
+        // the one an ApprovalRequested (which carries no call id of its own) belongs to.
+        private var lastToolMessageId: String? = null
+
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
 
         fun onEvent(event: ChatUiEvent) {
             when (event) {
                 is ChatUiEvent.Submit -> submit(event.text)
                 ChatUiEvent.Stop -> runningJob?.cancel()
+                is ChatUiEvent.ToggleToolCallDetails -> toggleToolCallDetails(event.messageId)
                 ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null) }
             }
         }
@@ -68,18 +74,25 @@ class ChatViewModel
                                     assistantMessageId = null
                                     val id = nextId()
                                     toolMessageIdByCallId[event.call.id] = id
-                                    val summary = "${event.description.title}: ${event.description.summary}"
-                                    mutableState.update { it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, summary)) }
+                                    lastToolMessageId = id
+                                    val toolCall =
+                                        ToolCallMessage(
+                                            status = ToolCallStatus.Running,
+                                            description = event.description,
+                                            arguments = event.call.arguments,
+                                        )
+                                    mutableState.update {
+                                        it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, "", toolCall = toolCall))
+                                    }
+                                }
+
+                                is AgentEvent.ApprovalRequested -> {
+                                    lastToolMessageId?.let { updateToolCallStatus(it, ToolCallStatus.AwaitingApproval) }
                                 }
 
                                 is AgentEvent.ToolCallFinished -> {
                                     val id = toolMessageIdByCallId.remove(event.call.id)
-                                    if (id != null) replaceMessageText(id, event.outcome.toDisplayText())
-                                }
-
-                                is AgentEvent.ApprovalRequested -> {
-                                    // Rendered by the app-wide InteractionHost, not the chat feed itself.
-                                    Unit
+                                    if (id != null) updateToolCallStatus(id, event.outcome.toCardStatus())
                                 }
 
                                 is AgentEvent.TurnCompleted -> {
@@ -93,7 +106,7 @@ class ChatViewModel
                             }
                         }
                     } finally {
-                        // Runs on normal completion, a Failed event, and on Stop (job.cancel()) alike.
+                        cancelPendingToolCalls()
                         mutableState.update { it.copy(isRunning = false) }
                     }
                 }
@@ -115,21 +128,55 @@ class ChatViewModel
             }
         }
 
-        private fun replaceMessageText(
+        private fun updateToolCallStatus(
             id: String,
-            text: String,
+            status: ToolCallStatus,
         ) {
             mutableState.update { state ->
-                state.copy(messages = state.messages.map { message -> if (message.id == id) message.copy(text = text) else message })
+                state.copy(
+                    messages =
+                        state.messages.map { message ->
+                            val toolCall = message.toolCall
+                            if (message.id == id && toolCall != null) {
+                                message.copy(toolCall = toolCall.copy(status = status))
+                            } else {
+                                message
+                            }
+                        },
+                )
             }
+        }
+
+        private fun toggleToolCallDetails(id: String) {
+            mutableState.update { state ->
+                state.copy(
+                    messages =
+                        state.messages.map { message ->
+                            val toolCall = message.toolCall
+                            if (message.id == id && toolCall != null) {
+                                message.copy(toolCall = toolCall.copy(expanded = !toolCall.expanded))
+                            } else {
+                                message
+                            }
+                        },
+                )
+            }
+        }
+
+        // Stop leaves any tool call that never got a ToolCallFinished stuck showing "waiting" or
+        // "running" forever; the card's own "прервано" state exists exactly for this.
+        private fun cancelPendingToolCalls() {
+            val pendingIds = toolMessageIdByCallId.values.toList()
+            toolMessageIdByCallId.clear()
+            pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
 
-        private fun ToolOutcome.toDisplayText(): String =
+        private fun ToolOutcome.toCardStatus(): ToolCallStatus =
             when (this) {
-                is ToolOutcome.Success -> text
-                is ToolOutcome.Rejected -> ChatCopy.toolRejected(reason)
-                is ToolOutcome.Failed -> ChatCopy.toolFailed(reason)
+                is ToolOutcome.Success -> ToolCallStatus.Done(text)
+                is ToolOutcome.Rejected -> ToolCallStatus.Rejected
+                is ToolOutcome.Failed -> ToolCallStatus.Failed(reason)
             }
     }

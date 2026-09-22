@@ -2,6 +2,7 @@ package com.example.phoneagent.domain.interaction
 
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
+import kotlinx.serialization.json.JsonObject
 
 public enum class Capability {
     NOTIFICATIONS,
@@ -13,9 +14,11 @@ public sealed interface CapabilityResult {
     public data object Denied : CapabilityResult
 }
 
+/** [arguments]: the raw call arguments, so the confirmation UI can show them (e.g. monospace) alongside [description]. */
 public data class ApprovalRequest(
     public val description: CallDescription,
     public val risk: Risk,
+    public val arguments: JsonObject,
 )
 
 public interface UserInteraction {

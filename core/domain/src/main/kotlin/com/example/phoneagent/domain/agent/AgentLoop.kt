@@ -94,7 +94,7 @@ public class AgentLoop(
         val description = toolPipeline.describe(call.name, call.arguments) ?: unknownToolDescription(call.name)
         emit(AgentEvent.ToolCallStarted(call, description))
         toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE }?.let { risk ->
-            emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk)))
+            emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
         }
         val outcome = toolPipeline.run(call.name, call.arguments)
         emit(AgentEvent.ToolCallFinished(call, outcome))

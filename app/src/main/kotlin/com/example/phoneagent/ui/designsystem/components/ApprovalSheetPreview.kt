@@ -14,18 +14,6 @@ import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-@Composable
-private fun previewApprovalRequest(): ApprovalRequest =
-    ApprovalRequest(
-        description =
-            CallDescription(
-                title = stringResource(R.string.preview_tool_call_title),
-                summary = stringResource(R.string.preview_tool_call_summary),
-                details = listOf(stringResource(R.string.preview_tool_call_details)),
-            ),
-        risk = Risk.CONFIRM,
-    )
-
 private const val PREVIEW_ALARM_HOUR = 7
 
 private const val PREVIEW_ALARM_MINUTE = 30
@@ -36,6 +24,19 @@ private fun previewArguments() =
         put("minute", PREVIEW_ALARM_MINUTE)
         put("label", "Работа")
     }
+
+@Composable
+private fun previewApprovalRequest(): ApprovalRequest =
+    ApprovalRequest(
+        description =
+            CallDescription(
+                title = stringResource(R.string.preview_tool_call_title),
+                summary = stringResource(R.string.preview_tool_call_summary),
+                details = listOf(stringResource(R.string.preview_tool_call_details)),
+            ),
+        risk = Risk.CONFIRM,
+        arguments = previewArguments(),
+    )
 
 @PreviewLightDark
 @Composable

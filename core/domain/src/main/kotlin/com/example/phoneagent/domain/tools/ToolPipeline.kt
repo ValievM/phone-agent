@@ -74,7 +74,7 @@ public class ToolPipeline(
     ): Boolean =
         when (tool.spec.risk) {
             Risk.SAFE -> true
-            Risk.CONFIRM, Risk.SENSITIVE -> userInteraction.confirm(ApprovalRequest(tool.describe(args), tool.spec.risk))
+            Risk.CONFIRM, Risk.SENSITIVE -> userInteraction.confirm(ApprovalRequest(tool.describe(args), tool.spec.risk, args))
         }
 
     private suspend fun execute(
