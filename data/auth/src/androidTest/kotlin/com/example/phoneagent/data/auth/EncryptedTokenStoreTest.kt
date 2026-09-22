@@ -2,6 +2,7 @@ package com.example.phoneagent.data.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,7 +16,7 @@ class EncryptedTokenStoreTest {
     fun writesEncryptedTokensReadsAndClears() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val store = EncryptedTokenStore(context)
+            val store = EncryptedTokenStore(context, FakeAppLogger())
             val tokens =
                 AuthTokens(
                     accessToken = "instrumented-access-token",

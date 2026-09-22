@@ -20,4 +20,5 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(testFixtures(project(":core:domain")))
 }

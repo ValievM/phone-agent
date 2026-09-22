@@ -31,14 +31,20 @@ public class AndroidLogcatLogger(
         fields: Map<String, String>,
         throwable: Throwable?,
     ) {
+        // Fields must be folded into the Logcat message itself: Log.d/i/w/e take no structured
+        // payload, so a field passed only to the ring-buffer file would be invisible in Logcat.
+        val fullMessage = message + fieldsSuffix(fields)
         when (level) {
-            LogLevel.DEBUG -> Log.d(tag, message, throwable)
-            LogLevel.INFO -> Log.i(tag, message, throwable)
-            LogLevel.WARN -> Log.w(tag, message, throwable)
-            LogLevel.ERROR -> Log.e(tag, message, throwable)
+            LogLevel.DEBUG -> Log.d(tag, fullMessage, throwable)
+            LogLevel.INFO -> Log.i(tag, fullMessage, throwable)
+            LogLevel.WARN -> Log.w(tag, fullMessage, throwable)
+            LogLevel.ERROR -> Log.e(tag, fullMessage, throwable)
         }
-        appendToFile(formatLine(level, tag, message, fields, throwable))
+        appendToFile(formatLine(level, tag, fullMessage, throwable))
     }
+
+    private fun fieldsSuffix(fields: Map<String, String>): String =
+        if (fields.isEmpty()) "" else " " + fields.entries.joinToString(" ") { (key, value) -> "$key=$value" }
 
     private fun appendToFile(line: String) {
         synchronized(lock) {
@@ -50,13 +56,11 @@ public class AndroidLogcatLogger(
     private fun formatLine(
         level: LogLevel,
         tag: String,
-        message: String,
-        fields: Map<String, String>,
+        fullMessage: String,
         throwable: Throwable?,
     ): String {
-        val fieldsText = if (fields.isEmpty()) "" else " " + fields.entries.joinToString(" ") { (key, value) -> "$key=$value" }
         val throwableText = throwable?.let { " | ${it::class.qualifiedName}: ${it.message}" }.orEmpty()
-        return "${System.currentTimeMillis()} $level/$tag: $message$fieldsText$throwableText"
+        return "${System.currentTimeMillis()} $level/$tag: $fullMessage$throwableText"
     }
 
     private companion object {

@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.error
+import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,6 +21,7 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 private const val UTF_8: String = "UTF-8"
+private const val TAG: String = "ChatGptBrowserAuth"
 
 public fun interface BrowserLauncher {
     public fun open(url: String)
@@ -66,6 +70,7 @@ public interface CallbackReceiver {
 }
 
 public class LoopbackCallbackReceiver(
+    private val logger: AppLogger,
     private val port: Int = LOOPBACK_PORT,
 ) : CallbackReceiver {
     private var serverSocket: ServerSocket? = null
@@ -81,7 +86,10 @@ public class LoopbackCallbackReceiver(
         } catch (_: BindException) {
             close()
             CallbackReceiverStartResult.Failure(AuthFailure.LoopbackPortUnavailable)
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            // Unlike the port-busy case above, this is unexpected (e.g. a missing runtime
+            // permission or an OS-level socket restriction) and worth a trace to diagnose.
+            logger.warn(TAG, "failed to start the OAuth loopback receiver", throwable = exception)
             close()
             CallbackReceiverStartResult.Failure(AuthFailure.Network(null))
         }
@@ -100,7 +108,8 @@ public class LoopbackCallbackReceiver(
                 CallbackResult.TimedOut
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                logger.warn(TAG, "OAuth loopback callback failed", throwable = exception)
                 CallbackResult.Failure(AuthFailure.Network(null))
             }
         }
@@ -144,6 +153,7 @@ public class ChatGptBrowserAuth(
     private val callbackReceiver: CallbackReceiver,
     private val browserLauncher: BrowserLauncher,
     private val tokenGateway: TokenRefreshGateway,
+    private val logger: AppLogger,
     private val entropy: AuthEntropy = SecureAuthEntropy,
     private val timeoutMillis: Long = CALLBACK_TIMEOUT_MILLIS,
 ) : AuthProvider {
@@ -192,7 +202,11 @@ public class ChatGptBrowserAuth(
             }
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            // This is exactly the catch that once hid a plain Android bug (missing
+            // FLAG_ACTIVITY_NEW_TASK) behind a generic "network" error — always log the real
+            // exception here so the next surprise doesn't cost an hour of guessing.
+            logger.error(TAG, "browser sign-in threw an unexpected exception", throwable = exception)
             AuthResult.Failure(AuthFailure.Network(null))
         } finally {
             callbackReceiver.close()

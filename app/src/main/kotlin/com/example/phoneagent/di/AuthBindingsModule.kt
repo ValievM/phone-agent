@@ -71,8 +71,9 @@ internal object AuthNetworkModule {
     @Singleton
     fun provideTokenGateway(
         config: AuthConfig,
+        logger: AppLogger,
         client: OkHttpClient,
-    ): TokenRefreshGateway = OkHttpTokenRefreshGateway(config, client)
+    ): TokenRefreshGateway = OkHttpTokenRefreshGateway(config, logger, client)
 
     @Provides
     @Singleton
@@ -103,11 +104,12 @@ internal object AuthRuntimeModule {
     @Singleton
     fun provideTokenStore(
         @ApplicationContext context: Context,
-    ): TokenStore = EncryptedTokenStore(context)
+        logger: AppLogger,
+    ): TokenStore = EncryptedTokenStore(context, logger)
 
     @Provides
     @Singleton
-    fun provideCallbackReceiver(): CallbackReceiver = LoopbackCallbackReceiver()
+    fun provideCallbackReceiver(logger: AppLogger): CallbackReceiver = LoopbackCallbackReceiver(logger)
 
     @Provides
     @Singleton
@@ -122,7 +124,8 @@ internal object AuthRuntimeModule {
         receiver: CallbackReceiver,
         launcher: BrowserLauncher,
         tokenGateway: TokenRefreshGateway,
-    ): ChatGptBrowserAuth = ChatGptBrowserAuth(config, receiver, launcher, tokenGateway)
+        logger: AppLogger,
+    ): ChatGptBrowserAuth = ChatGptBrowserAuth(config, receiver, launcher, tokenGateway, logger)
 
     @Provides
     @Singleton

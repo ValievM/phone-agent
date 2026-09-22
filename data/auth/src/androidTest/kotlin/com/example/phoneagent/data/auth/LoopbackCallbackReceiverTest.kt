@@ -2,6 +2,7 @@ package com.example.phoneagent.data.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -25,7 +26,7 @@ class LoopbackCallbackReceiverTest {
     private fun receivesCallbackFrom(host: String) =
         runBlocking {
             val port = ServerSocket(0).use { it.localPort }
-            val receiver = LoopbackCallbackReceiver(port)
+            val receiver = LoopbackCallbackReceiver(FakeAppLogger(), port)
             val code = UUID.randomUUID().toString()
             val state = UUID.randomUUID().toString()
 

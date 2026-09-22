@@ -1,5 +1,6 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,6 +66,27 @@ class ChatGptBrowserAuthTest {
             assertFalse(gateway.exchanges.any { it.code == existingTokens.accessToken })
         }
 
+    @Test
+    fun `an unexpected exception is logged instead of disappearing silently`() =
+        runTest {
+            val logger = FakeAppLogger()
+            val boom = IllegalStateException("boom")
+            val auth =
+                ChatGptBrowserAuth(
+                    config = AuthConfig.ChatGptSubscription,
+                    callbackReceiver = FakeCallbackReceiver(CallbackResult.TimedOut),
+                    browserLauncher = BrowserLauncher { throw boom },
+                    tokenGateway = FakeTokenGateway(),
+                    logger = logger,
+                    entropy = FixedEntropy(),
+                )
+
+            val result = auth.signIn()
+
+            assertEquals(AuthResult.Failure(AuthFailure.Network(null)), result)
+            assertEquals(boom, logger.events.single().throwable)
+        }
+
     private fun browserAuth(
         receiver: CallbackReceiver,
         gateway: TokenRefreshGateway,
@@ -74,6 +96,7 @@ class ChatGptBrowserAuthTest {
             callbackReceiver = receiver,
             browserLauncher = FakeBrowserLauncher(),
             tokenGateway = gateway,
+            logger = FakeAppLogger(),
             entropy = FixedEntropy(),
         )
 

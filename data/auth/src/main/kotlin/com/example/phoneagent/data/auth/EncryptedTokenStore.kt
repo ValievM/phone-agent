@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -38,12 +40,14 @@ private const val REFRESH_TOKEN = "refresh_token"
 private const val EXPIRES_AT = "expires_at"
 private const val EARLIEST_REFRESH_AT = "earliest_refresh_at"
 private const val METHOD = "method"
+private const val TAG = "EncryptedTokenStore"
 
 private val Context.authTokenDataStore: DataStore<Preferences> by preferencesDataStore(name = DATA_STORE_NAME)
 private val encryptedTokensKey = stringPreferencesKey("encrypted_tokens")
 
 public class EncryptedTokenStore(
     context: Context,
+    private val logger: AppLogger,
 ) : TokenStore {
     private val dataStore: DataStore<Preferences> = context.applicationContext.authTokenDataStore
     private val cipher: AndroidKeystoreAesGcm = AndroidKeystoreAesGcm()
@@ -55,7 +59,11 @@ public class EncryptedTokenStore(
             }
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            // Silently treating this as "signed out" is the right user-facing behavior (a
+            // corrupted entry shouldn't crash the app), but without a log line a vanished
+            // session looks like a mystery instead of, say, a Keystore key wipe.
+            logger.warn(TAG, "failed to read the stored session, treating it as signed out", throwable = exception)
             null
         }
 

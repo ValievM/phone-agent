@@ -1,5 +1,7 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,8 +16,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 
+private const val TAG: String = "TokenRefreshGateway"
+
 public class OkHttpTokenRefreshGateway(
     private val config: AuthConfig,
+    private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
     private val nowEpochSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
 ) : TokenRefreshGateway {
@@ -52,16 +57,39 @@ public class OkHttpTokenRefreshGateway(
                 client.newCall(request).execute().use { response ->
                     val responseBody = response.body.string()
                     when {
-                        response.isSuccessful -> parseTokens(responseBody)
-                        responseBody.errorCode() == INVALID_GRANT -> GatewayResult.InvalidGrant
-                        else -> GatewayResult.Network
+                        response.isSuccessful -> {
+                            parseTokens(responseBody)
+                        }
+
+                        responseBody.errorCode() == INVALID_GRANT -> {
+                            GatewayResult.InvalidGrant
+                        }
+
+                        else -> {
+                            // A non-2xx response that isn't invalid_grant used to be collapsed into
+                            // a generic "network" failure with the real reason thrown away. The
+                            // OAuth "error" field (e.g. invalid_client, invalid_request) is not a
+                            // secret; only the raw response body is withheld.
+                            logger.warn(
+                                TAG,
+                                "token endpoint returned a non-success response",
+                                fields =
+                                    mapOf(
+                                        "httpStatus" to response.code.toString(),
+                                        "error" to (responseBody.errorCode() ?: "unknown"),
+                                    ),
+                            )
+                            GatewayResult.Network
+                        }
                     }
                 }
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: IOException) {
+            } catch (exception: IOException) {
+                logger.warn(TAG, "token endpoint request failed", throwable = exception)
                 GatewayResult.Network
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                logger.warn(TAG, "token endpoint response could not be parsed", throwable = exception)
                 GatewayResult.Malformed
             }
         }
@@ -84,7 +112,8 @@ public class OkHttpTokenRefreshGateway(
                     method = AuthMethod.CHATGPT_BROWSER,
                 ),
             )
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            logger.warn(TAG, "token endpoint success response could not be parsed", throwable = exception)
             GatewayResult.Malformed
         }
 

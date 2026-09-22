@@ -1,5 +1,6 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -38,6 +39,27 @@ class OkHttpTokenRefreshGatewayTest {
         runTest {
             serverWith(invalidGrantResponse()) { server ->
                 assertEquals(AuthResult.Failure(AuthFailure.InvalidGrant), gateway(server).exchangeAuthorizationCode(EXCHANGE))
+            }
+        }
+
+    @Test
+    fun `a non-success response other than invalid_grant logs the HTTP status and OAuth error instead of disappearing`() =
+        runTest {
+            val response =
+                MockResponse
+                    .Builder()
+                    .code(400)
+                    .body("""{"error":"invalid_client"}""")
+                    .build()
+            serverWith(response) { server ->
+                val logger = FakeAppLogger()
+
+                val result = gateway(server, logger).exchangeAuthorizationCode(EXCHANGE)
+
+                assertEquals(AuthResult.Failure(AuthFailure.Network(null)), result)
+                val logged = logger.events.single()
+                assertEquals("400", logged.fields["httpStatus"])
+                assertEquals("invalid_client", logged.fields["error"])
             }
         }
 
@@ -125,8 +147,10 @@ class OkHttpTokenRefreshGatewayTest {
             assertFalse(result.toString().contains("secret-refresh"))
         }
 
-    private fun gateway(server: MockWebServer): OkHttpTokenRefreshGateway =
-        OkHttpTokenRefreshGateway(config(server), nowEpochSeconds = { NOW_SECONDS })
+    private fun gateway(
+        server: MockWebServer,
+        logger: FakeAppLogger = FakeAppLogger(),
+    ): OkHttpTokenRefreshGateway = OkHttpTokenRefreshGateway(config(server), logger, nowEpochSeconds = { NOW_SECONDS })
 
     private fun config(server: MockWebServer): AuthConfig =
         AuthConfig("issuer", "authorize", server.url("/oauth/token").toString(), "client", "redirect", "scope", emptyMap())
