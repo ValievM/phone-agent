@@ -1,5 +1,9 @@
 package com.example.phoneagent.ui.chat
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -48,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallCard
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
@@ -59,10 +65,33 @@ fun ChatRoute(
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     ChatScreen(
         state = state,
         onEvent = viewModel::onEvent,
         onOpenSettings = onOpenSettings,
+        onOpenFile = { fileHit ->
+            if (!fileHit.hasContentUriScheme()) {
+                Toast.makeText(context, R.string.file_open_failed, Toast.LENGTH_LONG).show()
+            } else {
+                val viewIntent =
+                    Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(Uri.parse(fileHit.uri), fileHit.mime ?: "*/*")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                try {
+                    context.startActivity(
+                        Intent.createChooser(
+                            viewIntent,
+                            context.getString(R.string.file_open_chooser_title),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(context, R.string.file_open_failed, Toast.LENGTH_LONG).show()
+                } catch (_: SecurityException) {
+                    Toast.makeText(context, R.string.file_open_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        },
         modifier = modifier,
     )
 }
@@ -74,6 +103,7 @@ fun ChatScreen(
     onEvent: (ChatUiEvent) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenFile: (FileHit) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -94,6 +124,7 @@ fun ChatScreen(
         ChatBody(
             state = state,
             onEvent = onEvent,
+            onOpenFile = onOpenFile,
             modifier = Modifier.padding(contentPadding),
         )
     }
@@ -104,6 +135,7 @@ fun ChatScreen(
 private fun ChatBody(
     state: ChatUiState,
     onEvent: (ChatUiEvent) -> Unit,
+    onOpenFile: (FileHit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -132,6 +164,7 @@ private fun ChatBody(
             MessageList(
                 messages = state.messages,
                 onEvent = onEvent,
+                onOpenFile = onOpenFile,
                 modifier =
                     Modifier
                         .weight(1f)
@@ -150,6 +183,7 @@ private fun ChatBody(
 private fun MessageList(
     messages: List<ChatMessage>,
     onEvent: (ChatUiEvent) -> Unit,
+    onOpenFile: (FileHit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (messages.isEmpty()) {
@@ -184,7 +218,7 @@ private fun MessageList(
                 key = ChatMessage::id,
                 contentType = ChatMessage::role,
             ) { message ->
-                Message(message, onEvent)
+                Message(message, onEvent, onOpenFile)
             }
         }
     }
@@ -194,6 +228,7 @@ private fun MessageList(
 private fun Message(
     message: ChatMessage,
     onEvent: (ChatUiEvent) -> Unit,
+    onOpenFile: (FileHit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val toolCall = message.toolCall
@@ -205,6 +240,8 @@ private fun Message(
             expanded = toolCall.expanded,
             onExpandToggle = { onEvent(ChatUiEvent.ToggleToolCallDetails(message.id)) },
             modifier = modifier,
+            fileHits = toolCall.fileHits,
+            onOpenFile = onOpenFile,
         )
     } else {
         BubbleMessage(message, modifier)

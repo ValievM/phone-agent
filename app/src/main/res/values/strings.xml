@@ -54,4 +54,17 @@
     <string name="preview_tool_call_details">Сработает один раз, сегодня</string>
     <string name="preview_tool_call_result">Будильник поставлен на 07:30</string>
     <string name="preview_tool_call_reason">Приложение «Часы» не найдено</string>
+    <string name="files_found_heading">Найденные файлы</string>
+    <string name="file_search_completed">Найдено файлов: %1$d</string>
+    <string name="file_open_confirm_title">Открыть файл?</string>
+    <string name="file_size_format">Размер: %1$s</string>
+    <string name="file_size_unknown">Размер неизвестен</string>
+    <string name="file_open_action">Открыть</string>
+    <string name="file_cancel_action">Отмена</string>
+    <string name="file_open_chooser_title">Открыть файл с помощью</string>
+    <string name="file_open_failed">Не удалось открыть файл. Проверьте доступ или установите приложение для этого типа файла.</string>
+    <string name="preview_file_name">Отчёт за сентябрь.pdf</string>
+    <string name="preview_file_size">1,2 МБ</string>
+    <string name="preview_search_files_title">Поиск файлов</string>
+    <string name="preview_search_files_summary">По запросу «отчёт»</string>
 </resources>
