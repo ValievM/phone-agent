@@ -1,0 +1,154 @@
+package com.example.phoneagent.tools.files
+
+import com.example.phoneagent.domain.fakes.FakeAppLogger
+import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.fakes.FakeUserInteraction
+import com.example.phoneagent.domain.interaction.Capability
+import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolResult
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SearchFilesToolTest {
+    @Test
+    fun `requires files capability and skips querying when it is denied`() =
+        runTest {
+            val interaction = FakeUserInteraction().apply { capabilityResult = CapabilityResult.Denied }
+            val search = RecordingMediaStoreSearch()
+
+            val result = tool(interaction, search).execute(args("report"), context())
+
+            assertTrue(result is ToolResult.Failed)
+            assertEquals(listOf(Capability.FILES), interaction.capabilityRequests)
+            assertFalse(search.called)
+        }
+
+    @Test
+    fun `queries after capability is available and returns the structured result`() =
+        runTest {
+            val interaction = FakeUserInteraction()
+            val hit = SearchFileMetadata("report.pdf", "content://report", "Download/report.pdf", 42, 123, "application/pdf")
+            val search = RecordingMediaStoreSearch(records = listOf(hit))
+
+            val result = tool(interaction, search).execute(args("report"), context()) as ToolResult.Success
+            val root = Json.parseToJsonElement(result.text).jsonObject
+
+            assertEquals(listOf(Capability.FILES), interaction.capabilityRequests)
+            assertTrue(search.called)
+            assertEquals("report", search.query)
+            assertEquals(
+                "report.pdf",
+                root
+                    .getValue("items")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+                    .getValue("name")
+                    .jsonPrimitive.content,
+            )
+            assertEquals("false", root.getValue("truncated").jsonPrimitive.content)
+        }
+
+    @Test
+    fun `malformed arguments fail without requesting permission or querying`() =
+        runTest {
+            val interaction = FakeUserInteraction()
+            val search = RecordingMediaStoreSearch()
+
+            val result = tool(interaction, search).execute(buildJsonObject { put("query", 9) }, context())
+
+            assertTrue(result is ToolResult.Failed)
+            assertEquals(emptyList<Capability>(), interaction.capabilityRequests)
+            assertFalse(search.called)
+        }
+
+    @Test
+    fun `stops scanning at the five second clock budget and marks results truncated`() =
+        runTest {
+            val clock = FakeClock()
+            val interaction = FakeUserInteraction()
+            val search =
+                MediaStoreSearch { _, shouldContinue ->
+                    val firstRowAllowed = shouldContinue()
+                    clock.epochMillis += SearchFilesLimits.TIMEOUT_MILLIS
+                    val secondRowAllowed = shouldContinue()
+                    MediaStoreQueryResult(
+                        records =
+                            if (firstRowAllowed) {
+                                listOf(
+                                    SearchFileMetadata("first.txt", "content://first", "first.txt", 1, 1, null),
+                                )
+                            } else {
+                                emptyList()
+                            },
+                        truncated = !secondRowAllowed,
+                    )
+                }
+
+            val result = tool(interaction, search).execute(args("txt"), context(clock)) as ToolResult.Success
+            val root = Json.parseToJsonElement(result.text).jsonObject
+
+            assertTrue(
+                root
+                    .getValue("truncated")
+                    .jsonPrimitive.content
+                    .toBoolean(),
+            )
+            assertEquals(1, root.getValue("items").jsonArray.size)
+        }
+
+    @Test
+    fun `declares a safe search tool and russian card`() {
+        val tool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+
+        assertEquals("search_files", tool.spec.name)
+        assertEquals(Risk.SAFE, tool.spec.risk)
+        assertTrue(tool.spec.description.isNotBlank())
+        val querySchema =
+            tool.spec.inputSchema
+                .getValue("properties")
+                .jsonObject
+                .getValue("query")
+                .jsonObject
+        assertEquals("1", querySchema.getValue("minLength").jsonPrimitive.content)
+        assertEquals("200", querySchema.getValue("maxLength").jsonPrimitive.content)
+        assertEquals("Поиск файлов", tool.describe(args("план")).title)
+        assertTrue(tool.describe(args("план")).summary.contains("план"))
+    }
+
+    private fun tool(
+        interaction: FakeUserInteraction,
+        search: MediaStoreSearch,
+    ) = SearchFilesTool(interaction, search)
+
+    private fun args(query: String) = buildJsonObject { put("query", query) }
+
+    private fun context(clock: FakeClock = FakeClock()) = ToolContext(clock, FakeAppLogger())
+}
+
+private class RecordingMediaStoreSearch(
+    private val records: List<SearchFileMetadata> = emptyList(),
+) : MediaStoreSearch {
+    var called: Boolean = false
+    var query: String? = null
+
+    override fun search(
+        query: String,
+        shouldContinue: () -> Boolean,
+    ): MediaStoreQueryResult {
+        called = true
+        this.query = query
+        return MediaStoreQueryResult(records, truncated = !shouldContinue())
+    }
+}

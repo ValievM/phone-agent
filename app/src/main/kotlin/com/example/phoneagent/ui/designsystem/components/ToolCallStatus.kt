@@ -15,6 +15,10 @@ sealed interface ToolCallStatus {
         val summary: String,
     ) : ToolCallStatus
 
+    data class FilesFound(
+        val count: Int,
+    ) : ToolCallStatus
+
     data class Failed(
         val reason: String,
     ) : ToolCallStatus

@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.tools.ToolOutcome
+import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -60,56 +61,78 @@ class ChatViewModel
             }
 
             runningJob =
-                viewModelScope.launch {
-                    try {
-                        var assistantMessageId: String? = null
-                        agentLoop.run(history, trimmed).collect { event ->
-                            when (event) {
-                                is AgentEvent.TextDelta -> {
-                                    val id = assistantMessageId ?: nextId().also { assistantMessageId = it }
-                                    appendAssistantText(id, event.text)
-                                }
+                viewModelScope.launch { collectTurn(trimmed) }
+        }
 
-                                is AgentEvent.ToolCallStarted -> {
-                                    assistantMessageId = null
-                                    val id = nextId()
-                                    toolMessageIdByCallId[event.call.id] = id
-                                    lastToolMessageId = id
-                                    val toolCall =
-                                        ToolCallMessage(
-                                            status = ToolCallStatus.Running,
-                                            description = event.description,
-                                            arguments = event.call.arguments,
-                                        )
-                                    mutableState.update {
-                                        it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, "", toolCall = toolCall))
-                                    }
-                                }
-
-                                is AgentEvent.ApprovalRequested -> {
-                                    lastToolMessageId?.let { updateToolCallStatus(it, ToolCallStatus.AwaitingApproval) }
-                                }
-
-                                is AgentEvent.ToolCallFinished -> {
-                                    val id = toolMessageIdByCallId.remove(event.call.id)
-                                    if (id != null) updateToolCallStatus(id, event.outcome.toCardStatus())
-                                }
-
-                                is AgentEvent.TurnCompleted -> {
-                                    history = history + event.newItems
-                                }
-
-                                is AgentEvent.TurnFailed -> {
-                                    history = history + event.newItems
-                                    mutableState.update { it.copy(error = event.error) }
-                                }
-                            }
-                        }
-                    } finally {
-                        cancelPendingToolCalls()
-                        mutableState.update { it.copy(isRunning = false) }
-                    }
+        private suspend fun collectTurn(text: String) {
+            try {
+                var assistantMessageId: String? = null
+                agentLoop.run(history, text).collect { event ->
+                    assistantMessageId = handleAgentEvent(event, assistantMessageId)
                 }
+            } finally {
+                cancelPendingToolCalls()
+                mutableState.update { it.copy(isRunning = false) }
+            }
+        }
+
+        private fun handleAgentEvent(
+            event: AgentEvent,
+            assistantMessageId: String?,
+        ): String? =
+            when (event) {
+                is AgentEvent.TextDelta -> {
+                    val id = assistantMessageId ?: nextId()
+                    appendAssistantText(id, event.text)
+                    id
+                }
+
+                is AgentEvent.ToolCallStarted -> {
+                    val id = nextId()
+                    toolMessageIdByCallId[event.call.id] = id
+                    lastToolMessageId = id
+                    val toolCall =
+                        ToolCallMessage(
+                            status = ToolCallStatus.Running,
+                            description = event.description,
+                            arguments = event.call.arguments,
+                        )
+                    mutableState.update {
+                        it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, "", toolCall = toolCall))
+                    }
+                    null
+                }
+
+                is AgentEvent.ApprovalRequested -> {
+                    lastToolMessageId?.let { updateToolCallStatus(it, ToolCallStatus.AwaitingApproval) }
+                    assistantMessageId
+                }
+
+                is AgentEvent.ToolCallFinished -> {
+                    finishToolCall(event)
+                    assistantMessageId
+                }
+
+                is AgentEvent.TurnCompleted -> {
+                    history = history + event.newItems
+                    assistantMessageId
+                }
+
+                is AgentEvent.TurnFailed -> {
+                    history = history + event.newItems
+                    mutableState.update { it.copy(error = event.error) }
+                    assistantMessageId
+                }
+            }
+
+        private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
+            val id = toolMessageIdByCallId.remove(event.call.id) ?: return
+            val fileHits = event.toFileHits()
+            updateToolCallStatus(
+                id = id,
+                status = event.outcome.toCardStatus(event.call.name, fileHits.size),
+                fileHits = fileHits,
+            )
         }
 
         private fun appendAssistantText(
@@ -131,6 +154,7 @@ class ChatViewModel
         private fun updateToolCallStatus(
             id: String,
             status: ToolCallStatus,
+            fileHits: List<FileHit>? = null,
         ) {
             mutableState.update { state ->
                 state.copy(
@@ -138,7 +162,7 @@ class ChatViewModel
                         state.messages.map { message ->
                             val toolCall = message.toolCall
                             if (message.id == id && toolCall != null) {
-                                message.copy(toolCall = toolCall.copy(status = status))
+                                message.copy(toolCall = toolCall.copy(status = status, fileHits = fileHits ?: toolCall.fileHits))
                             } else {
                                 message
                             }
@@ -172,11 +196,28 @@ class ChatViewModel
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
-
-        private fun ToolOutcome.toCardStatus(): ToolCallStatus =
-            when (this) {
-                is ToolOutcome.Success -> ToolCallStatus.Done(text)
-                is ToolOutcome.Rejected -> ToolCallStatus.Rejected
-                is ToolOutcome.Failed -> ToolCallStatus.Failed(reason)
-            }
     }
+
+private fun ToolOutcome.toCardStatus(
+    toolName: String,
+    fileHitCount: Int,
+): ToolCallStatus =
+    when (this) {
+        is ToolOutcome.Success -> {
+            if (toolName == SEARCH_FILES_TOOL_NAME) {
+                ToolCallStatus.FilesFound(fileHitCount)
+            } else {
+                ToolCallStatus.Done(text)
+            }
+        }
+
+        is ToolOutcome.Rejected -> {
+            ToolCallStatus.Rejected
+        }
+
+        is ToolOutcome.Failed -> {
+            ToolCallStatus.Failed(reason)
+        }
+    }
+
+private const val SEARCH_FILES_TOOL_NAME = "search_files"

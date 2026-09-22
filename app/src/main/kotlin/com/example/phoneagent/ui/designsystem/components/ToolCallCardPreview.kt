@@ -38,16 +38,19 @@ private fun previewArguments() =
 private fun ToolCallCardPreviewFrame(
     state: ToolCallStatus,
     expanded: Boolean = false,
+    fileHits: List<FileHit> = emptyList(),
+    description: CallDescription? = null,
 ) {
     AppTheme(useDynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.padding(AppTheme.spacing.large)) {
                 ToolCallCard(
                     state = state,
-                    description = previewDescription(),
+                    description = description ?: previewDescription(),
                     arguments = previewArguments(),
                     expanded = expanded,
                     onExpandToggle = {},
+                    fileHits = fileHits,
                 )
             }
         }

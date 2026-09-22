@@ -20,6 +20,7 @@ import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
+import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -146,6 +147,34 @@ class ChatViewModelTest {
                 viewModel.state.value.messages
                     .first { it.role == ChatRole.TOOL }
             assertEquals(ToolCallStatus.Done("noon"), toolMessage.toolCall?.status)
+        }
+
+    @Test
+    fun `search files result is attached as structured file hits`() =
+        runTest(dispatcher.scheduler) {
+            val result =
+                """{"items":[{"name":"report.pdf",
+                    "uri":"content://media/external/downloads/42","size":1024,"mimeType":"application/pdf"}],
+                    "truncated":false}"""
+            val call = ToolCall("call-1", "search_files", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val registry = ToolRegistry(setOf(fakeTool("search_files") { ToolResult.Success(result) }))
+            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+
+            viewModel.onEvent(ChatUiEvent.Submit("найди отчет"))
+            advanceUntilIdle()
+
+            val toolMessage =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+            assertEquals(
+                listOf(FileHit("report.pdf", "content://media/external/downloads/42", 1024L, "application/pdf")),
+                toolMessage.toolCall?.fileHits,
+            )
+            assertEquals(ToolCallStatus.FilesFound(1), toolMessage.toolCall?.status)
         }
 
     @Test

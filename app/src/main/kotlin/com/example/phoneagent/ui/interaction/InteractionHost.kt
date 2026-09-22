@@ -55,24 +55,39 @@ private fun PermissionRequest(
 ) {
     val currentOnResult by rememberUpdatedState(onResult)
     val launcher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            currentOnResult(if (granted) CapabilityResult.Available else CapabilityResult.Denied)
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            currentOnResult(if (grants.values.any { it }) CapabilityResult.Available else CapabilityResult.Denied)
         }
     DisposableEffect(capability) {
-        val permission = capability.androidPermissionOrNull()
-        if (permission == null) {
+        val permissions = capability.androidPermissions()
+        if (permissions.isEmpty()) {
             // No runtime permission needed for this capability on this OS version.
             currentOnResult(CapabilityResult.Available)
         } else {
-            launcher.launch(permission)
+            launcher.launch(permissions.toTypedArray())
         }
         onDispose {}
     }
 }
 
-private fun Capability.androidPermissionOrNull(): String? =
+private fun Capability.androidPermissions(): List<String> =
     when (this) {
         Capability.NOTIFICATIONS -> {
-            Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU }
+            listOfNotNull(Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU })
+        }
+
+        Capability.FILES -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                buildList {
+                    add(Manifest.permission.READ_MEDIA_IMAGES)
+                    add(Manifest.permission.READ_MEDIA_VIDEO)
+                    add(Manifest.permission.READ_MEDIA_AUDIO)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+                    }
+                }
+            } else {
+                listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
         }
     }

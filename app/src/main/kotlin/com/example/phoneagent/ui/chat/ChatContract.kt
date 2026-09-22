@@ -2,6 +2,7 @@ package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.serialization.json.JsonObject
 
@@ -24,6 +25,7 @@ data class ToolCallMessage(
     val description: CallDescription,
     val arguments: JsonObject,
     val expanded: Boolean = false,
+    val fileHits: List<FileHit> = emptyList(),
 )
 
 enum class ChatRole {

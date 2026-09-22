@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -17,6 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,7 +55,10 @@ fun ToolCallCard(
     expanded: Boolean,
     onExpandToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    fileHits: List<FileHit> = emptyList(),
+    onOpenFile: (FileHit) -> Unit = {},
 ) {
+    var selectedFile by remember { mutableStateOf<FileHit?>(null) }
     OutlinedCard(
         modifier =
             modifier
@@ -71,25 +79,7 @@ fun ToolCallCard(
             modifier = Modifier.padding(AppTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
-            ) {
-                Text(
-                    text = description.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                StatusVisual(state)
-                Icon(
-                    painter = painterResource(AppIcons.expandMore),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ToolCallCardHeader(title = description.title, state = state)
             Text(
                 text = description.summary,
                 style = MaterialTheme.typography.bodyMedium,
@@ -99,9 +89,50 @@ fun ToolCallCard(
             )
             StatusLabel(state)
             if (expanded) {
-                ExpandedDetails(description = description, arguments = arguments)
+                ExpandedDetails(
+                    description = description,
+                    arguments = arguments,
+                    fileHits = fileHits,
+                    onFileHitClick = { selectedFile = it },
+                )
             }
         }
+    }
+    selectedFile?.let { fileHit ->
+        FileOpenConfirmationSheet(
+            fileHit = fileHit,
+            onOpen = {
+                selectedFile = null
+                onOpenFile(fileHit)
+            },
+            onDismiss = { selectedFile = null },
+        )
+    }
+}
+
+@Composable
+private fun ToolCallCardHeader(
+    title: String,
+    state: ToolCallStatus,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        StatusVisual(state)
+        Icon(
+            painter = painterResource(AppIcons.expandMore),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -110,6 +141,8 @@ fun ToolCallCard(
 private fun ExpandedDetails(
     description: CallDescription,
     arguments: JsonObject,
+    fileHits: List<FileHit>,
+    onFileHitClick: (FileHit) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -130,6 +163,26 @@ private fun ExpandedDetails(
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
             color = MaterialTheme.colorScheme.onSurface,
         )
+        if (fileHits.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.files_found_heading),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            fileHits.forEach { fileHit ->
+                AssistChip(
+                    onClick = { onFileHitClick(fileHit) },
+                    label = {
+                        Text(
+                            text = fileHit.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -156,7 +209,7 @@ private fun StatusVisual(state: ToolCallStatus) {
             )
         }
 
-        is ToolCallStatus.Done -> {
+        is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> {
             Icon(
                 painter = painterResource(AppIcons.checkCircle),
                 contentDescription = null,
@@ -209,6 +262,10 @@ private fun StatusLabel(state: ToolCallStatus) {
 
             is ToolCallStatus.Done -> {
                 state.summary to AppTheme.extendedColors.success
+            }
+
+            is ToolCallStatus.FilesFound -> {
+                stringResource(R.string.file_search_completed, state.count) to AppTheme.extendedColors.success
             }
 
             is ToolCallStatus.Failed -> {
