@@ -1,6 +1,7 @@
 package com.example.phoneagent.data.auth
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import kotlinx.coroutines.CancellationException
@@ -25,8 +26,13 @@ public fun interface BrowserLauncher {
 public class CustomTabsBrowserLauncher(
     private val context: Context,
 ) : BrowserLauncher {
+    // `context` here is the application context (see DI), not an Activity, so starting a new
+    // screen from it requires FLAG_ACTIVITY_NEW_TASK or Android throws AndroidRuntimeException —
+    // which the caller's broad catch then silently turned into a generic "network" failure.
     override fun open(url: String) {
-        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+        val customTabsIntent = CustomTabsIntent.Builder().build()
+        customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        customTabsIntent.launchUrl(context, Uri.parse(url))
     }
 }
 
