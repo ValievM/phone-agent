@@ -39,4 +39,7 @@
     <string name="login_error_network">Не удалось связаться с сервером. Проверьте сеть и повторите.</string>
     <string name="login_error_generic">Не удалось войти. Попробуйте другой способ.</string>
     <string name="sign_out">Выйти</string>
+    <!-- Temporary until stage-4/tool-call-ui's real ApprovalSheet replaces this AlertDialog. -->
+    <string name="approval_allow">Разрешить</string>
+    <string name="approval_deny">Отклонить</string>
 </resources>

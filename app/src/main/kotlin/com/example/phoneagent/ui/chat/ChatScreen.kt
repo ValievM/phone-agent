@@ -192,6 +192,17 @@ private fun Message(
     message: ChatMessage,
     modifier: Modifier = Modifier,
 ) {
+    when (message.role) {
+        ChatRole.TOOL -> ToolMessage(message, modifier)
+        else -> BubbleMessage(message, modifier)
+    }
+}
+
+@Composable
+private fun BubbleMessage(
+    message: ChatMessage,
+    modifier: Modifier = Modifier,
+) {
     val isUser = message.role == ChatRole.USER
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -230,6 +241,25 @@ private fun Message(
             }
         }
     }
+}
+
+// Temporary until stage-4/tool-call-ui's real ToolCallCard (design/components.md) is wired in.
+@Composable
+private fun ToolMessage(
+    message: ChatMessage,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = message.text,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = AppTheme.spacing.medium, vertical = AppTheme.spacing.small),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 @Composable

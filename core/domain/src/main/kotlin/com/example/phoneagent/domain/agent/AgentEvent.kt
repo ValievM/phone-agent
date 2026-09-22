@@ -34,7 +34,12 @@ public sealed interface AgentEvent {
         public val newItems: List<HistoryItem>,
     ) : AgentEvent
 
+    /**
+     * [newItems]: whatever the turn had already produced before it failed (at least the user's
+     * message), so the caller doesn't lose it from history.
+     */
     public data class TurnFailed(
         public val error: AgentError,
+        public val newItems: List<HistoryItem>,
     ) : AgentEvent
 }

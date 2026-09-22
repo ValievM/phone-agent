@@ -12,11 +12,11 @@ internal data class FindFilesArgs(
     fun validationError(): String? =
         when {
             query.isBlank() -> {
-                "query must not be empty or blank"
+                FindFilesCopy.QUERY_BLANK
             }
 
             query.length > MAX_QUERY_LENGTH -> {
-                "query must be at most $MAX_QUERY_LENGTH characters, got ${query.length}"
+                FindFilesCopy.queryTooLong(query.length, MAX_QUERY_LENGTH)
             }
 
             else -> {

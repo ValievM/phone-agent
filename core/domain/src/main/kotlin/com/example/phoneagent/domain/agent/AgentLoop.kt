@@ -40,12 +40,12 @@ public class AgentLoop(
             while (true) {
                 step++
                 if (step > config.maxSteps) {
-                    emit(AgentEvent.TurnFailed(AgentError.StepLimit))
+                    emit(AgentEvent.TurnFailed(AgentError.StepLimit, newItems.toList()))
                     return@flow
                 }
                 val turn = runModelTurn(history + newItems)
                 if (turn.failure != null) {
-                    emit(AgentEvent.TurnFailed(turn.failure))
+                    emit(AgentEvent.TurnFailed(turn.failure, newItems.toList()))
                     return@flow
                 }
                 if (turn.text.isNotEmpty()) {
@@ -66,7 +66,7 @@ public class AgentLoop(
         val text = StringBuilder()
         val toolCalls = mutableListOf<ToolCall>()
         var failure: AgentError? = null
-        val request = ModelRequest(contextWindowPolicy.apply(history))
+        val request = ModelRequest(contextWindowPolicy.apply(history), toolPipeline.specs)
         modelGateway.stream(request).collect { event ->
             when (event) {
                 is ModelEvent.TextDelta -> {

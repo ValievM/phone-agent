@@ -17,6 +17,9 @@ data class ChatMessage(
 enum class ChatRole {
     USER,
     ASSISTANT,
+
+    /** Renders as a plain line for now; stage-4/tool-call-ui's ToolCallCard will replace this rendering. */
+    TOOL,
 }
 
 sealed interface ChatUiEvent {

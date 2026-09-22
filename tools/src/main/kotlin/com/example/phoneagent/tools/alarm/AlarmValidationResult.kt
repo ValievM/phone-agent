@@ -10,8 +10,8 @@ public sealed interface AlarmValidationResult {
 
 public fun validateAlarmArgs(args: AlarmArgs): AlarmValidationResult =
     when {
-        args.hour !in MIN_HOUR..MAX_HOUR -> AlarmValidationResult.Invalid("Час должен быть от 0 до 23")
-        args.minute !in MINUTE_RANGE -> AlarmValidationResult.Invalid("Минуты должны быть от 0 до 59")
+        args.hour !in MIN_HOUR..MAX_HOUR -> AlarmValidationResult.Invalid(AlarmCopy.VALIDATION_HOUR_RANGE)
+        args.minute !in MINUTE_RANGE -> AlarmValidationResult.Invalid(AlarmCopy.VALIDATION_MINUTE_RANGE)
         else -> AlarmValidationResult.Valid
     }
 

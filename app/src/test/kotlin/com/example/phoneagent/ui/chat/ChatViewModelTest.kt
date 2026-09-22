@@ -1,11 +1,18 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
-import com.example.phoneagent.domain.conversation.LastNMessagesPolicy
+import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.ContextWindowPolicy
+import com.example.phoneagent.domain.fakes.FakeAppLogger
+import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.fakes.FakeIdGenerator
 import com.example.phoneagent.domain.fakes.FakeModelGateway
+import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.tools.ToolPipeline
+import com.example.phoneagent.domain.tools.ToolRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -50,7 +57,7 @@ class ChatViewModelTest {
                             ModelEvent.Completed(),
                         )
                 }
-            val viewModel = ChatViewModel(gateway, LastNMessagesPolicy(CONTEXT_WINDOW_MAX_ITEMS))
+            val viewModel = ChatViewModel(agentLoop(gateway))
             val states = mutableListOf<ChatUiState>()
             backgroundScope.launch { viewModel.state.collect { states += it } }
 
@@ -77,7 +84,7 @@ class ChatViewModelTest {
         runTest(dispatcher.scheduler) {
             val expectedError = AgentError.Offline
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(expectedError)) }
-            val viewModel = ChatViewModel(gateway, LastNMessagesPolicy(CONTEXT_WINDOW_MAX_ITEMS))
+            val viewModel = ChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Проверка"))
             advanceUntilIdle()
@@ -90,7 +97,7 @@ class ChatViewModelTest {
     fun `stopping mid-response cancels the stream, clears running state, and keeps partial text`() =
         runTest(dispatcher.scheduler) {
             val gateway = HangingModelGateway()
-            val viewModel = ChatViewModel(gateway, LastNMessagesPolicy(CONTEXT_WINDOW_MAX_ITEMS))
+            val viewModel = ChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
@@ -109,6 +116,20 @@ class ChatViewModelTest {
             )
         }
 
+    private fun agentLoop(gateway: ModelGateway): AgentLoop =
+        AgentLoop(
+            modelGateway = gateway,
+            toolPipeline =
+                ToolPipeline(
+                    registry = ToolRegistry(emptySet()),
+                    userInteraction = FakeUserInteraction(),
+                    clock = FakeClock(),
+                    logger = FakeAppLogger(),
+                ),
+            contextWindowPolicy = ContextWindowPolicy { it },
+            idGenerator = FakeIdGenerator(),
+        )
+
     private class HangingModelGateway : ModelGateway {
         var wasCancelled: Boolean = false
 
@@ -121,9 +142,5 @@ class ChatViewModelTest {
                     wasCancelled = true
                 }
             }
-    }
-
-    private companion object {
-        private const val CONTEXT_WINDOW_MAX_ITEMS = 40
     }
 }
