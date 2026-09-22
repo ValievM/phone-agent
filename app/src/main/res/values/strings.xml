@@ -39,4 +39,19 @@
     <string name="login_error_network">Не удалось связаться с сервером. Проверьте сеть и повторите.</string>
     <string name="login_error_generic">Не удалось войти. Попробуйте другой способ.</string>
     <string name="sign_out">Выйти</string>
+    <string name="tool_call_status_awaiting">Ждёт вашего решения</string>
+    <string name="tool_call_status_running">Выполняется…</string>
+    <string name="tool_call_status_rejected">Отклонено</string>
+    <string name="tool_call_status_cancelled">Остановлено</string>
+    <string name="tool_call_arguments">Аргументы</string>
+    <string name="tool_call_toggle_arguments">Показать или скрыть аргументы вызова</string>
+    <string name="approval_sheet_title">Разрешить действие?</string>
+    <string name="approval_sheet_details">Подробности</string>
+    <string name="approval_reject">Отклонить</string>
+    <string name="approval_approve">Разрешить</string>
+    <string name="preview_tool_call_title">Будильник</string>
+    <string name="preview_tool_call_summary">07:30 · «Работа»</string>
+    <string name="preview_tool_call_details">Сработает один раз, сегодня</string>
+    <string name="preview_tool_call_result">Будильник поставлен на 07:30</string>
+    <string name="preview_tool_call_reason">Приложение «Часы» не найдено</string>
 </resources>
