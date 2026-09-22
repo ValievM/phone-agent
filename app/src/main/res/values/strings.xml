@@ -2,7 +2,7 @@
     <string name="app_name">Телефонный агент</string>
     <string name="chat_title">Чат</string>
     <string name="chat_empty_title">Начните разговор</string>
-    <string name="chat_empty_body">Напишите сообщение — сейчас отвечает безопасная тестовая модель.</string>
+    <string name="chat_empty_body">Напишите сообщение, чтобы начать разговор с моделью.</string>
     <string name="message_hint">Сообщение</string>
     <string name="send_message">Отправить сообщение</string>
     <string name="open_settings">Открыть настройки</string>
@@ -13,7 +13,6 @@
     <string name="settings_title">Настройки</string>
     <string name="settings_placeholder">Настройки появятся на следующих этапах.</string>
     <string name="go_back">Назад</string>
-    <string name="fake_model_response">Каркас готов. Это ответ тестовой модели.</string>
     <string name="preview_user_message">Покажи состояние проекта</string>
     <string name="preview_assistant_message">Каркас приложения готов к следующим этапам.</string>
     <string name="preview_cyrillic">Ёё Щщ Ъъ Ыы — кириллица отображается корректно</string>

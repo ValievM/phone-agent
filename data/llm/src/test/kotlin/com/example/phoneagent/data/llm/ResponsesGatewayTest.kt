@@ -198,12 +198,7 @@ class ResponsesGatewayTest {
             profile = profile(server),
             credentialsProvider = credentials,
             logger = FakeAppLogger(),
-            client =
-                OkHttpClient
-                    .Builder()
-                    .readTimeout(1, TimeUnit.SECONDS)
-                    .authenticator(RefreshAuthenticator(credentials))
-                    .build(),
+            client = OkHttpClient.Builder().readTimeout(1, TimeUnit.SECONDS).build(),
             newSessionId = { "session-1" },
         )
 

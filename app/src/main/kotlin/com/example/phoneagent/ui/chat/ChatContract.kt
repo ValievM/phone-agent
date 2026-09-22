@@ -24,5 +24,7 @@ sealed interface ChatUiEvent {
         val text: String,
     ) : ChatUiEvent
 
+    data object Stop : ChatUiEvent
+
     data object DismissError : ChatUiEvent
 }

@@ -13,26 +13,25 @@ import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import okhttp3.Authenticator
 import okhttp3.Call
-import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.Route
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 
 private const val TAG = "ResponsesGateway"
 private const val AUTHORIZATION_HEADER = "Authorization"
@@ -40,86 +39,119 @@ private const val BEARER_PREFIX = "Bearer "
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_TOO_MANY_REQUESTS = 429
+private const val MAX_ATTEMPTS = 2
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 /**
- * Implements [ModelGateway] against the Responses API (docs/backend-notes.md). 401s are retried
- * once by [RefreshAuthenticator] on the OkHttp client itself; everything else (403/429/network)
- * is mapped straight to [ModelEvent.Failed] rather than thrown, matching the port's contract.
+ * Implements [ModelGateway] against the Responses API (docs/backend-notes.md). A 401 is retried
+ * exactly once after [CredentialsProvider.refreshAfterUnauthorized] — as plain sequential suspend
+ * code, not an OkHttp Authenticator, because that would need `runBlocking` to call a suspend
+ * function from OkHttp's synchronous callback, which architecture/patterns.md forbids in
+ * production code (enforced by ArchitectureTest). Everything else (403/429/network) maps straight
+ * to [ModelEvent.Failed] rather than being thrown, matching the port's contract.
+ *
+ * Uses `channelFlow`/`send` rather than `flow`/`emit`: the blocking OkHttp read has to run on
+ * `Dispatchers.IO`, and plain `flow{}` forbids emitting from a dispatcher other than the
+ * collector's ("flow exception transparency"); `channelFlow` decouples producer and collector for
+ * exactly this case. The work runs in a `launch`ed child so `awaitClose` — which, unlike
+ * `Job.invokeOnCompletion`, is guaranteed to run promptly on cancellation rather than waiting for
+ * the (blocked-on-a-socket-read) job to reach a terminal state — can cancel the in-flight `Call`.
  */
 public class ResponsesGateway(
     private val profile: BackendProfile,
     private val credentialsProvider: CredentialsProvider,
     private val logger: AppLogger,
-    private val client: OkHttpClient = defaultClient(credentialsProvider),
+    private val client: OkHttpClient = OkHttpClient(),
     // Test seam: lets a test capture the Call OkHttp created, to assert it gets cancelled when
     // the collecting coroutine is (see docs/stages/3-model-client.md item 3.5).
     private val callFactory: Call.Factory = client,
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
 ) : ModelGateway {
     override fun stream(request: ModelRequest): Flow<ModelEvent> =
-        callbackFlow {
+        channelFlow {
             val channel: SendChannel<ModelEvent> = this
-            try {
-                val credentials = credentialsProvider.current()
-                if (credentials !is CredentialsResult.Ready) {
-                    channel.emitOrIgnore(ModelEvent.Failed(AgentError.SessionExpired))
+            val activeCall = AtomicReference<Call?>(null)
+            launch {
+                try {
+                    val ready = credentialsProvider.current()
+                    if (ready !is CredentialsResult.Ready) {
+                        channel.send(ModelEvent.Failed(AgentError.SessionExpired))
+                        return@launch
+                    }
+                    channel.streamWithRetry(request, ready.credentials, activeCall)
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    logger.warn(TAG, "failed to start a model request", throwable = exception)
+                    channel.send(ModelEvent.Failed(AgentError.Unexpected(exception.message ?: "unknown")))
+                } finally {
                     channel.close()
-                    return@callbackFlow
                 }
-
-                val body = buildResponsesRequestBody(request, profile, newSessionId())
-                val call = callFactory.newCall(httpRequest(body, credentials.credentials))
-                call.enqueue(StreamingCallback(channel))
-
-                awaitClose { call.cancel() }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                logger.warn(TAG, "failed to start a model request", throwable = exception)
-                channel.emitOrIgnore(ModelEvent.Failed(AgentError.Unexpected(exception.message ?: "unknown")))
-                channel.close()
             }
+            awaitClose { activeCall.get()?.cancel() }
         }
 
-    private inner class StreamingCallback(
-        private val channel: SendChannel<ModelEvent>,
-    ) : Callback {
-        override fun onFailure(
-            call: Call,
-            e: IOException,
-        ) {
-            channel.emitOrIgnore(ModelEvent.Failed(e.toAgentError()))
-            channel.close()
+    private suspend fun SendChannel<ModelEvent>.streamWithRetry(
+        request: ModelRequest,
+        initialCredentials: Credentials,
+        activeCall: AtomicReference<Call?>,
+    ) {
+        val body = buildResponsesRequestBody(request, profile, newSessionId())
+        var credentials = initialCredentials
+        var sessionExpired = false
+        for (attempt in 1..MAX_ATTEMPTS) {
+            if (attempt(body, credentials, activeCall) != AttemptOutcome.Unauthorized) return
+            val refreshed = if (attempt < MAX_ATTEMPTS) credentialsProvider.refreshAfterUnauthorized() else null
+            if (refreshed == null) {
+                sessionExpired = true
+                break
+            }
+            credentials = refreshed
         }
+        if (sessionExpired) send(ModelEvent.Failed(AgentError.SessionExpired))
+    }
 
-        override fun onResponse(
-            call: Call,
-            response: Response,
-        ) {
+    private suspend fun SendChannel<ModelEvent>.attempt(
+        body: JsonObject,
+        credentials: Credentials,
+        activeCall: AtomicReference<Call?>,
+    ): AttemptOutcome {
+        val call = callFactory.newCall(httpRequest(body, credentials))
+        activeCall.set(call)
+        return withContext(Dispatchers.IO) {
             try {
-                response.use(::handle)
-            } catch (exception: Exception) {
-                logger.warn(TAG, "streaming response handling threw", throwable = exception)
-                channel.emitOrIgnore(ModelEvent.Failed(AgentError.Unexpected(exception.message ?: "unknown")))
-            } finally {
-                channel.close()
+                val response = call.execute()
+                try {
+                    handle(response)
+                } finally {
+                    response.close()
+                }
+            } catch (e: IOException) {
+                send(ModelEvent.Failed(e.toAgentError()))
+                AttemptOutcome.Done
             }
         }
+    }
 
-        private fun handle(response: Response) {
-            if (!response.isSuccessful) {
-                channel.emitOrIgnore(ModelEvent.Failed(response.toAgentError()))
-                return
-            }
-            val source = response.body.source()
-            val parser = SseParser()
-            // Lazy: only reads as many lines as needed to reach the first terminal event.
+    private suspend fun SendChannel<ModelEvent>.handle(response: Response): AttemptOutcome {
+        when {
+            response.code == HTTP_UNAUTHORIZED -> return AttemptOutcome.Unauthorized
+            !response.isSuccessful -> send(ModelEvent.Failed(response.toAgentError()))
+            else -> streamBody(response)
+        }
+        return AttemptOutcome.Done
+    }
+
+    private suspend fun SendChannel<ModelEvent>.streamBody(response: Response) {
+        val source = response.body.source()
+        val parser = SseParser()
+        val events =
             generateSequence { source.readUtf8Line() }
                 .flatMap { line -> parser.feed("$line\n") }
                 .mapNotNull { it.toModelEvent() }
-                .onEach { channel.emitOrIgnore(it) }
-                .firstOrNull { it is ModelEvent.Completed || it is ModelEvent.Failed }
+        for (event in events) {
+            send(event)
+            if (event is ModelEvent.Completed || event is ModelEvent.Failed) break
         }
     }
 
@@ -135,27 +167,15 @@ public class ResponsesGateway(
             .header("Accept", "text/event-stream")
             .post(Json.encodeToString(JsonObject.serializer(), body).toRequestBody(JSON_MEDIA_TYPE))
             .build()
-
-    public companion object {
-        public fun defaultClient(credentialsProvider: CredentialsProvider): OkHttpClient =
-            OkHttpClient
-                .Builder()
-                .authenticator(RefreshAuthenticator(credentialsProvider))
-                .build()
-    }
 }
 
-private fun SendChannel<ModelEvent>.emitOrIgnore(event: ModelEvent) {
-    try {
-        trySendBlocking(event)
-    } catch (_: CancellationException) {
-        // The flow was already cancelled (e.g. the user hit "stop"); nothing left to deliver to.
-    }
+private enum class AttemptOutcome {
+    Done,
+    Unauthorized,
 }
 
 private fun Response.toAgentError(): AgentError =
     when (code) {
-        HTTP_UNAUTHORIZED -> AgentError.SessionExpired
         HTTP_FORBIDDEN -> AgentError.Forbidden
         HTTP_TOO_MANY_REQUESTS -> AgentError.RateLimited(header("Retry-After")?.toLongOrNull())
         else -> AgentError.Server(code)
@@ -166,35 +186,3 @@ private fun IOException.toAgentError(): AgentError =
         is SocketTimeoutException -> AgentError.Timeout
         else -> AgentError.Offline
     }
-
-/** OkHttp calls this on its own dispatcher thread, never the calling coroutine's — see adapters.md. */
-internal class RefreshAuthenticator(
-    private val credentialsProvider: CredentialsProvider,
-) : Authenticator {
-    override fun authenticate(
-        route: Route?,
-        response: Response,
-    ): Request? {
-        if (response.priorResponseCount() >= MAX_ATTEMPTS) return null
-        return runBlocking { credentialsProvider.refreshAfterUnauthorized() }?.let { refreshed ->
-            response.request
-                .newBuilder()
-                .header(AUTHORIZATION_HEADER, "$BEARER_PREFIX${refreshed.accessToken}")
-                .build()
-        }
-    }
-
-    private fun Response.priorResponseCount(): Int {
-        var count = 1
-        var current = priorResponse
-        while (current != null) {
-            count += 1
-            current = current.priorResponse
-        }
-        return count
-    }
-
-    private companion object {
-        private const val MAX_ATTEMPTS = 2
-    }
-}
