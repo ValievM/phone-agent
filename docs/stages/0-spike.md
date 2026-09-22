@@ -8,7 +8,7 @@
 - [x] 0.2 Создан `docs/backend-notes.md`: issuer, client_id, redirect, scope, параметры authorize, endpoint обмена и обновления токена, endpoints device code, URL бэкенда, обязательные заголовки, пример тела запроса, список доступных моделей. У каждого значения пометка: «из исходников» или «проверено запуском».
 - [x] 0.3 Скрипт в `spike/` (Python или curl): вход → токен → обновление токена → один запрос с одним function-tool → ответ модели с `function_call` → повторный запрос с `function_call_output` → финальный текст. Заодно проверить: нужно ли возвращать в `input` служебные элементы ответа (например, reasoning-блоки) при `store=false`. Результат записать в `backend-notes.md`: от него зависит слот `HistoryItem.Opaque` ([architecture/core.md](../architecture/core.md#история-и-непрозрачные-элементы)).
 - [x] 0.4 Сырой SSE-ответ сохранён в `spike/sample_sse.txt` **без токенов**. Он пригодится для тестов парсера на этапе 3.
-- [ ] 0.5 (отложено до эмулятора, этап 2) Мини-приложение на телефоне принимает редирект от Chrome Custom Tab на `127.0.0.1:1455` и показывает полученный `code` (одноразовый тест, в репозиторий не идёт).
+- [x] 0.5 Приёмник Android на эмуляторе принял синтетический одноразовый callback через shell для `127.0.0.1` и `localhost`; `code` проверен только в памяти, не выводился и не сохранялся.
 - [ ] 0.6 (отложено до эмулятора/телефона) Проверен будильник: `adb shell am start -a android.intent.action.SET_ALARM --ei android.intent.extra.alarm.HOUR 7 --ei android.intent.extra.alarm.MINUTES 30 --ez android.intent.extra.alarm.SKIP_UI true` на твоём телефоне: будильник появился в Часах или нет.
 - [x] 0.7 В `docs/backend-notes.md` записано решение: **GO** (основной вход — подписка) или **NO-GO** (основной вход — API-ключ), с причиной.
 

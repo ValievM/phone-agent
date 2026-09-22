@@ -33,6 +33,8 @@ public sealed interface AuthFailure {
 
     public data object TimedOut : AuthFailure
 
+    public data object LoopbackPortUnavailable : AuthFailure
+
     public data object MalformedToken : AuthFailure
 
     public class Network(
@@ -91,7 +93,16 @@ public sealed interface RefreshResult {
     ) : RefreshResult
 }
 
+public data class AuthorizationCodeExchange(
+    public val code: String,
+    public val codeVerifier: String,
+    public val redirectUri: String,
+)
+
 public interface TokenRefreshGateway {
+    public suspend fun exchangeAuthorizationCode(exchange: AuthorizationCodeExchange): AuthResult =
+        AuthResult.Failure(AuthFailure.Network(null))
+
     public suspend fun refresh(refreshToken: String): RefreshResult
 }
 

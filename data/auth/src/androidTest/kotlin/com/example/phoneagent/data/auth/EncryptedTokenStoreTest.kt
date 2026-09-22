@@ -15,11 +15,7 @@ class EncryptedTokenStoreTest {
     fun writesEncryptedTokensReadsAndClears() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val store =
-                Class
-                    .forName("com.example.phoneagent.data.auth.EncryptedTokenStore")
-                    .getConstructor(android.content.Context::class.java)
-                    .newInstance(context) as TokenStore
+            val store = EncryptedTokenStore(context)
             val tokens =
                 AuthTokens(
                     accessToken = "instrumented-access-token",
