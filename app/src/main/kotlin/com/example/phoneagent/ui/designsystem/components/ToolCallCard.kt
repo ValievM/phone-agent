@@ -111,28 +111,26 @@ private fun ExpandedDetails(
     description: CallDescription,
     arguments: JsonObject,
 ) {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    if (description.details.isNotEmpty()) {
-        Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
-            description.details.forEach { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        description.details.forEach { detail ->
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        Text(
+            text = stringResource(R.string.tool_call_arguments),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = arguments.toPrettyString(),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
-    Text(
-        text = stringResource(R.string.tool_call_arguments),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(
-        text = arguments.toPrettyString(),
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
-        color = MaterialTheme.colorScheme.onSurface,
-    )
 }
 
 /** Status mark in the card corner: an icon, or a small progress indicator while running. */
@@ -140,53 +138,59 @@ private fun ExpandedDetails(
 private fun StatusVisual(state: ToolCallStatus) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     when (state) {
-        ToolCallStatus.AwaitingApproval ->
+        ToolCallStatus.AwaitingApproval -> {
             Icon(
                 painter = painterResource(AppIcons.hourglassEmpty),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
+        }
 
-        ToolCallStatus.Running ->
+        ToolCallStatus.Running -> {
             CircularProgressIndicator(
                 modifier = Modifier.size(20.dp),
                 strokeWidth = 2.dp,
                 color = onSurfaceVariant,
                 trackColor = Color.Transparent,
             )
+        }
 
-        is ToolCallStatus.Done ->
+        is ToolCallStatus.Done -> {
             Icon(
                 painter = painterResource(AppIcons.checkCircle),
                 contentDescription = null,
                 tint = AppTheme.extendedColors.success,
                 modifier = Modifier.size(20.dp),
             )
+        }
 
-        is ToolCallStatus.Failed ->
+        is ToolCallStatus.Failed -> {
             Icon(
                 painter = painterResource(AppIcons.error),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(20.dp),
             )
+        }
 
-        ToolCallStatus.Rejected ->
+        ToolCallStatus.Rejected -> {
             Icon(
                 painter = painterResource(AppIcons.block),
                 contentDescription = null,
                 tint = onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
+        }
 
-        ToolCallStatus.Cancelled ->
+        ToolCallStatus.Cancelled -> {
             Icon(
                 painter = painterResource(AppIcons.stop),
                 contentDescription = null,
                 tint = onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
+        }
     }
 }
 
@@ -195,21 +199,29 @@ private fun StatusVisual(state: ToolCallStatus) {
 private fun StatusLabel(state: ToolCallStatus) {
     val (text, color) =
         when (state) {
-            ToolCallStatus.AwaitingApproval ->
+            ToolCallStatus.AwaitingApproval -> {
                 stringResource(R.string.tool_call_status_awaiting) to MaterialTheme.colorScheme.primary
+            }
 
-            ToolCallStatus.Running ->
+            ToolCallStatus.Running -> {
                 stringResource(R.string.tool_call_status_running) to MaterialTheme.colorScheme.onSurfaceVariant
+            }
 
-            is ToolCallStatus.Done -> state.summary to AppTheme.extendedColors.success
+            is ToolCallStatus.Done -> {
+                state.summary to AppTheme.extendedColors.success
+            }
 
-            is ToolCallStatus.Failed -> state.reason to MaterialTheme.colorScheme.error
+            is ToolCallStatus.Failed -> {
+                state.reason to MaterialTheme.colorScheme.error
+            }
 
-            ToolCallStatus.Rejected ->
+            ToolCallStatus.Rejected -> {
                 stringResource(R.string.tool_call_status_rejected) to MaterialTheme.colorScheme.onSurfaceVariant
+            }
 
-            ToolCallStatus.Cancelled ->
+            ToolCallStatus.Cancelled -> {
                 stringResource(R.string.tool_call_status_cancelled) to MaterialTheme.colorScheme.onSurfaceVariant
+            }
         }
     Text(
         text = text,
