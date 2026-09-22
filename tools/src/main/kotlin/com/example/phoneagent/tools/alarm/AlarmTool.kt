@@ -32,18 +32,17 @@ internal class AlarmTool
         override fun describe(args: JsonObject): CallDescription {
             val alarmArgs =
                 decodeArgs(args)
-                    ?: return CallDescription(title = "Поставить будильник", summary = "С неверными параметрами")
-            val label = alarmArgs.message?.let { ". Название: $it" }.orEmpty()
+                    ?: return CallDescription(title = AlarmCopy.CARD_TITLE, summary = AlarmCopy.CARD_SUMMARY_INVALID_ARGS)
             return CallDescription(
-                title = "Поставить будильник",
-                summary = "На ${alarmArgs.hour.toString().padStart(2, '0')}:${alarmArgs.minute.toString().padStart(2, '0')}$label",
+                title = AlarmCopy.CARD_TITLE,
+                summary = AlarmCopy.cardSummary(alarmArgs.hour, alarmArgs.minute, alarmArgs.message),
             )
         }
 
         override suspend fun execute(
             args: JsonObject,
             context: ToolContext,
-        ): ToolResult = decodeArgs(args)?.let(::executeAlarm) ?: ToolResult.Failed("Неверные параметры будильника")
+        ): ToolResult = decodeArgs(args)?.let(::executeAlarm) ?: ToolResult.Failed(AlarmCopy.RESULT_INVALID_ARGS)
 
         private fun executeAlarm(alarmArgs: AlarmArgs): ToolResult =
             when (val validation = validateAlarmArgs(alarmArgs)) {
@@ -53,9 +52,9 @@ internal class AlarmTool
 
                 AlarmValidationResult.Valid -> {
                     when (intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))) {
-                        AlarmLaunchResult.Started -> ToolResult.Success("Запрос на будильник отправлен")
-                        AlarmLaunchResult.NoClockApp -> ToolResult.Failed("Не найдено приложение «Часы»")
-                        AlarmLaunchResult.Failed -> ToolResult.Failed("Не удалось отправить запрос на будильник")
+                        AlarmLaunchResult.Started -> ToolResult.Success(AlarmCopy.RESULT_SUCCESS)
+                        AlarmLaunchResult.NoClockApp -> ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
+                        AlarmLaunchResult.Failed -> ToolResult.Failed(AlarmCopy.RESULT_FAILED)
                     }
                 }
             }

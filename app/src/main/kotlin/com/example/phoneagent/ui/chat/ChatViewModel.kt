@@ -2,11 +2,10 @@ package com.example.phoneagent.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.phoneagent.domain.conversation.ContextWindowPolicy
+import com.example.phoneagent.domain.agent.AgentEvent
+import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
-import com.example.phoneagent.domain.model.ModelEvent
-import com.example.phoneagent.domain.model.ModelGateway
-import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.tools.ToolOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,12 +19,17 @@ import javax.inject.Inject
 class ChatViewModel
     @Inject
     constructor(
-        private val modelGateway: ModelGateway,
-        private val contextWindowPolicy: ContextWindowPolicy,
+        private val agentLoop: AgentLoop,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
         private var nextMessageId = 0L
         private var runningJob: Job? = null
+
+        // Authoritative conversation history for the model, owned entirely by AgentLoop's return
+        // values (TurnCompleted/TurnFailed) — ChatMessage below is a UI-only rendering concern and
+        // is never converted back into HistoryItem.
+        private var history: List<HistoryItem> = emptyList()
+        private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
 
@@ -39,11 +43,11 @@ class ChatViewModel
 
         private fun submit(text: String) {
             if (text.isBlank() || mutableState.value.isRunning) return
+            val trimmed = text.trim()
 
-            val userMessage = ChatMessage(nextId(), ChatRole.USER, text.trim())
             mutableState.update {
                 it.copy(
-                    messages = it.messages + userMessage,
+                    messages = it.messages + ChatMessage(nextId(), ChatRole.USER, trimmed),
                     isRunning = true,
                     error = null,
                 )
@@ -52,35 +56,39 @@ class ChatViewModel
             runningJob =
                 viewModelScope.launch {
                     try {
-                        val history = contextWindowPolicy.apply(mutableState.value.messages.map { it.toHistoryItem() })
                         var assistantMessageId: String? = null
-                        modelGateway.stream(ModelRequest(history)).collect { event ->
+                        agentLoop.run(history, trimmed).collect { event ->
                             when (event) {
-                                is ModelEvent.TextDelta -> {
+                                is AgentEvent.TextDelta -> {
                                     val id = assistantMessageId ?: nextId().also { assistantMessageId = it }
-                                    mutableState.update { state ->
-                                        val existing = state.messages.firstOrNull { it.id == id }
-                                        val messages =
-                                            if (existing == null) {
-                                                state.messages + ChatMessage(id, ChatRole.ASSISTANT, event.text)
-                                            } else {
-                                                state.messages.map { message ->
-                                                    if (message.id == id) message.copy(text = message.text + event.text) else message
-                                                }
-                                            }
-                                        state.copy(messages = messages)
-                                    }
+                                    appendAssistantText(id, event.text)
                                 }
 
-                                is ModelEvent.Failed -> {
-                                    mutableState.update { it.copy(error = event.error) }
+                                is AgentEvent.ToolCallStarted -> {
+                                    assistantMessageId = null
+                                    val id = nextId()
+                                    toolMessageIdByCallId[event.call.id] = id
+                                    val summary = "${event.description.title}: ${event.description.summary}"
+                                    mutableState.update { it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, summary)) }
                                 }
 
-                                is ModelEvent.Completed,
-                                is ModelEvent.OpaqueItem,
-                                is ModelEvent.ToolCallRequested,
-                                -> {
+                                is AgentEvent.ToolCallFinished -> {
+                                    val id = toolMessageIdByCallId.remove(event.call.id)
+                                    if (id != null) replaceMessageText(id, event.outcome.toDisplayText())
+                                }
+
+                                is AgentEvent.ApprovalRequested -> {
+                                    // Rendered by the app-wide InteractionHost, not the chat feed itself.
                                     Unit
+                                }
+
+                                is AgentEvent.TurnCompleted -> {
+                                    history = history + event.newItems
+                                }
+
+                                is AgentEvent.TurnFailed -> {
+                                    history = history + event.newItems
+                                    mutableState.update { it.copy(error = event.error) }
                                 }
                             }
                         }
@@ -91,11 +99,37 @@ class ChatViewModel
                 }
         }
 
+        private fun appendAssistantText(
+            id: String,
+            delta: String,
+        ) {
+            mutableState.update { state ->
+                val existing = state.messages.firstOrNull { it.id == id }
+                val messages =
+                    if (existing == null) {
+                        state.messages + ChatMessage(id, ChatRole.ASSISTANT, delta)
+                    } else {
+                        state.messages.map { message -> if (message.id == id) message.copy(text = message.text + delta) else message }
+                    }
+                state.copy(messages = messages)
+            }
+        }
+
+        private fun replaceMessageText(
+            id: String,
+            text: String,
+        ) {
+            mutableState.update { state ->
+                state.copy(messages = state.messages.map { message -> if (message.id == id) message.copy(text = text) else message })
+            }
+        }
+
         private fun nextId(): String = (++nextMessageId).toString()
 
-        private fun ChatMessage.toHistoryItem(): HistoryItem =
-            when (role) {
-                ChatRole.USER -> HistoryItem.UserMessage(id, text)
-                ChatRole.ASSISTANT -> HistoryItem.AssistantMessage(id, text)
+        private fun ToolOutcome.toDisplayText(): String =
+            when (this) {
+                is ToolOutcome.Success -> text
+                is ToolOutcome.Rejected -> ChatCopy.toolRejected(reason)
+                is ToolOutcome.Failed -> ChatCopy.toolFailed(reason)
             }
     }

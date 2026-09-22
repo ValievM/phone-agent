@@ -171,19 +171,24 @@ class AgentLoopTest {
 
             val events = loop(registry, AgentConfig(maxSteps = 3)).run(emptyList(), "loop forever").toList()
 
-            assertEquals(AgentEvent.TurnFailed(AgentError.StepLimit), events.last())
+            val failed = events.last() as AgentEvent.TurnFailed
+            assertEquals(AgentError.StepLimit, failed.error)
+            assertEquals(HistoryItem.UserMessage("id-1", "loop forever"), failed.newItems.first())
             assertEquals(3, executedCalls.size)
         }
 
     @Test
-    fun `a model error mid-stream ends the turn but keeps text already received`() =
+    fun `a model error mid-stream ends the turn but keeps the user message for history`() =
         runTest {
             gateway.events = listOf(ModelEvent.TextDelta("partial"), ModelEvent.Failed(AgentError.Offline))
 
             val events = loop().run(emptyList(), "hello").toList()
 
             assertEquals(
-                listOf(AgentEvent.TextDelta("partial"), AgentEvent.TurnFailed(AgentError.Offline)),
+                listOf(
+                    AgentEvent.TextDelta("partial"),
+                    AgentEvent.TurnFailed(AgentError.Offline, listOf(HistoryItem.UserMessage("id-1", "hello"))),
+                ),
                 events,
             )
         }

@@ -32,6 +32,9 @@ public class ToolPipeline(
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
 ) {
+    /** For [com.example.phoneagent.domain.agent.AgentLoop] to advertise available tools in each model request. */
+    public val specs: List<ToolSpec> get() = registry.specs
+
     /** For [com.example.phoneagent.domain.agent.AgentLoop] to build a UI-facing event before running the call. */
     public fun describe(
         name: String,

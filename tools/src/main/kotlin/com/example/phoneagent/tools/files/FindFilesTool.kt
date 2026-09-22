@@ -29,10 +29,7 @@ internal class FindFilesTool
         override val spec: ToolSpec =
             ToolSpec(
                 name = NAME,
-                description =
-                    "Search the folder the user pre-selected in the app settings for files whose " +
-                        "name contains the query. Returns up to 20 matches as name and path relative " +
-                        "to that folder. Only names are read; file contents are never opened.",
+                description = FindFilesCopy.SPEC_DESCRIPTION,
                 inputSchema =
                     buildJsonObject {
                         put("type", "object")
@@ -43,7 +40,7 @@ internal class FindFilesTool
                                     "query",
                                     buildJsonObject {
                                         put("type", "string")
-                                        put("description", "Case-insensitive substring of a file name to look for.")
+                                        put("description", FindFilesCopy.QUERY_SCHEMA_DESCRIPTION)
                                     },
                                 )
                             },
@@ -56,11 +53,9 @@ internal class FindFilesTool
         override fun describe(args: JsonObject): CallDescription {
             val query = args.queryOrNull()
             return CallDescription(
-                title = "Поиск файлов",
-                summary =
-                    query?.let { "Найти файлы по запросу «$it» в выбранной папке" }
-                        ?: "Найти файлы в выбранной пользователем папке",
-                details = listOf("Показываются только имена файлов, содержимое не читается"),
+                title = FindFilesCopy.CARD_TITLE,
+                summary = query?.let(FindFilesCopy::cardSummaryWithQuery) ?: FindFilesCopy.CARD_SUMMARY_NO_QUERY,
+                details = FindFilesCopy.CARD_DETAILS,
             )
         }
 
@@ -76,7 +71,7 @@ internal class FindFilesTool
 
                 is ParsedArgs.Valid -> {
                     when (val root = selectedFolder.root()) {
-                        null -> ToolResult.Failed(REASON_NOT_SELECTED)
+                        null -> ToolResult.Failed(FindFilesCopy.REASON_NOT_SELECTED)
                         else -> searchSafely(root, parsed.query, context)
                     }
                 }
@@ -92,13 +87,11 @@ internal class FindFilesTool
                 val result = SafTreeWalker(context.clock).search(root, query)
                 ToolResult.Success(result.toModelText())
             } catch (exception: Exception) {
-                ToolResult.Failed("File system query failed: ${exception.message}")
+                ToolResult.Failed(FindFilesCopy.fileSystemQueryFailed(exception.message))
             }
 
         private companion object {
             const val NAME = "find_files"
-            const val REASON_NOT_SELECTED =
-                "Search folder is not selected: the user needs to pick one in the app settings"
         }
     }
 
@@ -117,25 +110,25 @@ private fun parseArgs(args: JsonObject): ParsedArgs =
         val parsed = json.decodeFromJsonElement(FindFilesArgs.serializer(), args)
         parsed
             .validationError()
-            ?.let { ParsedArgs.Invalid("Invalid find_files arguments: $it") }
+            ?.let { ParsedArgs.Invalid(FindFilesCopy.invalidArguments(it)) }
             ?: ParsedArgs.Valid(parsed.query)
     } catch (expected: SerializationException) {
-        ParsedArgs.Invalid("Invalid find_files arguments: ${expected.message}")
+        ParsedArgs.Invalid(FindFilesCopy.invalidArguments(expected.message))
     }
 
 private fun WalkResult.toModelText(): String =
     if (matches.isEmpty()) {
-        "No files matching the query were found in the selected folder."
+        FindFilesCopy.NO_MATCHES
     } else {
         buildString {
-            appendLine("Found ${matches.size} matching item(s) in the selected folder:")
+            appendLine(FindFilesCopy.matchesFoundHeader(matches.size))
             for (match in matches) {
-                appendLine("- ${match.name} (${match.relativePath})")
+                appendLine(FindFilesCopy.matchLine(match.name, match.relativePath))
             }
-            if (WalkLimit.DEPTH in limitsHit) appendLine("Search stopped early: depth limit of 6 reached.")
-            if (WalkLimit.NODES in limitsHit) appendLine("Search stopped early: scan limit of 5000 nodes reached.")
-            if (WalkLimit.TIME in limitsHit) appendLine("Search stopped early: 5-second time limit reached.")
-            if (WalkLimit.RESULTS in limitsHit) appendLine("Result list capped at 20 matches; more may exist.")
+            if (WalkLimit.DEPTH in limitsHit) appendLine(FindFilesCopy.LIMIT_DEPTH)
+            if (WalkLimit.NODES in limitsHit) appendLine(FindFilesCopy.LIMIT_NODES)
+            if (WalkLimit.TIME in limitsHit) appendLine(FindFilesCopy.LIMIT_TIME)
+            if (WalkLimit.RESULTS in limitsHit) appendLine(FindFilesCopy.LIMIT_RESULTS)
         }
     }
 
