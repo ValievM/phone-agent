@@ -25,6 +25,8 @@ public sealed interface AuthState {
 }
 
 public sealed interface AuthFailure {
+    public data object InvalidApiKey : AuthFailure
+
     public data object InvalidGrant : AuthFailure
 
     public data object StateMismatch : AuthFailure
@@ -112,4 +114,18 @@ public interface TokenStore {
     public suspend fun write(tokens: AuthTokens)
 
     public suspend fun clear()
+}
+
+public sealed interface ApiKeyValidationResult {
+    public data object Valid : ApiKeyValidationResult
+
+    public data object Rejected : ApiKeyValidationResult
+
+    public data class Failure(
+        public val failure: AuthFailure,
+    ) : ApiKeyValidationResult
+}
+
+public interface ApiKeyValidationGateway {
+    public suspend fun validate(key: String): ApiKeyValidationResult
 }
