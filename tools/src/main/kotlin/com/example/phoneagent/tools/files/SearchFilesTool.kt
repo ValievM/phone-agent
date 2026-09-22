@@ -92,7 +92,12 @@ internal class SearchFilesTool
             return try {
                 val searched = withContext(Dispatchers.IO) { mediaStoreSearch.search(query, ::shouldContinue) }
                 if (!shouldContinue()) budgetReached = true
-                val result = SearchFilesPolicy.process(searched.records, sourceIncomplete = searched.truncated || budgetReached)
+                val result =
+                    SearchFilesPolicy.process(
+                        searched.records,
+                        sourceIncomplete = searched.truncated || budgetReached,
+                        partialAccess = searched.inaccessible,
+                    )
                 ToolResult.Success(SearchFilesPolicy.toJson(result))
             } catch (cancellation: CancellationException) {
                 throw cancellation

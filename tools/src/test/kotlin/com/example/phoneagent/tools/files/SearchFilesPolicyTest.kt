@@ -118,6 +118,15 @@ class SearchFilesPolicyTest {
     }
 
     @Test
+    fun `partial access is reported separately from truncation`() {
+        val result = SearchFilesPolicy.process(listOf(hit(name = "seen")), partialAccess = true)
+
+        val json = Json.parseToJsonElement(SearchFilesPolicy.toJson(result)).jsonObject
+        assertEquals("true", json.getValue("partialAccess").toString())
+        assertEquals("false", json.getValue("truncated").toString())
+    }
+
+    @Test
     fun `serializes absent optional metadata as JSON null`() {
         val result = SearchFilesPolicy.process(listOf(hit(name = "voice-note", dateModified = null, mimeType = null)))
         val item =

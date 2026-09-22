@@ -31,12 +31,15 @@ internal data class SearchFileMetadata(
 internal data class SearchFilesResult(
     val items: List<SearchFileMetadata>,
     val truncated: Boolean,
+    /** True when some MediaStore collections were inaccessible (partial media access). */
+    val partialAccess: Boolean = false,
 )
 
 internal object SearchFilesPolicy {
     fun process(
         records: List<SearchFileMetadata>,
         sourceIncomplete: Boolean = false,
+        partialAccess: Boolean = false,
     ): SearchFilesResult {
         val newestByIdentity = linkedMapOf<Pair<String, Long>, SearchFileMetadata>()
         records.forEach { record ->
@@ -59,6 +62,7 @@ internal object SearchFilesPolicy {
         return SearchFilesResult(
             items = sorted.take(SearchFilesLimits.MAX_RESULTS),
             truncated = sourceIncomplete || sorted.size > SearchFilesLimits.MAX_RESULTS,
+            partialAccess = partialAccess,
         )
     }
 
@@ -68,15 +72,26 @@ internal object SearchFilesPolicy {
         for (item in result.items) {
             val candidate = item.toJsonObject()
             val proposedItems = items + candidate
-            val proposedJson = serialize(proposedItems, truncated = true)
+            val proposedJson = serialize(proposedItems, truncated = true, partialAccess = true)
             if (proposedJson.toByteArray(Charsets.UTF_8).size > SearchFilesLimits.MAX_OUTPUT_BYTES) {
                 truncated = true
                 break
             }
             items += candidate
         }
-        return serialize(items, truncated || items.size < result.items.size)
+        return serialize(items, truncated || items.size < result.items.size, partialAccess = result.partialAccess)
     }
+
+    private fun serialize(
+        items: List<kotlinx.serialization.json.JsonObject>,
+        truncated: Boolean,
+        partialAccess: Boolean,
+    ): String =
+        buildJsonObject {
+            put("items", JsonArray(items))
+            put("truncated", truncated)
+            put("partialAccess", partialAccess)
+        }.toString()
 
     private fun SearchFileMetadata.toJsonObject() =
         buildJsonObject {
@@ -87,15 +102,6 @@ internal object SearchFilesPolicy {
             put("dateModified", dateModified?.let(::JsonPrimitive) ?: JsonNull)
             put("mimeType", mimeType?.let(::JsonPrimitive) ?: JsonNull)
         }
-
-    private fun serialize(
-        items: List<kotlinx.serialization.json.JsonObject>,
-        truncated: Boolean,
-    ): String =
-        buildJsonObject {
-            put("items", JsonArray(items))
-            put("truncated", truncated)
-        }.toString()
 
     private fun clipMetadata(record: SearchFileMetadata): SearchFileMetadata {
         val clippedName = record.name.takeCodePoints(SearchFilesMetadataCaps.NAME)

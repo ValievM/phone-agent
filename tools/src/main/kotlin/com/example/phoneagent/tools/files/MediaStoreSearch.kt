@@ -14,6 +14,8 @@ import javax.inject.Inject
 internal data class MediaStoreQueryResult(
     val records: List<SearchFileMetadata>,
     val truncated: Boolean,
+    /** True when at least one collection was blocked (e.g. partially granted media access). */
+    val inaccessible: Boolean = false,
 )
 
 internal fun interface MediaStoreSearch {
@@ -37,16 +39,18 @@ internal class AndroidMediaStoreSearch
         ): MediaStoreQueryResult {
             val records = mutableListOf<SearchFileMetadata>()
             var truncated = false
+            var inaccessible = false
             collections().forEach { collection ->
                 if (shouldContinue()) {
                     val scan = scanCollection(collection, query, shouldContinue)
                     records += scan.records
                     truncated = truncated || scan.truncated
+                    inaccessible = inaccessible || scan.inaccessible
                 } else {
                     truncated = true
                 }
             }
-            return MediaStoreQueryResult(records, truncated)
+            return MediaStoreQueryResult(records, truncated, inaccessible)
         }
 
         private fun scanCollection(
@@ -58,8 +62,9 @@ internal class AndroidMediaStoreSearch
                 queryCollection(collection.uri, query)?.use { rows -> scanRows(rows, collection, shouldContinue) }
                     ?: MediaStoreQueryResult(emptyList(), truncated = false)
             } catch (_: SecurityException) {
-                // Android may deny individual MediaStore collections for the granted scope.
-                MediaStoreQueryResult(emptyList(), truncated = true)
+                // Android may deny individual MediaStore collections for the granted scope;
+                // that is missing access, not an incomplete scan.
+                MediaStoreQueryResult(emptyList(), truncated = false, inaccessible = true)
             }
 
         private fun scanRows(
