@@ -13,6 +13,12 @@
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
+        <!-- Makes ACTION_VIEW viewers resolvable so files can open in the default app
+             and only fall back to the chooser when there is none. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
     </queries>
 
     <application
