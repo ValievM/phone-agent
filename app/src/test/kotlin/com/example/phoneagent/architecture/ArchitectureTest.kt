@@ -27,7 +27,12 @@ class ArchitectureTest {
 
     @Test
     fun `production code uses AppLogger instead of Android Log`() {
-        val violations = productionFiles.filter { file -> file.imports.any { it.name == "android.util.Log" } }
+        // AndroidLogcatLogger is the one sanctioned AppLogger implementation that is allowed to
+        // touch android.util.Log; everything else must go through AppLogger.
+        val violations =
+            productionFiles
+                .filter { file -> file.imports.any { it.name == "android.util.Log" } }
+                .filterNot { it.path.endsWith("/logging/AndroidLogcatLogger.kt") }
 
         assertTrue("Direct Android Log in: ${violations.map { it.path }}", violations.isEmpty())
     }

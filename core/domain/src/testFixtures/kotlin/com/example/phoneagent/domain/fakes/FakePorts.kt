@@ -14,6 +14,7 @@ import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.LogLevel
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
@@ -91,18 +92,24 @@ public class FakeUserInteraction : UserInteraction {
     }
 }
 
+public data class LoggedEvent(
+    public val level: LogLevel,
+    public val tag: String,
+    public val message: String,
+    public val fields: Map<String, String>,
+    public val throwable: Throwable?,
+)
+
 public class FakeAppLogger : AppLogger {
-    public val debugMessages: MutableList<String> = mutableListOf()
-    public val errors: MutableList<Pair<String, Throwable?>> = mutableListOf()
+    public val events: MutableList<LoggedEvent> = mutableListOf()
 
-    override fun debug(message: String) {
-        debugMessages += message
-    }
-
-    override fun error(
+    override fun log(
+        level: LogLevel,
+        tag: String,
         message: String,
+        fields: Map<String, String>,
         throwable: Throwable?,
     ) {
-        errors += message to throwable
+        events += LoggedEvent(level, tag, message, fields, throwable)
     }
 }

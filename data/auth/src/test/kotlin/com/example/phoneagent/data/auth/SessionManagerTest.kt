@@ -1,6 +1,7 @@
 package com.example.phoneagent.data.auth
 
 import com.example.phoneagent.domain.auth.CredentialsResult
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -133,15 +134,31 @@ class SessionManagerTest {
             assertEquals(null, store.stored)
         }
 
+    @Test
+    fun `logs a sign-in failure without leaking the failure message`() =
+        runTest {
+            val logger = FakeAppLogger()
+            val provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER, AuthResult.Failure(AuthFailure.Network("secret-body")))
+            val manager = sessionManager(provider, logger = logger)
+
+            manager.signIn(AuthMethod.CHATGPT_BROWSER)
+
+            val logged = logger.events.joinToString(" ") { it.message + " " + it.fields.values.joinToString(" ") }
+            assertEquals(false, logged.contains("secret-body"))
+            assertEquals(true, logged.contains("sign-in failed"))
+        }
+
     private fun sessionManager(
         provider: AuthProvider,
         store: InMemoryTokenStore = InMemoryTokenStore(),
         refreshResult: RefreshResult = RefreshResult.Success(tokens()),
+        logger: FakeAppLogger = FakeAppLogger(),
     ): SessionManager =
         SessionManager(
             providers = mapOf(provider.method to provider),
             tokenStore = store,
             tokenRefresher = TokenRefresher(store, FakeRefreshGateway(refreshResult), FakeClock()),
+            logger = logger,
         )
 
     private fun tokens(
