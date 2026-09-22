@@ -37,6 +37,7 @@ private const val ID_TOKEN = "id_token"
 private const val REFRESH_TOKEN = "refresh_token"
 private const val EXPIRES_AT = "expires_at"
 private const val EARLIEST_REFRESH_AT = "earliest_refresh_at"
+private const val METHOD = "method"
 
 private val Context.authTokenDataStore: DataStore<Preferences> by preferencesDataStore(name = DATA_STORE_NAME)
 private val encryptedTokensKey = stringPreferencesKey("encrypted_tokens")
@@ -74,17 +75,23 @@ public class EncryptedTokenStore(
             tokens.refreshToken?.let { put(REFRESH_TOKEN, it) }
             tokens.accessTokenExpiresAtEpochSeconds?.let { put(EXPIRES_AT, it) }
             tokens.earliestRefreshAtEpochSeconds?.let { put(EARLIEST_REFRESH_AT, it) }
+            put(METHOD, tokens.method.name)
         }.toString()
 
     private fun deserialize(serializedTokens: String): AuthTokens? {
         val payload = Json.parseToJsonElement(serializedTokens).jsonObject
-        val accessToken = payload.stringValue(ACCESS_TOKEN) ?: return null
+        val accessToken = payload.stringValue(ACCESS_TOKEN)
+        // Missing or unrecognized method means data from before this field existed, or from a
+        // future/rolled-back app version: treat it as unreadable rather than guessing.
+        val method = payload.stringValue(METHOD)?.let { runCatching { AuthMethod.valueOf(it) }.getOrNull() }
+        if (accessToken == null || method == null) return null
         return AuthTokens(
             accessToken = accessToken,
             idToken = payload.stringValue(ID_TOKEN),
             refreshToken = payload.stringValue(REFRESH_TOKEN),
             accessTokenExpiresAtEpochSeconds = payload.longValue(EXPIRES_AT),
             earliestRefreshAtEpochSeconds = payload.longValue(EARLIEST_REFRESH_AT),
+            method = method,
         )
     }
 }

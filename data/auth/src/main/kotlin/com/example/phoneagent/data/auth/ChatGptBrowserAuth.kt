@@ -172,13 +172,14 @@ public class ChatGptBrowserAuth(
                         }
 
                         else -> {
-                            tokenGateway.exchangeAuthorizationCode(
-                                AuthorizationCodeExchange(
-                                    code = callback.code,
-                                    codeVerifier = pkce.verifier,
-                                    redirectUri = config.redirectUri,
-                                ),
-                            )
+                            tokenGateway
+                                .exchangeAuthorizationCode(
+                                    AuthorizationCodeExchange(
+                                        code = callback.code,
+                                        codeVerifier = pkce.verifier,
+                                        redirectUri = config.redirectUri,
+                                    ),
+                                ).withMethod(AuthMethod.CHATGPT_BROWSER)
                         }
                     }
                 }

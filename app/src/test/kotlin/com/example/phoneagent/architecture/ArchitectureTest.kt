@@ -33,14 +33,24 @@ class ArchitectureTest {
     }
 
     @Test
-    fun `pure JVM modules do not import platform or dependency injection libraries`() {
+    fun `core domain does not import platform network adapters or dependency injection libraries`() {
         val forbiddenPrefixes = listOf("android.", "androidx.", "okhttp3.", "dagger.", "com.example.phoneagent.data.")
-        val violations =
+        val coreViolations =
             productionFiles
-                .filter { "/core/domain/" in it.path || "/data/llm/" in it.path }
+                .filter { "/core/domain/" in it.path }
                 .filter { file -> file.imports.any { import -> forbiddenPrefixes.any(import.name::startsWith) } }
+        val llmViolations =
+            productionFiles
+                .filter { "/data/llm/" in it.path }
+                .filter { file ->
+                    file.imports.any { import ->
+                        listOf("android.", "androidx.", "dagger.", "com.example.phoneagent.data.auth.")
+                            .any(import.name::startsWith)
+                    }
+                }
 
-        assertTrue("Forbidden pure JVM imports in: ${violations.map { it.path }}", violations.isEmpty())
+        assertTrue("Forbidden core imports in: ${coreViolations.map { it.path }}", coreViolations.isEmpty())
+        assertTrue("Forbidden LLM adapter imports in: ${llmViolations.map { it.path }}", llmViolations.isEmpty())
     }
 
     @Test

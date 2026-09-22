@@ -23,6 +23,7 @@ class EncryptedTokenStoreTest {
                     refreshToken = "instrumented-refresh-token",
                     accessTokenExpiresAtEpochSeconds = 200L,
                     earliestRefreshAtEpochSeconds = 100L,
+                    method = AuthMethod.CHATGPT_DEVICE_CODE,
                 )
 
             store.clear()

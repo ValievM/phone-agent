@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+import com.example.phoneagent.ui.login.LoginRoute
 import com.example.phoneagent.ui.navigation.AppNavigation
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -17,7 +18,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AppTheme {
-                AppNavigation()
+                LoginRoute(authenticatedContent = { onSignOut -> AppNavigation(onSignOut = onSignOut) })
             }
         }
     }

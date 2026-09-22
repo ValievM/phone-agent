@@ -33,6 +33,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.okhttp)
     ksp(libs.hilt.compiler)
 
     implementation(platform(libs.androidx.compose.bom))

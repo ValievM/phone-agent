@@ -31,7 +31,10 @@ sealed interface AppDestination {
 }
 
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
+fun AppNavigation(
+    onSignOut: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val backStack = remember { mutableStateListOf<AppDestination>(AppDestination.Chat) }
     NavDisplay(
         backStack = backStack,
@@ -47,7 +50,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
                 AppDestination.Settings -> {
                     NavEntry(key) {
-                        SettingsPlaceholder(onBack = { backStack.removeLastOrNull() })
+                        SettingsPlaceholder(onBack = { backStack.removeLastOrNull() }, onSignOut = onSignOut)
                     }
                 }
             }
@@ -59,6 +62,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsPlaceholder(
     onBack: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -90,6 +94,9 @@ private fun SettingsPlaceholder(
                 text = stringResource(R.string.settings_placeholder),
                 style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
             )
+            androidx.compose.material3.Button(onClick = onSignOut) {
+                Text(stringResource(R.string.sign_out))
+            }
         }
     }
 }

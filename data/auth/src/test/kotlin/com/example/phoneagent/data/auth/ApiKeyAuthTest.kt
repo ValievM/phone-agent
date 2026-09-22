@@ -1,5 +1,7 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.auth.ApiKeyValidationGateway
+import com.example.phoneagent.domain.auth.ApiKeyValidationResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -9,48 +11,34 @@ class ApiKeyAuthTest {
     fun `blank API key is rejected without a network request`() =
         runTest {
             val gateway = FakeValidationGateway(ApiKeyValidationResult.Valid)
-            val store = InMemoryTokenStore()
-            val auth = ApiKeyAuth("   ", gateway, store)
+            val auth = ApiKeyAuth("   ", gateway)
 
             assertEquals(AuthResult.Failure(AuthFailure.InvalidApiKey), auth.signIn())
             assertEquals(0, gateway.calls)
-            assertEquals(null, store.stored)
         }
 
     @Test
-    fun `valid API key is stored after validation`() =
+    fun `valid API key is returned as a success, ready for SessionManager to persist`() =
         runTest {
-            val store = InMemoryTokenStore()
-            val auth = ApiKeyAuth("api-key", FakeValidationGateway(ApiKeyValidationResult.Valid), store)
+            val auth = ApiKeyAuth("api-key", FakeValidationGateway(ApiKeyValidationResult.Valid))
 
             assertEquals(AuthResult.Success(tokens("api-key")), auth.signIn())
-            assertEquals(tokens("api-key"), store.stored)
         }
 
     @Test
-    fun `rejected API key is not stored`() =
+    fun `rejected API key is a failure`() =
         runTest {
-            val store = InMemoryTokenStore()
-            val auth = ApiKeyAuth("api-key", FakeValidationGateway(ApiKeyValidationResult.Rejected), store)
+            val auth = ApiKeyAuth("api-key", FakeValidationGateway(ApiKeyValidationResult.Rejected))
 
             assertEquals(AuthResult.Failure(AuthFailure.InvalidApiKey), auth.signIn())
-            assertEquals(null, store.stored)
         }
 
     @Test
-    fun `network validation failure does not replace or clear an existing session`() =
+    fun `network validation failure is returned as data, not stored`() =
         runTest {
-            val existing = tokens("existing-key")
-            val store = InMemoryTokenStore(existing)
-            val auth =
-                ApiKeyAuth(
-                    "api-key",
-                    FakeValidationGateway(ApiKeyValidationResult.Failure(AuthFailure.Network("offline"))),
-                    store,
-                )
+            val auth = ApiKeyAuth("api-key", FakeValidationGateway(ApiKeyValidationResult.NetworkFailure))
 
-            assertEquals(AuthResult.Failure(AuthFailure.Network("offline")), auth.signIn())
-            assertEquals(existing, store.stored)
+            assertEquals(AuthResult.Failure(AuthFailure.Network(null)), auth.signIn())
         }
 
     private fun tokens(key: String): AuthTokens =
@@ -60,21 +48,8 @@ class ApiKeyAuthTest {
             refreshToken = null,
             accessTokenExpiresAtEpochSeconds = null,
             earliestRefreshAtEpochSeconds = null,
+            method = AuthMethod.API_KEY,
         )
-
-    private class InMemoryTokenStore(
-        var stored: AuthTokens? = null,
-    ) : TokenStore {
-        override suspend fun read(): AuthTokens? = stored
-
-        override suspend fun write(tokens: AuthTokens) {
-            stored = tokens
-        }
-
-        override suspend fun clear() {
-            stored = null
-        }
-    }
 
     private class FakeValidationGateway(
         private val result: ApiKeyValidationResult,

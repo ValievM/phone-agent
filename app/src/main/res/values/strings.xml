@@ -18,4 +18,26 @@
     <string name="preview_assistant_message">Каркас приложения готов к следующим этапам.</string>
     <string name="preview_cyrillic">Ёё Щщ Ъъ Ыы — кириллица отображается корректно</string>
     <string name="preview_code">val status = "ready"</string>
+    <string name="login_logo">PA</string>
+    <string name="login_title">Вход в OpenAI</string>
+    <string name="login_description">Войдите через подписку ChatGPT или используйте API-ключ.</string>
+    <string name="login_openai">Войти через OpenAI</string>
+    <string name="login_again">Войти заново</string>
+    <string name="login_use_api_key">Использовать API-ключ</string>
+    <string name="login_use_device_code">Войти через код устройства</string>
+    <string name="login_storage_notice">Токены хранятся только на этом устройстве.</string>
+    <string name="login_session_expired">Сессия истекла. Войдите заново.</string>
+    <string name="login_api_key_label">API-ключ</string>
+    <string name="login_api_key_placeholder">sk-…</string>
+    <string name="login_api_key_helper">Ключ проверяется запросом списка моделей и сохраняется зашифрованным.</string>
+    <string name="login_api_key_submit">Продолжить с API-ключом</string>
+    <string name="login_device_code_title">Код устройства</string>
+    <string name="login_device_code_hint">Код действует 15 минут. В настройках безопасности ChatGPT должна быть включена авторизация по коду устройства.</string>
+    <string name="login_open_device_page">Открыть страницу входа</string>
+    <string name="login_error_invalid_api_key">API-ключ отклонён. Проверьте его и попробуйте снова.</string>
+    <string name="login_error_port_busy">Порт входа занят. Используйте код устройства или API-ключ.</string>
+    <string name="login_error_timeout">Время входа истекло. Запустите вход заново.</string>
+    <string name="login_error_network">Не удалось связаться с сервером. Проверьте сеть и повторите.</string>
+    <string name="login_error_generic">Не удалось войти. Попробуйте другой способ.</string>
+    <string name="sign_out">Выйти</string>
 </resources>

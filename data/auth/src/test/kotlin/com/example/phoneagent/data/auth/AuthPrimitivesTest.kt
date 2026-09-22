@@ -89,6 +89,7 @@ class AuthPrimitivesTest {
                 refreshToken = "refresh-secret",
                 accessTokenExpiresAtEpochSeconds = 200L,
                 earliestRefreshAtEpochSeconds = 100L,
+                method = AuthMethod.CHATGPT_BROWSER,
             )
 
         val rendered = tokens.toString()
@@ -145,6 +146,22 @@ class AuthPrimitivesTest {
         }
 
     @Test
+    fun `refresh preserves the original sign-in method regardless of what the gateway returns`() =
+        runTest {
+            val oldTokens = tokens(expiresAt = 100L, method = AuthMethod.API_KEY)
+            // The gateway is shared and stamps an arbitrary method; the refresher must not trust it.
+            val gatewayTokens = tokens(expiresAt = 400L, method = AuthMethod.CHATGPT_BROWSER)
+            val store = InMemoryTokenStore(oldTokens)
+            val refresher =
+                TokenRefresher(store, FakeRefreshGateway(RefreshResult.Success(gatewayTokens)), FakeClock(epochMillis = 100_000L))
+
+            val outcome = refresher.current() as TokenRefreshOutcome.Ready
+
+            assertEquals(AuthMethod.API_KEY, outcome.tokens.method)
+            assertEquals(AuthMethod.API_KEY, store.stored?.method)
+        }
+
+    @Test
     fun `ten parallel requests perform one refresh`() =
         runTest {
             val oldTokens = tokens(expiresAt = 100L)
@@ -190,6 +207,7 @@ class AuthPrimitivesTest {
         expiresAt: Long,
         earliestRefreshAt: Long? = null,
         refreshToken: String = "refresh-token",
+        method: AuthMethod = AuthMethod.CHATGPT_BROWSER,
     ): AuthTokens =
         AuthTokens(
             accessToken = "access-token",
@@ -197,6 +215,7 @@ class AuthPrimitivesTest {
             refreshToken = refreshToken,
             accessTokenExpiresAtEpochSeconds = expiresAt,
             earliestRefreshAtEpochSeconds = earliestRefreshAt,
+            method = method,
         )
 
     private fun jwt(payload: String): String =

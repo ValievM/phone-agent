@@ -9,6 +9,18 @@ public data class AuthConfig(
     public val scope: String,
     public val authorizationParameters: Map<String, String>,
 ) {
+    public val deviceCodeEndpoint: String
+        get() = "${issuer.trimEnd('/')}/deviceauth/usercode"
+
+    public val deviceTokenEndpoint: String
+        get() = "${issuer.trimEnd('/')}/deviceauth/token"
+
+    public val deviceVerificationUrl: String
+        get() = "${issuer.trimEnd('/')}/device"
+
+    public val deviceCallbackUrl: String
+        get() = "${issuer.trimEnd('/')}/deviceauth/callback"
+
     public companion object {
         public val ChatGptSubscription: AuthConfig =
             AuthConfig(

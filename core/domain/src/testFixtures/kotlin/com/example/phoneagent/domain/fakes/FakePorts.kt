@@ -2,6 +2,7 @@ package com.example.phoneagent.domain.fakes
 
 import com.example.phoneagent.domain.auth.Credentials
 import com.example.phoneagent.domain.auth.CredentialsProvider
+import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
@@ -52,11 +53,11 @@ public class FakeSettingsRepository : SettingsRepository {
 }
 
 public class FakeCredentialsProvider(
-    public var credentials: Credentials,
+    public var currentResult: CredentialsResult,
 ) : CredentialsProvider {
     public var refreshedCredentials: Credentials? = null
 
-    override suspend fun current(): Credentials = credentials
+    override suspend fun current(): CredentialsResult = currentResult
 
     override suspend fun refreshAfterUnauthorized(): Credentials? = refreshedCredentials
 }

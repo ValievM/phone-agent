@@ -27,6 +27,8 @@ public sealed interface AuthState {
 public sealed interface AuthFailure {
     public data object InvalidApiKey : AuthFailure
 
+    public data object ProviderUnavailable : AuthFailure
+
     public data object InvalidGrant : AuthFailure
 
     public data object StateMismatch : AuthFailure
@@ -62,11 +64,16 @@ public data class AuthTokens(
     public val refreshToken: String?,
     public val accessTokenExpiresAtEpochSeconds: Long?,
     public val earliestRefreshAtEpochSeconds: Long?,
+    // The method that produced this session. OAuth gateways are shared by several AuthProvider
+    // implementations and cannot know it themselves, so the owning AuthProvider stamps it on the
+    // result it returns, and TokenRefresher preserves it across refreshes. Persisted so
+    // SessionManager.restore() can report the real method instead of guessing from token shape.
+    public val method: AuthMethod,
 ) {
     override fun toString(): String =
         "AuthTokens(accessToken=<redacted>, idToken=<redacted>, refreshToken=<redacted>, " +
             "accessTokenExpiresAtEpochSeconds=$accessTokenExpiresAtEpochSeconds, " +
-            "earliestRefreshAtEpochSeconds=$earliestRefreshAtEpochSeconds)"
+            "earliestRefreshAtEpochSeconds=$earliestRefreshAtEpochSeconds, method=$method)"
 }
 
 public sealed interface AuthResult {
@@ -108,24 +115,18 @@ public interface TokenRefreshGateway {
     public suspend fun refresh(refreshToken: String): RefreshResult
 }
 
+// Stamps the real sign-in method onto a gateway result. The OAuth gateway is shared by several
+// AuthProvider implementations and cannot know which one is calling it.
+internal fun AuthResult.withMethod(method: AuthMethod): AuthResult =
+    when (this) {
+        is AuthResult.Success -> AuthResult.Success(tokens.copy(method = method))
+        is AuthResult.Failure -> this
+    }
+
 public interface TokenStore {
     public suspend fun read(): AuthTokens?
 
     public suspend fun write(tokens: AuthTokens)
 
     public suspend fun clear()
-}
-
-public sealed interface ApiKeyValidationResult {
-    public data object Valid : ApiKeyValidationResult
-
-    public data object Rejected : ApiKeyValidationResult
-
-    public data class Failure(
-        public val failure: AuthFailure,
-    ) : ApiKeyValidationResult
-}
-
-public interface ApiKeyValidationGateway {
-    public suspend fun validate(key: String): ApiKeyValidationResult
 }

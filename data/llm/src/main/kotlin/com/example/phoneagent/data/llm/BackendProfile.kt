@@ -5,10 +5,10 @@ public data class BackendProfile(
     public val model: String,
 ) {
     public companion object {
-        public val StagePlaceholder: BackendProfile =
+        public val ChatGptSubscription: BackendProfile =
             BackendProfile(
-                baseUrl = "https://example.invalid",
-                model = "stage-placeholder",
+                baseUrl = "https://chatgpt.com/backend-api/codex",
+                model = "gpt-5.6-sol",
             )
     }
 }

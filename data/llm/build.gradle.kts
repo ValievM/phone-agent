@@ -4,6 +4,9 @@ plugins {
 
 dependencies {
     api(project(":core:domain"))
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver3)
     testImplementation(testFixtures(project(":core:domain")))
 }

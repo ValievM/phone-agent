@@ -41,6 +41,18 @@ class ChatGptBrowserAuthTest {
         }
 
     @Test
+    fun `successful exchange is stamped with the browser method regardless of what the gateway returns`() =
+        runTest {
+            val gatewayTokens = AuthTokens("new-access", null, "refresh", 300L, null, AuthMethod.API_KEY)
+            val gateway = FakeTokenGateway(AuthResult.Success(gatewayTokens))
+            val auth = browserAuth(FakeCallbackReceiver(CallbackResult.Received("code", EXPECTED_STATE)), gateway)
+
+            val result = auth.signIn() as AuthResult.Success
+
+            assertEquals(AuthMethod.CHATGPT_BROWSER, result.tokens.method)
+        }
+
+    @Test
     fun `network exchange failure does not clear an existing session`() =
         runTest {
             val existingTokens = tokens("existing-access")
@@ -119,6 +131,7 @@ class ChatGptBrowserAuthTest {
     private companion object {
         private const val EXPECTED_STATE: String = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
 
-        private fun tokens(accessToken: String): AuthTokens = AuthTokens(accessToken, null, "refresh", 300L, null)
+        private fun tokens(accessToken: String): AuthTokens =
+            AuthTokens(accessToken, null, "refresh", 300L, null, AuthMethod.CHATGPT_BROWSER)
     }
 }

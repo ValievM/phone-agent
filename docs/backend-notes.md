@@ -69,7 +69,6 @@
 События SSE, которые наблюдались: `response.created`, `response.in_progress`, `response.output_item.added`, `response.function_call_arguments.delta` / `.done`, `response.output_item.done`, `response.content_part.added` / `.done`, `response.output_text.delta` / `.done`, `response.completed`. В `delta` есть поле `obfuscation`, игнорировать. Образец потока: `spike/sample_sse.txt` (17 КБ, без токенов), используется в тестах парсера на этапе 3.
 
 ## Не проверено (остаётся на следующие этапы)
-- Приёмник на `127.0.0.1:1455` внутри приложения на эмуляторе Android (пункт 0.5, этап 2).
 - Будильник и приложение «Часы» (пункт 0.6).
 - Device code flow.
 - Минимальный набор заголовков, поведение при 401, 403, 429, лимиты подписки.

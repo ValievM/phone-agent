@@ -33,8 +33,11 @@ public class TokenRefresher(
 
             when (val result = gateway.refresh(refreshToken)) {
                 is RefreshResult.Success -> {
-                    tokenStore.write(result.tokens)
-                    TokenRefreshOutcome.Ready(result.tokens)
+                    // The gateway doesn't know which AuthProvider originally signed in, so it
+                    // cannot set the right method; preserve it from the tokens we just read.
+                    val refreshed = result.tokens.copy(method = tokens.method)
+                    tokenStore.write(refreshed)
+                    TokenRefreshOutcome.Ready(refreshed)
                 }
 
                 is RefreshResult.Failure -> {
