@@ -4,11 +4,14 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.error
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -156,6 +159,12 @@ public class ChatGptBrowserAuth(
     private val logger: AppLogger,
     private val entropy: AuthEntropy = SecureAuthEntropy,
     private val timeoutMillis: Long = CALLBACK_TIMEOUT_MILLIS,
+    // Android can cut a backgrounded app's outgoing network access for as long as the user is
+    // looking at the Custom Tab, which is exactly when the loopback callback arrives and this
+    // exchange would otherwise fire — see the retry comment on OkHttpTokenRefreshGateway for the
+    // observed evidence. Waiting here for the app to actually be back in the foreground avoids
+    // racing a network window that isn't open yet.
+    private val awaitForeground: suspend () -> Unit = { awaitProcessForeground() },
 ) : AuthProvider {
     override val method: AuthMethod = AuthMethod.CHATGPT_BROWSER
 
@@ -188,6 +197,7 @@ public class ChatGptBrowserAuth(
                         }
 
                         else -> {
+                            awaitForeground()
                             tokenGateway
                                 .exchangeAuthorizationCode(
                                     AuthorizationCodeExchange(
@@ -234,4 +244,11 @@ public class ChatGptBrowserAuth(
     private companion object {
         private const val CALLBACK_TIMEOUT_MILLIS: Long = 3 * 60 * 1_000L
     }
+}
+
+private suspend fun awaitProcessForeground() {
+    ProcessLifecycleOwner
+        .get()
+        .lifecycle.currentStateFlow
+        .first { it.isAtLeast(Lifecycle.State.STARTED) }
 }

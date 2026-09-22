@@ -1,6 +1,9 @@
 package com.example.phoneagent.data.auth
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -79,12 +82,41 @@ class ChatGptBrowserAuthTest {
                     tokenGateway = FakeTokenGateway(),
                     logger = logger,
                     entropy = FixedEntropy(),
+                    awaitForeground = {},
                 )
 
             val result = auth.signIn()
 
             assertEquals(AuthResult.Failure(AuthFailure.Network(null)), result)
             assertEquals(boom, logger.events.single().throwable)
+        }
+
+    @Test
+    fun `waits for the app to return to the foreground before exchanging the authorization code`() =
+        runTest {
+            val gateway = FakeTokenGateway()
+            val foregroundGate = CompletableDeferred<Unit>()
+            val auth =
+                ChatGptBrowserAuth(
+                    config = AuthConfig.ChatGptSubscription,
+                    callbackReceiver = FakeCallbackReceiver(CallbackResult.Received("code", EXPECTED_STATE)),
+                    browserLauncher = FakeBrowserLauncher(),
+                    tokenGateway = gateway,
+                    logger = FakeAppLogger(),
+                    entropy = FixedEntropy(),
+                    awaitForeground = { foregroundGate.await() },
+                )
+
+            val signIn = async { auth.signIn() }
+            runCurrent()
+
+            assertEquals(0, gateway.exchangeCalls)
+
+            foregroundGate.complete(Unit)
+            runCurrent()
+
+            assertEquals(1, gateway.exchangeCalls)
+            assertEquals(AuthMethod.CHATGPT_BROWSER, (signIn.await() as AuthResult.Success).tokens.method)
         }
 
     private fun browserAuth(
@@ -98,6 +130,7 @@ class ChatGptBrowserAuthTest {
             tokenGateway = gateway,
             logger = FakeAppLogger(),
             entropy = FixedEntropy(),
+            awaitForeground = {},
         )
 
     private class FixedEntropy : AuthEntropy {

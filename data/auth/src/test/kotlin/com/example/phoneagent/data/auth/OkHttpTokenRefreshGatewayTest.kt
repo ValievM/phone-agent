@@ -4,11 +4,13 @@ import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.URLDecoder
+import java.net.UnknownHostException
 
 class OkHttpTokenRefreshGatewayTest {
     @Test
@@ -74,6 +76,49 @@ class OkHttpTokenRefreshGatewayTest {
                     .build(),
             ) { server ->
                 assertEquals(AuthResult.Failure(AuthFailure.MalformedToken), gateway(server).exchangeAuthorizationCode(EXCHANGE))
+            }
+        }
+
+    @Test
+    fun `a transient DNS failure is retried and does not surface to the caller`() =
+        runTest {
+            serverWith(tokensResponse()) { server ->
+                var attempts = 0
+                val flakyClient =
+                    OkHttpClient
+                        .Builder()
+                        .addInterceptor { chain ->
+                            attempts += 1
+                            if (attempts == 1) throw UnknownHostException("simulated background DNS failure")
+                            chain.proceed(chain.request())
+                        }.build()
+
+                val result = gateway(server, client = flakyClient).exchangeAuthorizationCode(EXCHANGE)
+
+                assertEquals(AuthResult.Success(tokens()), result)
+                assertEquals(2, attempts)
+            }
+        }
+
+    @Test
+    fun `a DNS failure that never recovers exhausts retries, logs each attempt, and returns Network`() =
+        runTest {
+            serverWith(tokensResponse()) { server ->
+                var attempts = 0
+                val alwaysFailingClient =
+                    OkHttpClient
+                        .Builder()
+                        .addInterceptor {
+                            attempts += 1
+                            throw UnknownHostException("simulated persistent DNS failure")
+                        }.build()
+                val logger = FakeAppLogger()
+
+                val result = gateway(server, logger, alwaysFailingClient).exchangeAuthorizationCode(EXCHANGE)
+
+                assertEquals(AuthResult.Failure(AuthFailure.Network(null)), result)
+                assertEquals(3, attempts)
+                assertEquals(3, logger.events.size)
             }
         }
 
@@ -150,7 +195,9 @@ class OkHttpTokenRefreshGatewayTest {
     private fun gateway(
         server: MockWebServer,
         logger: FakeAppLogger = FakeAppLogger(),
-    ): OkHttpTokenRefreshGateway = OkHttpTokenRefreshGateway(config(server), logger, nowEpochSeconds = { NOW_SECONDS })
+        client: OkHttpClient = OkHttpClient(),
+    ): OkHttpTokenRefreshGateway =
+        OkHttpTokenRefreshGateway(config(server), logger, client, nowEpochSeconds = { NOW_SECONDS }, retryDelay = {})
 
     private fun config(server: MockWebServer): AuthConfig =
         AuthConfig("issuer", "authorize", server.url("/oauth/token").toString(), "client", "redirect", "scope", emptyMap())

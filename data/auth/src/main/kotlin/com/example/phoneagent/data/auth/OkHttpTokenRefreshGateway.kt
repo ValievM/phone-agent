@@ -4,6 +4,7 @@ import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -23,6 +24,12 @@ public class OkHttpTokenRefreshGateway(
     private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
     private val nowEpochSeconds: () -> Long = { System.currentTimeMillis() / MILLIS_PER_SECOND },
+    // Android can cut a backgrounded app's network access (Doze/App Standby/battery
+    // restrictions), which is exactly the window this call runs in: the user is still looking
+    // at the "you can close this" browser page when the loopback callback fires and this
+    // request goes out. A DNS/connection failure there is often transient, not "no internet".
+    private val retryDelaysMillis: List<Long> = listOf(FIRST_RETRY_DELAY_MILLIS, SECOND_RETRY_DELAY_MILLIS),
+    private val retryDelay: suspend (Long) -> Unit = { millis -> delay(millis) },
 ) : TokenRefreshGateway {
     override suspend fun exchangeAuthorizationCode(exchange: AuthorizationCodeExchange): AuthResult =
         request(
@@ -46,53 +53,68 @@ public class OkHttpTokenRefreshGateway(
 
     private suspend fun request(fields: Map<String, String>): GatewayResult =
         withContext(Dispatchers.IO) {
-            try {
-                val body = FormBody.Builder().apply { fields.forEach(::add) }.build()
-                val request =
-                    Request
-                        .Builder()
-                        .url(config.tokenEndpoint)
-                        .post(body)
-                        .build()
-                client.newCall(request).execute().use { response ->
-                    val responseBody = response.body.string()
-                    when {
-                        response.isSuccessful -> {
-                            parseTokens(responseBody)
-                        }
-
-                        responseBody.errorCode() == INVALID_GRANT -> {
-                            GatewayResult.InvalidGrant
-                        }
-
-                        else -> {
-                            // A non-2xx response that isn't invalid_grant used to be collapsed into
-                            // a generic "network" failure with the real reason thrown away. The
-                            // OAuth "error" field (e.g. invalid_client, invalid_request) is not a
-                            // secret; only the raw response body is withheld.
-                            logger.warn(
-                                TAG,
-                                "token endpoint returned a non-success response",
-                                fields =
-                                    mapOf(
-                                        "httpStatus" to response.code.toString(),
-                                        "error" to (responseBody.errorCode() ?: "unknown"),
-                                    ),
-                            )
-                            GatewayResult.Network
-                        }
-                    }
+            val maxAttempts = retryDelaysMillis.size + 1
+            for (attempt in 1..maxAttempts) {
+                try {
+                    return@withContext attemptRequest(fields)
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: IOException) {
+                    val isLastAttempt = attempt == maxAttempts
+                    logger.warn(
+                        TAG,
+                        if (isLastAttempt) "token endpoint request failed, giving up" else "token endpoint request failed, retrying",
+                        fields = mapOf("attempt" to attempt.toString(), "maxAttempts" to maxAttempts.toString()),
+                        throwable = exception,
+                    )
+                    if (isLastAttempt) return@withContext GatewayResult.Network
+                    retryDelay(retryDelaysMillis[attempt - 1])
+                } catch (exception: Exception) {
+                    logger.warn(TAG, "token endpoint response could not be parsed", throwable = exception)
+                    return@withContext GatewayResult.Malformed
                 }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: IOException) {
-                logger.warn(TAG, "token endpoint request failed", throwable = exception)
-                GatewayResult.Network
-            } catch (exception: Exception) {
-                logger.warn(TAG, "token endpoint response could not be parsed", throwable = exception)
-                GatewayResult.Malformed
+            }
+            error("unreachable: request() retry loop always returns before exhausting maxAttempts")
+        }
+
+    private fun attemptRequest(fields: Map<String, String>): GatewayResult {
+        val body = FormBody.Builder().apply { fields.forEach(::add) }.build()
+        val request =
+            Request
+                .Builder()
+                .url(config.tokenEndpoint)
+                .post(body)
+                .build()
+        return client.newCall(request).execute().use { response ->
+            val responseBody = response.body.string()
+            when {
+                response.isSuccessful -> {
+                    parseTokens(responseBody)
+                }
+
+                responseBody.errorCode() == INVALID_GRANT -> {
+                    GatewayResult.InvalidGrant
+                }
+
+                else -> {
+                    // A non-2xx response that isn't invalid_grant used to be collapsed into
+                    // a generic "network" failure with the real reason thrown away. The
+                    // OAuth "error" field (e.g. invalid_client, invalid_request) is not a
+                    // secret; only the raw response body is withheld.
+                    logger.warn(
+                        TAG,
+                        "token endpoint returned a non-success response",
+                        fields =
+                            mapOf(
+                                "httpStatus" to response.code.toString(),
+                                "error" to (responseBody.errorCode() ?: "unknown"),
+                            ),
+                    )
+                    GatewayResult.Network
+                }
             }
         }
+    }
 
     private fun parseTokens(body: String): GatewayResult =
         try {
@@ -156,6 +178,8 @@ public class OkHttpTokenRefreshGateway(
         private const val ERROR: String = "error"
         private const val INVALID_GRANT: String = "invalid_grant"
         private const val MILLIS_PER_SECOND: Long = 1_000L
+        private const val FIRST_RETRY_DELAY_MILLIS: Long = 500L
+        private const val SECOND_RETRY_DELAY_MILLIS: Long = 1_500L
     }
 }
 
