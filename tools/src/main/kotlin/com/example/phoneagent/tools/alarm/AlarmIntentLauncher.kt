@@ -3,13 +3,18 @@ package com.example.phoneagent.tools.alarm
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.warn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+
+private const val TAG = "AlarmIntentLauncher"
 
 internal class AlarmIntentLauncher
     @Inject
     constructor(
         @param:ApplicationContext private val applicationContext: Context,
+        private val logger: AppLogger,
     ) {
         fun launch(spec: AlarmIntentSpec): AlarmLaunchResult {
             val intent = spec.toAndroidIntent()
@@ -22,7 +27,11 @@ internal class AlarmIntentLauncher
                 AlarmLaunchResult.Started
             } catch (_: ActivityNotFoundException) {
                 AlarmLaunchResult.NoClockApp
-            } catch (_: SecurityException) {
+            } catch (exception: SecurityException) {
+                // Caught, not thrown: the tool must report a normal Failed outcome, not crash the
+                // turn — but the reason is easy to lose (e.g. background-activity-launch
+                // restrictions), so it goes to the log rather than being silently discarded.
+                logger.warn(TAG, "startActivity(SET_ALARM) rejected", throwable = exception)
                 AlarmLaunchResult.Failed
             }
         }

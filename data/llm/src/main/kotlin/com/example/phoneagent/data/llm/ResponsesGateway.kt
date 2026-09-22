@@ -127,6 +127,7 @@ public class ResponsesGateway(
                     response.close()
                 }
             } catch (e: IOException) {
+                logger.warn(TAG, "model request network failure", throwable = e)
                 send(ModelEvent.Failed(e.toAgentError()))
                 AttemptOutcome.Done
             }
@@ -135,9 +136,24 @@ public class ResponsesGateway(
 
     private suspend fun SendChannel<ModelEvent>.handle(response: Response): AttemptOutcome {
         when {
-            response.code == HTTP_UNAUTHORIZED -> return AttemptOutcome.Unauthorized
-            !response.isSuccessful -> send(ModelEvent.Failed(response.toAgentError()))
-            else -> streamBody(response)
+            response.code == HTTP_UNAUTHORIZED -> {
+                return AttemptOutcome.Unauthorized
+            }
+
+            !response.isSuccessful -> {
+                // RedactingAppLogger strips anything token-shaped, so logging the body is safe
+                // and is often the only way to tell a schema rejection from a quota error.
+                logger.warn(
+                    TAG,
+                    "model request rejected",
+                    fields = mapOf("status" to response.code.toString(), "body" to response.bodySnippet()),
+                )
+                send(ModelEvent.Failed(response.toAgentError()))
+            }
+
+            else -> {
+                streamBody(response)
+            }
         }
         return AttemptOutcome.Done
     }
@@ -173,6 +189,13 @@ private enum class AttemptOutcome {
     Done,
     Unauthorized,
 }
+
+private fun Response.bodySnippet(maxChars: Int = 500): String =
+    try {
+        body.string().take(maxChars)
+    } catch (_: IOException) {
+        "<unreadable>"
+    }
 
 private fun Response.toAgentError(): AgentError =
     when (code) {
