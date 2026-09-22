@@ -32,6 +32,15 @@ public class ToolPipeline(
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
 ) {
+    /** For [com.example.phoneagent.domain.agent.AgentLoop] to build a UI-facing event before running the call. */
+    public fun describe(
+        name: String,
+        args: JsonObject,
+    ): CallDescription? = registry.find(name)?.describe(args)
+
+    /** Null for an unregistered name; SAFE tools never trigger [UserInteraction.confirm]. */
+    public fun riskOf(name: String): Risk? = registry.find(name)?.spec?.risk
+
     public suspend fun run(
         name: String,
         args: JsonObject,

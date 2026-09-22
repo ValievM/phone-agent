@@ -14,6 +14,7 @@ import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.LogLevel
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.ConversationRepository
@@ -24,12 +25,18 @@ import kotlinx.coroutines.flow.flow
 
 public class FakeModelGateway : ModelGateway {
     public val requests: MutableList<ModelRequest> = mutableListOf()
+
+    /** Replayed on every call once [responseQueue] is empty; the simple single-response case. */
     public var events: List<ModelEvent> = emptyList()
+
+    /** One entry per call, consumed in order; lets a test script a multi-step conversation. */
+    public val responseQueue: ArrayDeque<List<ModelEvent>> = ArrayDeque()
 
     override fun stream(request: ModelRequest): Flow<ModelEvent> =
         flow {
             requests += request
-            events.forEach { emit(it) }
+            val toEmit = if (responseQueue.isNotEmpty()) responseQueue.removeFirst() else events
+            toEmit.forEach { emit(it) }
         }
 }
 
@@ -67,6 +74,12 @@ public class FakeClock(
     public var epochMillis: Long = 0L,
 ) : Clock {
     override fun nowEpochMillis(): Long = epochMillis
+}
+
+public class FakeIdGenerator : IdGenerator {
+    private var counter = 0
+
+    override fun newId(): String = "id-${++counter}"
 }
 
 public class FakeDispatcherProvider(

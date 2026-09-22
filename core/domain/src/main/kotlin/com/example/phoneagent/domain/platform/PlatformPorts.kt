@@ -13,6 +13,13 @@ public interface DispatcherProvider {
     public val default: CoroutineDispatcher
 }
 
+/** Ids for new [com.example.phoneagent.domain.conversation.HistoryItem]s; a port so tests get deterministic ids. */
+public fun interface IdGenerator {
+    public fun newId(): String
+}
+
+public val RandomIdGenerator: IdGenerator = IdGenerator { UUID.randomUUID().toString() }
+
 public enum class LogLevel {
     DEBUG,
     INFO,
