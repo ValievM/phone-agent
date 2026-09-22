@@ -40,6 +40,7 @@
 |---|---|---|---|
 | `set_alarm` | `hour` 0-23, `minute` 0-59, `label?` ≤ 60 симв., `days?` | `ACTION_SET_ALARM`, `EXTRA_SKIP_UI=true` после собственного подтверждения в приложении; перед запуском `resolveActivity`. Результат: «запрос отправлен в приложение Часы» (подтверждения создания нет) | да |
 | `find_files` | `query` (подстрока имени), `limit` ≤ 20 | SAF: пользователь один раз выбирает папку (`OpenDocumentTree`), `takePersistableUriPermission`; обход в ширину через `ContentResolver.query` по `DocumentsContract`; лимиты: глубина ≤ 6, ≤ 5000 просмотренных узлов, таймаут 5 с, `Dispatchers.IO`. Возвращает имя, относительный путь, размер, дату, MIME. Содержимое файлов не читается и в модель не уходит | нет (только чтение метаданных) |
+| `search_files` | `query` (непустая подстрока имени, ≤ 200 символов) | MediaStore `Files` + `Downloads`, совпадение по `DISPLAY_NAME`, сортировка по `DATE_MODIFIED DESC`; максимум 20, дедупликация по точным имени и размеру, таймаут 5 с. Возвращает JSON с именем, `content://` URI, относительным путём, размером, датой и MIME. Только доступные приложению метаданные, содержимое не читается | нет (только чтение метаданных) |
 | `notify` | `title` ≤ 60, `text` ≤ 200 | `NotificationManagerCompat`, канал создаётся при старте; на API 33+ сначала `POST_NOTIFICATIONS` | нет |
 
 Правила: никакого `run_shell`, произвольных путей, чтения содержимого файлов; неизвестное имя инструмента или невалидные аргументы → ошибка модели без выполнения.
@@ -55,5 +56,6 @@
 ## Разрешения и манифест
 - `com.android.alarm.permission.SET_ALARM`, `POST_NOTIFICATIONS`, `INTERNET`.
 - `<queries>` для `android.intent.action.SET_ALARM`.
-- Доступ к файлам только через SAF (без `MANAGE_EXTERNAL_STORAGE`).
+- `find_files` работает только в папке, выбранной через SAF. `search_files` использует доступные приложению строки MediaStore и не читает содержимое. На Android 10+ такой поиск не охватывает все файлы: часть загрузок других приложений доступна только через SAF; запасной обход SAF-корней для `search_files` не выполняется. `MANAGE_EXTERNAL_STORAGE` не используется.
+- Для `search_files`: `READ_EXTERNAL_STORAGE` до API 33; `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` с API 33; `READ_MEDIA_VISUAL_USER_SELECTED` с API 34 для частичного доступа к выбранным фото и видео.
 - Разрешения запрашиваются в момент первого использования с объяснением.

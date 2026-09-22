@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 
 public enum class Capability {
     NOTIFICATIONS,
+    FILES,
 }
 
 public sealed interface CapabilityResult {
