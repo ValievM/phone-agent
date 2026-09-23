@@ -172,7 +172,7 @@ class ChatViewModelRetryTest {
         }
 
     @Test
-    fun `the failed attempt leaves the saved history as soon as a retry starts`() =
+    fun `a retry saves only the question again so the failed attempt cannot come back`() =
         runTest(dispatcher.scheduler) {
             val repository = RetryFakeRepository()
             val gateway = FailThenHangGateway()
@@ -186,7 +186,10 @@ class ChatViewModelRetryTest {
 
             try {
                 assertTrue(viewModel.state.value.isRunning)
-                assertEquals(emptyList<HistoryItem>(), repository.load())
+                assertEquals(
+                    listOf("Привет"),
+                    repository.load().map { (it as HistoryItem.UserMessage).text },
+                )
             } finally {
                 viewModel.onEvent(ChatUiEvent.Stop)
                 runCurrent()

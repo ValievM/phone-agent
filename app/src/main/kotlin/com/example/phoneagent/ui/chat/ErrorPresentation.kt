@@ -78,6 +78,10 @@ internal fun AgentError.toPresentation(): ErrorPresentation? =
             ErrorPresentation(R.string.error_generic, ErrorPlacement.Inline, retryable = true)
         }
 
+        AgentError.Interrupted -> {
+            ErrorPresentation(R.string.error_interrupted, ErrorPlacement.Inline, retryable = true)
+        }
+
         AgentError.Cancelled -> {
             null
         }

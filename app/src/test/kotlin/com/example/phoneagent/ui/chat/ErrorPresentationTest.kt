@@ -91,6 +91,14 @@ class ErrorPresentationTest {
     }
 
     @Test
+    fun `a question left unanswered by a closed app is inline and can be retried`() {
+        assertEquals(
+            ErrorPresentation(R.string.error_interrupted, ErrorPlacement.Inline, retryable = true),
+            AgentError.Interrupted.toPresentation(),
+        )
+    }
+
+    @Test
     fun `a stop pressed by the user is not shown as an error`() {
         assertNull(AgentError.Cancelled.toPresentation())
     }
