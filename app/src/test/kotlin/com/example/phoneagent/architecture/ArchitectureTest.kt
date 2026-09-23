@@ -84,6 +84,29 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `model output can never load images because no image loader is used`() {
+        val violations =
+            productionFiles.filter { file ->
+                file.imports.any {
+                    it.name.startsWith("coil") ||
+                        (it.name.contains("ImageTransformer") && !it.name.endsWith("NoOpImageTransformerImpl"))
+                }
+            }
+
+        assertTrue("Image loading imports in: ${violations.map { it.path }}", violations.isEmpty())
+    }
+
+    @Test
+    fun `only AssistantMarkdown talks to the markdown library`() {
+        val violations =
+            productionFiles
+                .filter { file -> file.imports.any { it.name.startsWith("com.mikepenz.") || it.name.startsWith("dev.snipme.") } }
+                .filter { !it.path.endsWith("/ui/designsystem/components/AssistantMarkdown.kt") }
+
+        assertTrue("Markdown library used outside AssistantMarkdown: ${violations.map { it.path }}", violations.isEmpty())
+    }
+
+    @Test
     fun `ui color literals live only in theme and Text has no literals`() {
         val colorViolations =
             productionFiles

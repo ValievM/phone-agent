@@ -59,6 +59,23 @@ class ChatScreenScreenshotTest {
         )
 
     @Test
+    fun markdownReply() =
+        composeRule.snapshot("chat_markdown", listOf(Variant.Light, Variant.Dark), fillScreen = true, immediateWork = true) {
+            ChatScreen(
+                state =
+                    ChatUiState(
+                        messages =
+                            listOf(
+                                ChatMessage("1", ChatRole.USER, "Составь план на утро"),
+                                ChatMessage("2", ChatRole.ASSISTANT, MARKDOWN_REPLY),
+                            ),
+                    ),
+                onEvent = {},
+                onOpenSettings = {},
+            )
+        }
+
+    @Test
     fun running() =
         screen(
             "running",

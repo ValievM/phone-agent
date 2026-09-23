@@ -37,3 +37,17 @@ internal val fileHits =
 
 internal const val LONG_CYRILLIC =
     "Чрезвычайнопродолжительноесловоневлезающеевстрокуприобычныхнастройкахшрифта и обычный текст после него"
+
+internal const val MARKDOWN_REPLY =
+    "Вот **план** на утро:\n\n" +
+        "1. Откройте [документацию](https://developer.android.com/docs)\n" +
+        "2. Проверьте `AlarmClock` и *интент*\n\n" +
+        "```kotlin\nval hour = 7\nval minute = 30\n```\n\n" +
+        "> Осторожно: будильник сработает один раз\n\n" +
+        "| Поле | Значение |\n|---|---|\n| hour | 7 |\n| minute | 30 |"
+
+internal const val UNCLOSED_FENCE_REPLY = "Запускаю:\n\n```kotlin\nval hour = 7\nval minute ="
+
+internal const val HOSTILE_REPLY =
+    "Смотри: ![пиксель слежения](https://tracker.example/p.png) и <script>alert(1)</script>\n\n" +
+        "<a href=\"https://evil.example\">нажми</a>"

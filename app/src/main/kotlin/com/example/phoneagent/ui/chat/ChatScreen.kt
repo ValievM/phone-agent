@@ -47,6 +47,7 @@ fun ChatRoute(
         onEvent = viewModel::onEvent,
         onOpenSettings = onOpenSettings,
         onOpenFile = { fileHit -> openFileHit(context, fileHit) },
+        onOpenLink = { url -> openLink(context, url) },
         modifier = modifier,
     )
 }
@@ -59,6 +60,7 @@ fun ChatScreen(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenFile: (FileHit) -> Unit = {},
+    onOpenLink: (String) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -80,6 +82,7 @@ fun ChatScreen(
             state = state,
             onEvent = onEvent,
             onOpenFile = onOpenFile,
+            onOpenLink = onOpenLink,
             modifier = Modifier.padding(contentPadding),
         )
     }
@@ -91,6 +94,7 @@ private fun ChatBody(
     state: ChatUiState,
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
+    onOpenLink: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -120,6 +124,7 @@ private fun ChatBody(
                 messages = state.messages,
                 onEvent = onEvent,
                 onOpenFile = onOpenFile,
+                onOpenLink = onOpenLink,
                 modifier =
                     Modifier
                         .weight(1f)

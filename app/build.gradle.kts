@@ -23,10 +23,11 @@ android {
     }
 }
 
-// Screenshot tests need androidx.activity.ComponentActivity from ui-test-manifest, which only the
-// debug variant carries; the rendering they check does not depend on the build type.
+// Compose UI tests (screenshot/ and *UiTest) need androidx.activity.ComponentActivity from
+// ui-test-manifest, which only the debug variant carries; what they check does not depend on the
+// build type.
 tasks.withType<Test>().configureEach {
-    if (name.contains("Release")) exclude("**/screenshot/**")
+    if (name.contains("Release")) exclude("**/screenshot/**", "**/*UiTest*")
 }
 
 roborazzi {
@@ -51,6 +52,16 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.runtime)
     implementation(libs.okhttp)
+    implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.code)
+    constraints {
+        // markdown-renderer-code asks for highlights 1.1.0, which is compiled for Java 21 and cannot
+        // be loaded by the JDK 17 the unit tests run on (this project's toolchain); 1.0.0 is Java 8
+        // bytecode with the API the renderer uses. Same reason the renderer stays on 0.39.x.
+        implementation(libs.snipme.highlights) {
+            version { strictly(libs.versions.snipmeHighlights.get()) }
+        }
+    }
     ksp(libs.hilt.compiler)
     ksp(libs.androidx.room.compiler)
 
