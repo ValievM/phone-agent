@@ -12,6 +12,7 @@ import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.warn
+import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.SendChannel
@@ -40,6 +41,7 @@ private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val MAX_ATTEMPTS = 2
+private const val DEFAULT_MODEL = "gpt-5.6-luna"
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 /**
@@ -60,6 +62,7 @@ private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 public class ResponsesGateway(
     private val profile: BackendProfile,
     private val credentialsProvider: CredentialsProvider,
+    private val settingsRepository: SettingsRepository,
     private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
     // Test seam: lets a test capture the Call OkHttp created, to assert it gets cancelled when
@@ -96,7 +99,8 @@ public class ResponsesGateway(
         initialCredentials: Credentials,
         activeCall: AtomicReference<Call?>,
     ) {
-        val body = buildResponsesRequestBody(request, profile, newSessionId())
+        val model = settingsRepository.load().model ?: DEFAULT_MODEL
+        val body = buildResponsesRequestBody(request, profile, model, newSessionId())
         var credentials = initialCredentials
         var sessionExpired = false
         for (attempt in 1..MAX_ATTEMPTS) {

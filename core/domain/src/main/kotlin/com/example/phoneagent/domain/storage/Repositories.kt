@@ -11,6 +11,7 @@ public interface ConversationRepository {
 public data class AppSettings(
     public val useDynamicColors: Boolean = true,
     public val useDarkTheme: Boolean? = null,
+    public val model: String? = null,
 )
 
 public interface SettingsRepository {
