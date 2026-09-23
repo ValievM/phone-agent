@@ -70,7 +70,7 @@ class LoginViewModel
                     )
                 }
 
-                AppAuthStatus.SignedIn -> {
+                is AppAuthStatus.SignedIn -> {
                     LoginUiState(isSignedIn = true)
                 }
 

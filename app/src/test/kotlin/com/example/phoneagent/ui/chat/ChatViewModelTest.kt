@@ -3,6 +3,7 @@ package com.example.phoneagent.ui.chat
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
+import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -12,6 +13,7 @@ import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
@@ -22,11 +24,16 @@ import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -70,7 +77,7 @@ class ChatViewModelTest {
                             ModelEvent.Completed(),
                         )
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
             val states = mutableListOf<ChatUiState>()
             backgroundScope.launch { viewModel.state.collect { states += it } }
 
@@ -93,11 +100,218 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `view model restores conversation after restarting`() =
+        runTest(dispatcher.scheduler) {
+            val repository = FakeConversationRepository(emptyList())
+            val firstRun =
+                ChatViewModel(
+                    agentLoop(
+                        FakeModelGateway().apply {
+                            events = listOf(ModelEvent.TextDelta("Earlier answer"), ModelEvent.Completed())
+                        },
+                    ),
+                    repository,
+                )
+            firstRun.onEvent(ChatUiEvent.Submit("Earlier question"))
+            advanceUntilIdle()
+
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+            assertEquals(
+                listOf(ChatRole.USER to "Earlier question", ChatRole.ASSISTANT to "Earlier answer"),
+                restarted.state.value.messages
+                    .map { it.role to it.text },
+            )
+        }
+
+    @Test
+    fun `external history replacement clears persisted and visible conversation`() =
+        runTest(dispatcher.scheduler) {
+            val repository =
+                FakeConversationRepository(
+                    listOf(
+                        HistoryItem.UserMessage("saved-user", "Earlier question"),
+                        HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                    ),
+                )
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+
+            repository.replace(emptyList())
+            advanceUntilIdle()
+
+            assertEquals(emptyList<HistoryItem>(), repository.load())
+            assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+        }
+
+    @Test
+    fun `external empty history emission cancels active turn and clears chat`() =
+        runTest(dispatcher.scheduler) {
+            val initialHistory =
+                listOf(
+                    HistoryItem.UserMessage("saved-user", "Earlier question"),
+                    HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                )
+            val repository = FakeConversationRepository(initialHistory)
+            val gateway = HangingModelGateway()
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("New question"))
+            runCurrent()
+            assertTrue(viewModel.state.value.isRunning)
+
+            try {
+                repository.replace(emptyList())
+                runCurrent()
+
+                assertTrue(gateway.wasCancelled)
+                assertFalse(viewModel.state.value.isRunning)
+                assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+                assertEquals(emptyList<HistoryItem>(), repository.load())
+            } finally {
+                viewModel.onEvent(ChatUiEvent.Stop)
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `initial history emission does not cancel submit waiting for startup load`() =
+        runTest(dispatcher.scheduler) {
+            val initialHistory = listOf(HistoryItem.UserMessage("saved-user", "Earlier question"))
+            val allowInitialEmission = CompletableDeferred<Unit>()
+            val updates = MutableSharedFlow<List<HistoryItem>>(extraBufferCapacity = 1)
+            val repository =
+                object : ConversationRepository {
+                    private var items: List<HistoryItem> = initialHistory
+
+                    override suspend fun load(): List<HistoryItem> = items
+
+                    override fun observe(): Flow<List<HistoryItem>> =
+                        flow {
+                            allowInitialEmission.await()
+                            emit(initialHistory)
+                            emitAll(updates)
+                        }
+
+                    override suspend fun replace(items: List<HistoryItem>) {
+                        this.items = items
+                        updates.emit(items)
+                    }
+                }
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Answer"), ModelEvent.Completed()) }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            runCurrent()
+
+            viewModel.onEvent(ChatUiEvent.Submit("New question"))
+            runCurrent()
+            assertTrue(viewModel.state.value.isRunning)
+            assertTrue(gateway.requests.isEmpty())
+
+            allowInitialEmission.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(1, gateway.requests.size)
+            assertFalse(viewModel.state.value.isRunning)
+            assertEquals(
+                listOf("Earlier question", "New question", "Answer"),
+                viewModel.state.value.messages
+                    .map(ChatMessage::text),
+            )
+        }
+
+    @Test
+    fun `completed cancelled turn cannot restore history after external clear`() =
+        runTest(dispatcher.scheduler) {
+            val repository =
+                FakeConversationRepository(
+                    listOf(HistoryItem.UserMessage("saved-user", "Earlier question")),
+                )
+            val finishTurn = CompletableDeferred<Unit>()
+            var wasCancelled = false
+            val gateway =
+                object : ModelGateway {
+                    override fun stream(request: ModelRequest): Flow<ModelEvent> =
+                        flow {
+                            emit(ModelEvent.TextDelta("partial"))
+                            try {
+                                finishTurn.await()
+                            } catch (exception: CancellationException) {
+                                wasCancelled = true
+                                throw exception
+                            }
+                            emit(ModelEvent.Completed())
+                        }
+                }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+            viewModel.onEvent(ChatUiEvent.Submit("New question"))
+            runCurrent()
+
+            try {
+                repository.replace(emptyList())
+                runCurrent()
+                finishTurn.complete(Unit)
+                advanceUntilIdle()
+
+                assertTrue(wasCancelled)
+                assertEquals(listOf(emptyList<HistoryItem>()), repository.replacements)
+                assertEquals(emptyList<HistoryItem>(), repository.load())
+            } finally {
+                viewModel.onEvent(ChatUiEvent.Stop)
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `failed cancelled turn cannot restore history after external clear`() =
+        runTest(dispatcher.scheduler) {
+            val repository =
+                FakeConversationRepository(
+                    listOf(HistoryItem.UserMessage("saved-user", "Earlier question")),
+                )
+            val finishTurn = CompletableDeferred<Unit>()
+            var wasCancelled = false
+            val gateway =
+                object : ModelGateway {
+                    override fun stream(request: ModelRequest): Flow<ModelEvent> =
+                        flow {
+                            emit(ModelEvent.TextDelta("partial"))
+                            try {
+                                finishTurn.await()
+                            } catch (exception: CancellationException) {
+                                wasCancelled = true
+                                throw exception
+                            }
+                            emit(ModelEvent.Failed(AgentError.Offline))
+                        }
+                }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+            viewModel.onEvent(ChatUiEvent.Submit("New question"))
+            runCurrent()
+
+            try {
+                repository.replace(emptyList())
+                runCurrent()
+                finishTurn.complete(Unit)
+                advanceUntilIdle()
+
+                assertTrue(wasCancelled)
+                assertEquals(listOf(emptyList<HistoryItem>()), repository.replacements)
+                assertEquals(emptyList<HistoryItem>(), repository.load())
+            } finally {
+                viewModel.onEvent(ChatUiEvent.Stop)
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `model failure is exposed in state without crashing`() =
         runTest(dispatcher.scheduler) {
             val expectedError = AgentError.Offline
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(expectedError)) }
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Проверка"))
             advanceUntilIdle()
@@ -110,7 +324,7 @@ class ChatViewModelTest {
     fun `stopping mid-response cancels the stream, clears running state, and keeps partial text`() =
         runTest(dispatcher.scheduler) {
             val gateway = HangingModelGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
@@ -138,7 +352,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             advanceUntilIdle()
@@ -162,7 +376,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("search_files") { ToolResult.Success(result) }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("найди отчет"))
             advanceUntilIdle()
@@ -187,7 +401,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("set_alarm", risk = Risk.CONFIRM) { ToolResult.Success("set") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("поставь будильник"))
             advanceUntilIdle()
@@ -207,7 +421,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             advanceUntilIdle()
             val id =
@@ -231,7 +445,7 @@ class ChatViewModelTest {
             val call = ToolCall("call-1", "get_time", buildJsonObject {})
             val gateway = HangingAfterToolCallGateway(call)
             val registry = ToolRegistry(setOf(fakeTool("get_time") { awaitCancellation() }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             // Not advanceUntilIdle(): ToolPipeline wraps execute() in a 5s withTimeout, and
@@ -263,6 +477,26 @@ class ChatViewModelTest {
             contextWindowPolicy = ContextWindowPolicy { it },
             idGenerator = FakeIdGenerator(),
         )
+
+    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel = ChatViewModel(agentLoop, FakeConversationRepository(emptyList()))
+
+    private class FakeConversationRepository(
+        initialItems: List<HistoryItem>,
+    ) : ConversationRepository {
+        private var items = initialItems
+        private val mutableItems = MutableStateFlow(initialItems)
+        val replacements = mutableListOf<List<HistoryItem>>()
+
+        override suspend fun load(): List<HistoryItem> = items
+
+        override fun observe(): Flow<List<HistoryItem>> = mutableItems
+
+        override suspend fun replace(items: List<HistoryItem>) {
+            replacements += items
+            this.items = items
+            mutableItems.value = items
+        }
+    }
 
     private fun fakeTool(
         name: String,

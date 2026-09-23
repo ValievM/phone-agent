@@ -70,7 +70,7 @@ class SessionAuthCoordinator
                 }
 
                 is AuthState.SignedIn -> {
-                    AppAuthStatus.SignedIn
+                    AppAuthStatus.SignedIn(authState.method)
                 }
 
                 is AuthState.Error -> {

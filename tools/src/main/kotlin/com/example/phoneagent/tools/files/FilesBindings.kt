@@ -3,7 +3,6 @@ package com.example.phoneagent.tools.files
 import com.example.phoneagent.domain.tools.Tool
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
@@ -23,8 +22,6 @@ internal abstract class FilesBindings {
     @Binds
     abstract fun bindMediaStoreSearch(search: AndroidMediaStoreSearch): MediaStoreSearch
 
-    companion object {
-        @Provides
-        fun provideSelectedFolder(): SelectedFolder = UnselectedFolder
-    }
+    @Binds
+    abstract fun bindSelectedFolder(implementation: RealSelectedFolder): SelectedFolder
 }

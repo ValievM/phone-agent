@@ -1,5 +1,6 @@
 package com.example.phoneagent.auth
 
+import com.example.phoneagent.data.auth.AuthMethod
 import kotlinx.coroutines.flow.StateFlow
 
 sealed interface AppAuthStatus {
@@ -16,7 +17,9 @@ sealed interface AppAuthStatus {
         val verificationUrl: String,
     ) : AppAuthStatus
 
-    data object SignedIn : AppAuthStatus
+    data class SignedIn(
+        val method: AuthMethod,
+    ) : AppAuthStatus
 
     data class Failure(
         val reason: AuthErrorReason,
@@ -30,6 +33,19 @@ enum class AuthErrorReason {
     NETWORK,
     GENERIC,
 }
+
+enum class AppSignInMethod {
+    Browser,
+    DeviceCode,
+    ApiKey,
+}
+
+internal fun AuthMethod.toAppSignInMethod(): AppSignInMethod =
+    when (this) {
+        AuthMethod.CHATGPT_BROWSER -> AppSignInMethod.Browser
+        AuthMethod.CHATGPT_DEVICE_CODE -> AppSignInMethod.DeviceCode
+        AuthMethod.API_KEY -> AppSignInMethod.ApiKey
+    }
 
 interface AuthCoordinator {
     val state: StateFlow<AppAuthStatus>

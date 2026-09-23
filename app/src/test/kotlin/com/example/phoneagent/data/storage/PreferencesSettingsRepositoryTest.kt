@@ -43,6 +43,17 @@ class PreferencesSettingsRepositoryTest {
             assertEquals(null, repository.load().model)
         }
 
+    @Test
+    fun `saved search folder uri is loaded back`() =
+        runTest {
+            val repository = repository(backgroundScope)
+            val settings = AppSettings(searchFolderUri = "content://example/tree/folder")
+
+            repository.save(settings)
+
+            assertEquals(settings, repository.load())
+        }
+
     private fun repository(scope: CoroutineScope): PreferencesSettingsRepository {
         val dataStore =
             PreferenceDataStoreFactory.create(

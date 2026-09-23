@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AppTheme {
-                LoginRoute(authenticatedContent = { onSignOut -> AppNavigation(onSignOut = onSignOut) })
+                LoginRoute(authenticatedContent = { AppNavigation() })
                 InteractionHost(bridge = userInteractionBridge)
             }
         }

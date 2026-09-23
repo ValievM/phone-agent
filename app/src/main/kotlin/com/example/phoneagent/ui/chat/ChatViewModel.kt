@@ -2,13 +2,17 @@ package com.example.phoneagent.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,15 +26,17 @@ class ChatViewModel
     @Inject
     constructor(
         private val agentLoop: AgentLoop,
+        private val conversationRepository: ConversationRepository,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
         private var nextMessageId = 0L
         private var runningJob: Job? = null
 
-        // Authoritative conversation history for the model, owned entirely by AgentLoop's return
-        // values (TurnCompleted/TurnFailed) — ChatMessage below is a UI-only rendering concern and
-        // is never converted back into HistoryItem.
+        // Persisted snapshots are authoritative for history; ChatMessage remains a UI-only rendering
+        // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
+        private val initialHistoryLoaded = CompletableDeferred<Unit>()
+        private var pendingOwnHistoryEmission: List<HistoryItem>? = null
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
@@ -38,6 +44,51 @@ class ChatViewModel
         private var lastToolMessageId: String? = null
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
+
+        init {
+            viewModelScope.launch {
+                try {
+                    conversationRepository.observe().collect { loadedHistory ->
+                        val isInitialEmission = !initialHistoryLoaded.isCompleted
+                        val isOwnHistoryEmission = loadedHistory == pendingOwnHistoryEmission
+                        if (isOwnHistoryEmission) pendingOwnHistoryEmission = null
+                        val interruptedActiveTurn =
+                            !isInitialEmission && !isOwnHistoryEmission && runningJob?.isActive == true
+                        if (interruptedActiveTurn) {
+                            runningJob?.cancel()
+                            runningJob = null
+                        }
+                        history = loadedHistory
+                        mutableState.update { state ->
+                            val messages =
+                                if (isInitialEmission) {
+                                    loadedHistory.toChatMessages() + state.messages
+                                } else if (loadedHistory.isEmpty()) {
+                                    emptyList()
+                                } else {
+                                    val toolMessages =
+                                        if (interruptedActiveTurn) {
+                                            emptyList()
+                                        } else {
+                                            state.messages.filter { it.role == ChatRole.TOOL }
+                                        }
+                                    loadedHistory.toChatMessages() + toolMessages
+                                }
+                            state.copy(messages = messages)
+                        }
+                        initialHistoryLoaded.complete(Unit)
+                    }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    mutableState.update {
+                        it.copy(error = AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"))
+                    }
+                } finally {
+                    initialHistoryLoaded.complete(Unit)
+                }
+            }
+        }
 
         fun onEvent(event: ChatUiEvent) {
             when (event) {
@@ -61,7 +112,10 @@ class ChatViewModel
             }
 
             runningJob =
-                viewModelScope.launch { collectTurn(trimmed) }
+                viewModelScope.launch {
+                    initialHistoryLoaded.await()
+                    collectTurn(trimmed)
+                }
         }
 
         private suspend fun collectTurn(text: String) {
@@ -69,9 +123,25 @@ class ChatViewModel
                 var assistantMessageId: String? = null
                 agentLoop.run(history, text).collect { event ->
                     assistantMessageId = handleAgentEvent(event, assistantMessageId)
+                    if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) {
+                        pendingOwnHistoryEmission = history
+                        try {
+                            conversationRepository.replace(history)
+                        } catch (exception: CancellationException) {
+                            pendingOwnHistoryEmission = null
+                            throw exception
+                        } catch (_: Exception) {
+                            pendingOwnHistoryEmission = null
+                            mutableState.update {
+                                it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
+                            }
+                        }
+                    }
                 }
             } finally {
-                cancelPendingToolCalls()
+                val pendingIds = toolMessageIdByCallId.values.toList()
+                toolMessageIdByCallId.clear()
+                pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
                 mutableState.update { it.copy(isRunning = false) }
             }
         }
@@ -187,15 +257,16 @@ class ChatViewModel
             }
         }
 
-        // Stop leaves any tool call that never got a ToolCallFinished stuck showing "waiting" or
-        // "running" forever; the card's own "прервано" state exists exactly for this.
-        private fun cancelPendingToolCalls() {
-            val pendingIds = toolMessageIdByCallId.values.toList()
-            toolMessageIdByCallId.clear()
-            pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
-        }
-
         private fun nextId(): String = (++nextMessageId).toString()
+    }
+
+private fun List<HistoryItem>.toChatMessages(): List<ChatMessage> =
+    mapNotNull { item ->
+        when (item) {
+            is HistoryItem.UserMessage -> ChatMessage(item.id, ChatRole.USER, item.text)
+            is HistoryItem.AssistantMessage -> ChatMessage(item.id, ChatRole.ASSISTANT, item.text)
+            is HistoryItem.ToolCallItem, is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
+        }
     }
 
 private fun ToolOutcome.toCardStatus(
