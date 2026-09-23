@@ -5,6 +5,7 @@
     <string name="chat_empty_body">Напишите сообщение, чтобы начать разговор с моделью.</string>
     <string name="message_hint">Сообщение</string>
     <string name="send_message">Отправить сообщение</string>
+    <string name="stop_generation">Остановить ответ</string>
     <string name="open_settings">Открыть настройки</string>
     <string name="model_working">Модель отвечает…</string>
     <string name="error_offline">Нет подключения к сети</string>
