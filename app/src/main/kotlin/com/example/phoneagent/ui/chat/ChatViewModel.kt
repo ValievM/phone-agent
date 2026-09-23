@@ -12,6 +12,7 @@ import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,27 +32,10 @@ class ChatViewModel
         private var nextMessageId = 0L
         private var runningJob: Job? = null
 
-        // Authoritative conversation history for the model, owned entirely by AgentLoop's return
-        // values (TurnCompleted/TurnFailed) — ChatMessage below is a UI-only rendering concern and
-        // is never converted back into HistoryItem.
+        // Persisted snapshots are authoritative for history; ChatMessage remains a UI-only rendering
+        // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
-        private val historyLoadJob =
-            viewModelScope.launch {
-                try {
-                    val loadedHistory = conversationRepository.load()
-                    if (!clearRequested) {
-                        history = loadedHistory
-                        val restoredMessages = history.toChatMessages()
-                        mutableState.update { state -> state.copy(messages = restoredMessages + state.messages) }
-                    }
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    mutableState.update {
-                        it.copy(error = AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"))
-                    }
-                }
-            }
+        private val initialHistoryLoaded = CompletableDeferred<Unit>()
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
@@ -60,6 +44,40 @@ class ChatViewModel
         private var clearRequested = false
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
+
+        init {
+            viewModelScope.launch {
+                try {
+                    conversationRepository.observe().collect { loadedHistory ->
+                        val isInitialEmission = !initialHistoryLoaded.isCompleted
+                        if (!clearRequested) {
+                            history = loadedHistory
+                            mutableState.update { state ->
+                                val messages =
+                                    if (isInitialEmission) {
+                                        loadedHistory.toChatMessages() + state.messages
+                                    } else if (loadedHistory.isEmpty()) {
+                                        emptyList()
+                                    } else {
+                                        val toolMessages = state.messages.filter { it.role == ChatRole.TOOL }
+                                        loadedHistory.toChatMessages() + toolMessages
+                                    }
+                                state.copy(messages = messages)
+                            }
+                        }
+                        initialHistoryLoaded.complete(Unit)
+                    }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    mutableState.update {
+                        it.copy(error = AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"))
+                    }
+                } finally {
+                    initialHistoryLoaded.complete(Unit)
+                }
+            }
+        }
 
         fun onEvent(event: ChatUiEvent) {
             when (event) {
@@ -85,7 +103,7 @@ class ChatViewModel
 
             runningJob =
                 viewModelScope.launch {
-                    historyLoadJob.join()
+                    initialHistoryLoaded.await()
                     collectTurn(trimmed)
                 }
         }
@@ -240,7 +258,7 @@ class ChatViewModel
                 var clearError: AgentError? = null
                 try {
                     activeTurn?.join()
-                    historyLoadJob.join()
+                    initialHistoryLoaded.await()
                     history = emptyList()
                     conversationRepository.replace(emptyList())
                 } catch (exception: CancellationException) {

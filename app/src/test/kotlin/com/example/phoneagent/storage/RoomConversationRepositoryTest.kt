@@ -2,6 +2,9 @@ package com.example.phoneagent.storage
 
 import com.example.phoneagent.domain.conversation.HistoryItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
@@ -58,16 +61,18 @@ class RoomConversationRepositoryTest {
     private class FakeConversationDao(
         initialRows: List<ConversationEntity>,
     ) : ConversationDao {
-        private var rows = initialRows
+        private val rows = MutableStateFlow(initialRows)
 
-        override suspend fun loadAll(): List<ConversationEntity> = rows.sortedBy(ConversationEntity::position)
+        override suspend fun loadAll(): List<ConversationEntity> = rows.value.sortedBy(ConversationEntity::position)
+
+        override fun observeAll(): Flow<List<ConversationEntity>> = rows.map { it.sortedBy(ConversationEntity::position) }
 
         override suspend fun insertAll(items: List<ConversationEntity>) {
-            rows = rows + items
+            rows.value = rows.value + items
         }
 
         override suspend fun deleteAll() {
-            rows = emptyList()
+            rows.value = emptyList()
         }
     }
 }

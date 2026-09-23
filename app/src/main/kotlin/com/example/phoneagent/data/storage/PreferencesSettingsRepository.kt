@@ -21,12 +21,14 @@ public class PreferencesSettingsRepository
                 useDynamicColors = preferences[USE_DYNAMIC_COLORS] ?: true,
                 useDarkTheme = preferences[USE_DARK_THEME],
                 model = preferences[MODEL],
+                searchFolderUri = preferences[SEARCH_FOLDER_URI],
             )
         }
 
         override suspend fun save(settings: AppSettings) {
             val useDarkTheme = settings.useDarkTheme
             val model = settings.model
+            val searchFolderUri = settings.searchFolderUri
             dataStore.edit { preferences ->
                 preferences[USE_DYNAMIC_COLORS] = settings.useDynamicColors
                 if (useDarkTheme == null) {
@@ -39,6 +41,11 @@ public class PreferencesSettingsRepository
                 } else {
                     preferences[MODEL] = model
                 }
+                if (searchFolderUri == null) {
+                    preferences.remove(SEARCH_FOLDER_URI)
+                } else {
+                    preferences[SEARCH_FOLDER_URI] = searchFolderUri
+                }
             }
         }
 
@@ -46,5 +53,6 @@ public class PreferencesSettingsRepository
             val USE_DYNAMIC_COLORS = booleanPreferencesKey("use_dynamic_colors")
             val USE_DARK_THEME = booleanPreferencesKey("use_dark_theme")
             val MODEL = stringPreferencesKey("model")
+            val SEARCH_FOLDER_URI = stringPreferencesKey("search_folder_uri")
         }
     }

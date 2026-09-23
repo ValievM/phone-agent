@@ -153,6 +153,6 @@ class FindFilesToolTest {
     private class FakeSelectedFolder(
         private val rootNode: FakeDocumentNode?,
     ) : SelectedFolder {
-        override fun root(): DocumentNode? = rootNode
+        override suspend fun root(): DocumentNode? = rootNode
     }
 }

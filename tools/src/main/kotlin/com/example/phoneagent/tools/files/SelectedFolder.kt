@@ -8,14 +8,5 @@ package com.example.phoneagent.tools.files
  */
 internal interface SelectedFolder {
     /** Root of the search scope, or null when the user has not selected a folder yet. */
-    fun root(): DocumentNode?
-}
-
-/**
- * Temporary [SelectedFolder] until the settings flow persists the user's folder choice (next
- * stage): always reports "nothing selected", so find_files answers with its setup error and the
- * UI can offer opening settings.
- */
-internal object UnselectedFolder : SelectedFolder {
-    override fun root(): DocumentNode? = null
+    suspend fun root(): DocumentNode?
 }

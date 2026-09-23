@@ -1,16 +1,20 @@
 package com.example.phoneagent.di
 
+import android.content.Context
 import com.example.phoneagent.data.llm.BackendProfile
+import com.example.phoneagent.data.llm.OkHttpModelCatalog
 import com.example.phoneagent.data.llm.ResponsesGateway
 import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.LastNMessagesPolicy
+import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.storage.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -27,6 +31,23 @@ private const val CONTEXT_WINDOW_MAX_ITEMS = 40
 @Module
 @InstallIn(SingletonComponent::class)
 internal object ModelModule {
+    @Provides
+    @Singleton
+    fun provideModelCatalog(
+        profile: BackendProfile,
+        credentialsProvider: CredentialsProvider,
+        @ApplicationContext context: Context,
+    ): ModelCatalog =
+        OkHttpModelCatalog(
+            profile = profile,
+            credentialsProvider = credentialsProvider,
+            clientVersion =
+                context.packageManager
+                    .getPackageInfo(context.packageName, 0)
+                    .versionName
+                    .orEmpty(),
+        )
+
     @Provides
     @Singleton
     fun provideModelGateway(

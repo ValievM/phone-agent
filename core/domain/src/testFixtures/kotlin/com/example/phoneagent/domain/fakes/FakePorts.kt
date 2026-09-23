@@ -21,6 +21,7 @@ import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 
 public class FakeModelGateway : ModelGateway {
@@ -41,9 +42,17 @@ public class FakeModelGateway : ModelGateway {
 }
 
 public class FakeConversationRepository : ConversationRepository {
-    public var items: List<HistoryItem> = emptyList()
+    private val mutableItems = MutableStateFlow<List<HistoryItem>>(emptyList())
+
+    public var items: List<HistoryItem>
+        get() = mutableItems.value
+        set(value) {
+            mutableItems.value = value
+        }
 
     override suspend fun load(): List<HistoryItem> = items
+
+    override fun observe(): Flow<List<HistoryItem>> = mutableItems
 
     override suspend fun replace(items: List<HistoryItem>) {
         this.items = items

@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -140,6 +141,26 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `external history replacement clears persisted and visible conversation`() =
+        runTest(dispatcher.scheduler) {
+            val repository =
+                FakeConversationRepository(
+                    listOf(
+                        HistoryItem.UserMessage("saved-user", "Earlier question"),
+                        HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                    ),
+                )
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+
+            repository.replace(emptyList())
+            advanceUntilIdle()
+
+            assertEquals(emptyList<HistoryItem>(), repository.load())
+            assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+        }
+
+    @Test
     fun `submit during history clearing does not start a turn or change chat`() =
         runTest(dispatcher.scheduler) {
             val initialHistory: List<HistoryItem> =
@@ -152,13 +173,18 @@ class ChatViewModelTest {
 
                     override suspend fun load(): List<HistoryItem> = items
 
+                    override fun observe(): Flow<List<HistoryItem>> = mutableItems
+
                     override suspend fun replace(items: List<HistoryItem>) {
                         if (items.isEmpty()) {
                             clearingStarted.complete(Unit)
                             finishClearing.await()
                         }
                         this.items = items
+                        mutableItems.value = items
                     }
+
+                    val mutableItems = MutableStateFlow(initialHistory)
                 }
             val gateway = FakeModelGateway()
             val viewModel = ChatViewModel(agentLoop(gateway), repository)
@@ -360,12 +386,18 @@ class ChatViewModelTest {
     private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel = ChatViewModel(agentLoop, FakeConversationRepository(emptyList()))
 
     private class FakeConversationRepository(
-        private var items: List<HistoryItem>,
+        initialItems: List<HistoryItem>,
     ) : ConversationRepository {
+        private var items = initialItems
+        private val mutableItems = MutableStateFlow(initialItems)
+
         override suspend fun load(): List<HistoryItem> = items
+
+        override fun observe(): Flow<List<HistoryItem>> = mutableItems
 
         override suspend fun replace(items: List<HistoryItem>) {
             this.items = items
+            mutableItems.value = items
         }
     }
 
