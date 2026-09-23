@@ -107,6 +107,16 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `log messages are constants and data goes through fields`() {
+        // The message is what a reader trusts to be free of user data; anything dynamic belongs in
+        // `fields`, where it is redacted and visible in review (docs/log-audit.md).
+        val interpolated = Regex("""\.(?:debug|info|warn|error)\(\s*[^,()]+,\s*"[^"\n]*\$""")
+        val violations = productionFiles.filter { interpolated.containsMatchIn(it.text) }
+
+        assertTrue("Interpolated log messages in: ${violations.map { it.path }}", violations.isEmpty())
+    }
+
+    @Test
     fun `ui color literals live only in theme and Text has no literals`() {
         val colorViolations =
             productionFiles

@@ -13,6 +13,6 @@ internal fun crashLoggingHandler(
     previous: Thread.UncaughtExceptionHandler?,
 ): Thread.UncaughtExceptionHandler =
     Thread.UncaughtExceptionHandler { thread, throwable ->
-        logger.error("Crash", "Uncaught exception on thread ${thread.name}", throwable = throwable)
+        logger.error("Crash", "Uncaught exception", fields = mapOf("thread" to thread.name), throwable = throwable)
         previous?.uncaughtException(thread, throwable)
     }
