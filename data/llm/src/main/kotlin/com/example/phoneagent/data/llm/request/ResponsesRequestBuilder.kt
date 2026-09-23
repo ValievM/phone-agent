@@ -28,10 +28,11 @@ private const val REASONING_EFFORT = "low"
 internal fun buildResponsesRequestBody(
     request: ModelRequest,
     profile: BackendProfile,
+    model: String,
     sessionId: String,
 ): JsonObject =
     buildJsonObject {
-        put("model", profile.model)
+        put("model", model)
         put("instructions", profile.instructions)
         putJsonArray("input") { request.history.forEach { add(it.toInputItem()) } }
         putJsonArray("tools") { request.tools.forEach { add(it.toToolJson()) } }

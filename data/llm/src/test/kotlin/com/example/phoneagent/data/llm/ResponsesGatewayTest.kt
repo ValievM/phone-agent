@@ -6,8 +6,11 @@ import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.fakes.FakeAppLogger
+import com.example.phoneagent.domain.fakes.FakeSettingsRepository
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.storage.AppSettings
+import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -15,6 +18,9 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.Call
@@ -26,6 +32,65 @@ import org.junit.Test
 import java.util.concurrent.TimeUnit
 
 class ResponsesGatewayTest {
+    @Test
+    fun `an unset model falls back to gpt-5-6-luna`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(sseResponse(sampleSse()))
+                val settings = FakeSettingsRepository()
+
+                gateway(server, settings = settings).stream(request()).toList()
+
+                val requestBody = requireNotNull(server.takeRequest().body)
+                val body = Json.parseToJsonElement(requestBody.utf8()).jsonObject
+                assertEquals("gpt-5.6-luna", body.getValue("model").jsonPrimitive.content)
+            }
+        }
+
+    @Test
+    fun `a selected model is sent in the request`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(sseResponse(sampleSse()))
+                val settings =
+                    FakeSettingsRepository().apply {
+                        this.settings = AppSettings(model = "gpt-5.6-terra")
+                    }
+
+                gateway(server, settings = settings).stream(request()).toList()
+
+                val requestBody = requireNotNull(server.takeRequest().body)
+                val body = Json.parseToJsonElement(requestBody.utf8()).jsonObject
+                assertEquals("gpt-5.6-terra", body.getValue("model").jsonPrimitive.content)
+            }
+        }
+
+    @Test
+    fun `each request reads the current model setting`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(sseResponse(sampleSse()))
+                server.enqueue(sseResponse(sampleSse()))
+                val settings = FakeSettingsRepository()
+                val gateway = gateway(server, settings = settings)
+
+                gateway.stream(request()).toList()
+                settings.settings = AppSettings(model = "gpt-5.6-terra")
+                gateway.stream(request()).toList()
+
+                val sentModels =
+                    List(2) {
+                        val requestBody = requireNotNull(server.takeRequest().body)
+                        Json
+                            .parseToJsonElement(requestBody.utf8())
+                            .jsonObject
+                            .getValue("model")
+                            .jsonPrimitive.content
+                    }
+                assertEquals(listOf("gpt-5.6-luna", "gpt-5.6-terra"), sentModels)
+            }
+        }
+
     @Test
     fun `a signed-out credentials provider fails fast without any HTTP call`() =
         runTest {
@@ -70,12 +135,34 @@ class ResponsesGatewayTest {
                         current = CredentialsResult.Ready(Credentials("stale", null)),
                         refreshed = Credentials("fresh", null),
                     )
+                val settings =
+                    object : SettingsRepository {
+                        var loads = 0
 
-                val events = gateway(server, credentials = credentialsProvider).stream(request()).toList()
+                        override suspend fun load(): AppSettings =
+                            AppSettings(model = if (loads++ == 0) "gpt-5.6-luna" else "gpt-5.6-terra")
+
+                        override suspend fun save(settings: AppSettings) = Unit
+                    }
+
+                val events = gateway(server, credentials = credentialsProvider, settings = settings).stream(request()).toList()
+                val firstRequest = server.takeRequest()
+                val secondRequest = server.takeRequest()
 
                 assertEquals(1, credentialsProvider.refreshCalls)
-                assertEquals("Bearer stale", server.takeRequest().headers["Authorization"])
-                assertEquals("Bearer fresh", server.takeRequest().headers["Authorization"])
+                assertEquals("Bearer stale", firstRequest.headers["Authorization"])
+                assertEquals("Bearer fresh", secondRequest.headers["Authorization"])
+                assertEquals(1, settings.loads)
+                val sentModels =
+                    listOf(firstRequest, secondRequest).map { recordedRequest ->
+                        val requestBody = requireNotNull(recordedRequest.body)
+                        Json
+                            .parseToJsonElement(requestBody.utf8())
+                            .jsonObject
+                            .getValue("model")
+                            .jsonPrimitive.content
+                    }
+                assertEquals(listOf("gpt-5.6-luna", "gpt-5.6-luna"), sentModels)
                 assertEquals(listOf(ModelEvent.TextDelta("hi"), ModelEvent.Completed(null)), events)
             }
         }
@@ -158,6 +245,7 @@ class ResponsesGatewayTest {
                     ResponsesGateway(
                         profile = profile(server),
                         credentialsProvider = FakeCredentialsProvider(),
+                        settingsRepository = FakeSettingsRepository(),
                         logger = FakeAppLogger(),
                         client = capturingFactory.delegate,
                         callFactory = capturingFactory,
@@ -181,7 +269,7 @@ class ResponsesGatewayTest {
     private fun request(): ModelRequest = ModelRequest(history = listOf(HistoryItem.UserMessage("1", "hi")))
 
     private fun profile(server: MockWebServer): BackendProfile =
-        BackendProfile(baseUrl = server.url("/backend-api/codex").toString().removeSuffix("/"), model = "test-model")
+        BackendProfile(baseUrl = server.url("/backend-api/codex").toString().removeSuffix("/"))
 
     // Long enough that only the explicit cancel() below can end the call, not a read timeout.
     private fun cancellableClient(): OkHttpClient =
@@ -193,10 +281,12 @@ class ResponsesGatewayTest {
     private fun gateway(
         server: MockWebServer,
         credentials: CredentialsProvider = FakeCredentialsProvider(),
+        settings: SettingsRepository = FakeSettingsRepository(),
     ): ResponsesGateway =
         ResponsesGateway(
             profile = profile(server),
             credentialsProvider = credentials,
+            settingsRepository = settings,
             logger = FakeAppLogger(),
             client = OkHttpClient.Builder().readTimeout(1, TimeUnit.SECONDS).build(),
             newSessionId = { "session-1" },

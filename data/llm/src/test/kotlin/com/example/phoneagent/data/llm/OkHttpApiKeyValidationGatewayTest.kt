@@ -58,7 +58,7 @@ class OkHttpApiKeyValidationGatewayTest {
         }
 
     private fun gateway(server: MockWebServer): OkHttpApiKeyValidationGateway =
-        OkHttpApiKeyValidationGateway(BackendProfile(server.url("/api").toString().removeSuffix("/"), "unused"))
+        OkHttpApiKeyValidationGateway(BackendProfile(server.url("/api").toString().removeSuffix("/")))
 
     private inline fun serverWith(
         code: Int,

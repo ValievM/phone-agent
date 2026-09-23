@@ -7,6 +7,7 @@ import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.LastNMessagesPolicy
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.storage.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,10 +32,11 @@ internal object ModelModule {
     fun provideModelGateway(
         profile: BackendProfile,
         credentialsProvider: CredentialsProvider,
+        settingsRepository: SettingsRepository,
         logger: AppLogger,
     ): ModelGateway {
         val client = OkHttpClient.Builder().readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS).build()
-        return ResponsesGateway(profile, credentialsProvider, logger, client)
+        return ResponsesGateway(profile, credentialsProvider, settingsRepository, logger, client)
     }
 
     @Provides
