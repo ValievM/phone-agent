@@ -187,6 +187,30 @@ class ResponsesGatewayTest {
         }
 
     @Test
+    fun `a rejected request logs the error identifiers but never the response body`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(
+                    MockResponse
+                        .Builder()
+                        .code(400)
+                        .body(
+                            """{"error":{"message":"Invalid text: 'SECRET chat text'","type":"invalid_request_error",""" +
+                                """"param":"input[0].content[0].text","code":"invalid_value"}}""",
+                        ).build(),
+                )
+                val logger = FakeAppLogger()
+
+                gateway(server, logger = logger).stream(request()).toList()
+
+                val logged = logger.events.single { it.message == "model request rejected" }
+                assertEquals("400", logged.fields["status"])
+                assertEquals("type=invalid_request_error code=invalid_value param=input[0].content[0].text", logged.fields["error"])
+                assertTrue(logger.events.none { event -> "SECRET" in event.message || event.fields.values.any { "SECRET" in it } })
+            }
+        }
+
+    @Test
     fun `403 maps to Forbidden`() =
         runTest {
             withServer { server ->
@@ -282,12 +306,13 @@ class ResponsesGatewayTest {
         server: MockWebServer,
         credentials: CredentialsProvider = FakeCredentialsProvider(),
         settings: SettingsRepository = FakeSettingsRepository(),
+        logger: FakeAppLogger = FakeAppLogger(),
     ): ResponsesGateway =
         ResponsesGateway(
             profile = profile(server),
             credentialsProvider = credentials,
             settingsRepository = settings,
-            logger = FakeAppLogger(),
+            logger = logger,
             client = OkHttpClient.Builder().readTimeout(1, TimeUnit.SECONDS).build(),
             newSessionId = { "session-1" },
         )
