@@ -3,6 +3,9 @@
     <string name="chat_title">Чат</string>
     <string name="chat_empty_title">Начните разговор</string>
     <string name="chat_empty_body">Напишите сообщение, чтобы начать разговор с моделью.</string>
+    <string name="chat_suggestion_alarm">Поставь будильник на 7:30</string>
+    <string name="chat_suggestion_find_file">Найди файл </string>
+    <string name="chat_suggestion_notify">Покажи уведомление </string>
     <string name="message_hint">Сообщение</string>
     <string name="send_message">Отправить сообщение</string>
     <string name="stop_generation">Остановить ответ</string>
@@ -12,6 +15,16 @@
     <string name="model_working">Модель отвечает…</string>
     <string name="error_offline">Нет подключения к сети</string>
     <string name="error_generic">Не удалось получить ответ</string>
+    <string name="error_session_expired">Сессия истекла. Войдите заново.</string>
+    <string name="error_forbidden">Доступ закрыт. Проверьте способ входа в настройках.</string>
+    <string name="error_timeout">Сервер слишком долго не отвечает. Попробуйте ещё раз.</string>
+    <string name="error_rate_limited">Слишком много запросов. Немного подождите и повторите.</string>
+    <string name="error_rate_limited_after">Слишком много запросов. Повторите через %1$d с.</string>
+    <string name="error_server">Сервер вернул ошибку (код %1$d). Попробуйте позже.</string>
+    <string name="error_protocol_changed">Сервис изменил формат ответа, приложение может работать неправильно. Проверьте обновление.</string>
+    <string name="error_step_limit">Ассистент сделал слишком много шагов и остановился. Уточните запрос.</string>
+    <string name="error_tool_failure">Не удалось выполнить действие на телефоне.</string>
+    <string name="error_retry">Повторить</string>
     <string name="dismiss_error">Закрыть сообщение об ошибке</string>
     <string name="settings_title">Настройки</string>
     <string name="settings_account_title">Аккаунт</string>

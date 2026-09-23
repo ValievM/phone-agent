@@ -12,10 +12,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -26,24 +22,39 @@ import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
+/** What the composer can do right now. */
+enum class ComposerMode {
+    /** The user can type and send. */
+    Ready,
+
+    /** A reply is being generated: typing is off and the button stops it. */
+    Running,
+
+    /** Neither typing nor stopping makes sense (for example no network or not signed in). */
+    Unavailable,
+}
+
 /**
- * Message input. While [isRunning] the text field is disabled and the button turns into "stop";
- * the draft survives configuration changes and process death via [rememberSaveable].
+ * Message input. While the mode is [ComposerMode.Running] the text field is disabled and the button turns into "stop".
+ * The [draft] is owned by the caller (it also fills it from the empty-chat suggestions) and is
+ * expected to survive configuration changes and process death via `rememberSaveable`.
  */
 @Composable
 fun Composer(
-    enabled: Boolean,
-    isRunning: Boolean,
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    mode: ComposerMode,
     onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var draft by rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val enabled = mode == ComposerMode.Ready
+    val isRunning = mode == ComposerMode.Running
     val submit = {
         if (draft.isNotBlank() && enabled) {
             onSubmit(draft)
-            draft = ""
+            onDraftChange("")
             keyboardController?.hide()
         }
     }
@@ -58,7 +69,7 @@ fun Composer(
     ) {
         OutlinedTextField(
             value = draft,
-            onValueChange = { draft = it },
+            onValueChange = onDraftChange,
             modifier = Modifier.weight(1f),
             enabled = enabled,
             label = { Text(stringResource(R.string.message_hint)) },

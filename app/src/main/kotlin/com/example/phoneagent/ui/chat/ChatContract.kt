@@ -10,6 +10,8 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isRunning: Boolean = false,
     val error: AgentError? = null,
+    /** The last turn failed in a way a retry can fix; the UI offers "Повторить" only then. */
+    val canRetry: Boolean = false,
 )
 
 data class ChatMessage(
@@ -44,6 +46,8 @@ sealed interface ChatUiEvent {
     data class ToggleToolCallDetails(
         val messageId: String,
     ) : ChatUiEvent
+
+    data object Retry : ChatUiEvent
 
     data object DismissError : ChatUiEvent
 }
