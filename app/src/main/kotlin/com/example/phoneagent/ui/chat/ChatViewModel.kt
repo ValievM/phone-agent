@@ -36,12 +36,12 @@ class ChatViewModel
         // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
         private val initialHistoryLoaded = CompletableDeferred<Unit>()
+        private var pendingOwnHistoryEmission: List<HistoryItem>? = null
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
         // the one an ApprovalRequested (which carries no call id of its own) belongs to.
         private var lastToolMessageId: String? = null
-        private var clearRequested = false
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
 
@@ -50,20 +50,31 @@ class ChatViewModel
                 try {
                     conversationRepository.observe().collect { loadedHistory ->
                         val isInitialEmission = !initialHistoryLoaded.isCompleted
-                        if (!clearRequested) {
-                            history = loadedHistory
-                            mutableState.update { state ->
-                                val messages =
-                                    if (isInitialEmission) {
-                                        loadedHistory.toChatMessages() + state.messages
-                                    } else if (loadedHistory.isEmpty()) {
-                                        emptyList()
-                                    } else {
-                                        val toolMessages = state.messages.filter { it.role == ChatRole.TOOL }
-                                        loadedHistory.toChatMessages() + toolMessages
-                                    }
-                                state.copy(messages = messages)
-                            }
+                        val isOwnHistoryEmission = loadedHistory == pendingOwnHistoryEmission
+                        if (isOwnHistoryEmission) pendingOwnHistoryEmission = null
+                        val interruptedActiveTurn =
+                            !isInitialEmission && !isOwnHistoryEmission && runningJob?.isActive == true
+                        if (interruptedActiveTurn) {
+                            runningJob?.cancel()
+                            runningJob = null
+                        }
+                        history = loadedHistory
+                        mutableState.update { state ->
+                            val messages =
+                                if (isInitialEmission) {
+                                    loadedHistory.toChatMessages() + state.messages
+                                } else if (loadedHistory.isEmpty()) {
+                                    emptyList()
+                                } else {
+                                    val toolMessages =
+                                        if (interruptedActiveTurn) {
+                                            emptyList()
+                                        } else {
+                                            state.messages.filter { it.role == ChatRole.TOOL }
+                                        }
+                                    loadedHistory.toChatMessages() + toolMessages
+                                }
+                            state.copy(messages = messages)
                         }
                         initialHistoryLoaded.complete(Unit)
                     }
@@ -83,14 +94,13 @@ class ChatViewModel
             when (event) {
                 is ChatUiEvent.Submit -> submit(event.text)
                 ChatUiEvent.Stop -> runningJob?.cancel()
-                ChatUiEvent.ClearHistory -> clearHistory()
                 is ChatUiEvent.ToggleToolCallDetails -> toggleToolCallDetails(event.messageId)
                 ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null) }
             }
         }
 
         private fun submit(text: String) {
-            if (text.isBlank() || mutableState.value.isRunning || mutableState.value.isClearing) return
+            if (text.isBlank() || mutableState.value.isRunning) return
             val trimmed = text.trim()
 
             mutableState.update {
@@ -114,11 +124,14 @@ class ChatViewModel
                 agentLoop.run(history, text).collect { event ->
                     assistantMessageId = handleAgentEvent(event, assistantMessageId)
                     if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) {
+                        pendingOwnHistoryEmission = history
                         try {
                             conversationRepository.replace(history)
                         } catch (exception: CancellationException) {
+                            pendingOwnHistoryEmission = null
                             throw exception
                         } catch (_: Exception) {
+                            pendingOwnHistoryEmission = null
                             mutableState.update {
                                 it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
                             }
@@ -241,36 +254,6 @@ class ChatViewModel
                             }
                         },
                 )
-            }
-        }
-
-        private fun clearHistory() {
-            clearRequested = true
-            val activeTurn = runningJob
-            activeTurn?.cancel()
-            runningJob = null
-            history = emptyList()
-            toolMessageIdByCallId.clear()
-            lastToolMessageId = null
-            mutableState.update { it.copy(messages = emptyList(), isClearing = true, error = null) }
-
-            viewModelScope.launch {
-                var clearError: AgentError? = null
-                try {
-                    activeTurn?.join()
-                    initialHistoryLoaded.await()
-                    history = emptyList()
-                    conversationRepository.replace(emptyList())
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    clearError = AgentError.Unexpected("Failed to clear conversation history (${exception::class.simpleName})")
-                } finally {
-                    clearRequested = false
-                    mutableState.update {
-                        it.copy(messages = emptyList(), isRunning = false, isClearing = false, error = clearError)
-                    }
-                }
             }
         }
 

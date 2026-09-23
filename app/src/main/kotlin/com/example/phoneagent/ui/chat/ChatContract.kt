@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isRunning: Boolean = false,
-    val isClearing: Boolean = false,
     val error: AgentError? = null,
 )
 
@@ -41,8 +40,6 @@ sealed interface ChatUiEvent {
     ) : ChatUiEvent
 
     data object Stop : ChatUiEvent
-
-    data object ClearHistory : ChatUiEvent
 
     data class ToggleToolCallDetails(
         val messageId: String,

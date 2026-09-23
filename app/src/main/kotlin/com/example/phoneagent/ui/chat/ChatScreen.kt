@@ -101,12 +101,6 @@ fun ChatScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.chat_title)) },
                 actions = {
-                    TextButton(
-                        onClick = { onEvent(ChatUiEvent.ClearHistory) },
-                        enabled = !state.isClearing,
-                    ) {
-                        Text(stringResource(R.string.clear_chat))
-                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             painter = painterResource(AppIcons.settings),
@@ -168,7 +162,7 @@ private fun ChatBody(
             )
             HorizontalDivider()
             ChatComposer(
-                enabled = !state.isRunning && !state.isClearing,
+                enabled = !state.isRunning,
                 onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
             )
         }
