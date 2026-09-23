@@ -10,7 +10,7 @@
 | Navigation 3 (`navigation3-runtime`, `-ui`) | навигация: `NavKey` + `NavDisplay` | стабильная (1.1.x), 1.2 в RC; predictive back из коробки |
 | `activity-compose` | `enableEdgeToEdge()` | |
 | `core-splashscreen` | заставка | |
-| `multiplatform-markdown-renderer` 0.43.0: `-m3`, `-code` | markdown, потоковый режим, подсветка кода | версия 0.x, API может меняться: закрываем одной обёрткой `AssistantMarkdown`; версию фиксируем |
+| `multiplatform-markdown-renderer` **0.39.2**: `-m3`, `-code` | markdown, потоковый режим, подсветка кода | версия 0.x, API может меняться: закрываем одной обёрткой `AssistantMarkdown`; версию фиксируем. **Не 0.43.0** (проверено 23.09.2026): версии 0.42+ требуют `compileSdk 37` (наш AGP 8.13 поддерживает до 36), а 0.40+ собраны под Java 21, и юнит-тесты на JDK 17 их не загружают. Транзитивная `dev.snipme:highlights` 1.1.0 тоже под Java 21, поэтому в `app/build.gradle.kts` закреплена 1.0.0 (Java 8). Обновляемся вместе с AGP/JDK |
 | `compose-rules` (mrmans0n) для ktlint/detekt | проверка Compose-кода (порядок параметров, `modifier`, hoisting, превью) | подключаем на этапе 1 |
 | Compose UI tooling (debug) | превью, Layout Inspector | |
 | Roborazzi + Robolectric | скриншот-тесты ключевых компонентов | популярен, но версию и настройку **[проверить, этап 5]** |

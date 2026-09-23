@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
@@ -43,6 +44,7 @@ internal fun ComposeContentTestRule.snapshot(
     variants: List<Variant> = listOf(Variant.Light, Variant.Dark),
     fillScreen: Boolean = false,
     wholeScreen: Boolean = false,
+    immediateWork: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     var current by mutableStateOf(variants.first())
@@ -52,7 +54,11 @@ internal fun ComposeContentTestRule.snapshot(
         CompositionLocalProvider(LocalDensity provides Density(density.density, variant.fontScale)) {
             AppTheme(darkTheme = variant.darkTheme, useDynamicColor = false) {
                 Surface(modifier = if (fillScreen) Modifier.fillMaxSize() else Modifier) {
-                    content()
+                    // Inspection mode makes the markdown renderer parse synchronously, so the
+                    // capture never sees its "loading" placeholder.
+                    CompositionLocalProvider(LocalInspectionMode provides immediateWork) {
+                        content()
+                    }
                 }
             }
         }

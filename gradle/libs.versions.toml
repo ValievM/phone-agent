@@ -25,6 +25,8 @@ ktlint = "1.8.0"
 composeRules = "0.6.6"
 ksp = "2.2.21-2.0.5"
 roborazzi = "1.75.0"
+markdownRenderer = "0.39.2"
+snipmeHighlights = "1.0.0"
 robolectric = "4.17"
 
 [libraries]
@@ -60,6 +62,9 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 junit = { module = "junit:junit", version.ref = "junit" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdownRenderer" }
+snipme-highlights = { module = "dev.snipme:highlights", version.ref = "snipmeHighlights" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
