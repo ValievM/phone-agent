@@ -157,8 +157,17 @@ internal class AndroidMediaStoreSearch
             val uri: Uri
                 get() =
                     when (this) {
-                        FILES -> MediaStore.Files.getContentUri("external")
-                        DOWNLOADS -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                        FILES -> {
+                            MediaStore.Files.getContentUri("external")
+                        }
+
+                        DOWNLOADS -> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                            } else {
+                                error("Downloads collection requires API 29+")
+                            }
+                        }
                     }
         }
 
