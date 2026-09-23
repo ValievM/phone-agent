@@ -42,6 +42,7 @@ class MessageListFollowUiTest {
                     messages = messages,
                     onEvent = {},
                     onOpenFile = {},
+                    onSuggestionClick = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }
