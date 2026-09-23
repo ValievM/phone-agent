@@ -25,6 +25,9 @@ public sealed interface AgentError {
 
     public data object StepLimit : AgentError
 
+    /** The app was closed before the reply for the last question arrived. */
+    public data object Interrupted : AgentError
+
     public data object Cancelled : AgentError
 
     public data class Unexpected(

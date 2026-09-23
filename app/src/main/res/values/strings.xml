@@ -22,6 +22,7 @@
     <string name="error_protocol_changed">Сервис изменил формат ответа, приложение может работать неправильно. Проверьте обновление.</string>
     <string name="error_step_limit">Ассистент сделал слишком много шагов и остановился. Уточните запрос.</string>
     <string name="error_tool_failure">Не удалось выполнить действие на телефоне.</string>
+    <string name="error_interrupted">Ответ не успел прийти: приложение было закрыто. Отправить вопрос ещё раз?</string>
     <string name="error_retry">Повторить</string>
     <string name="dismiss_error">Закрыть сообщение об ошибке</string>
     <string name="settings_title">Настройки</string>

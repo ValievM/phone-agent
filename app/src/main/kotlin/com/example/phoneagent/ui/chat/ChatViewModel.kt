@@ -36,7 +36,11 @@ class ChatViewModel
         // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
         private val initialHistoryLoaded = CompletableDeferred<Unit>()
-        private var pendingOwnHistoryEmission: List<HistoryItem>? = null
+
+        // Every history we wrote and have not yet seen come back through observe(); a turn now saves
+        // twice (the question, then the finished turn), so one slot could mistake the first echo for
+        // an outside change and rebuild the feed from a stale list.
+        private val pendingOwnEmissions = ArrayDeque<List<HistoryItem>>()
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
@@ -50,8 +54,9 @@ class ChatViewModel
                 try {
                     conversationRepository.observe().collect { loadedHistory ->
                         val isInitialEmission = !initialHistoryLoaded.isCompleted
-                        val isOwnHistoryEmission = loadedHistory == pendingOwnHistoryEmission
-                        if (isOwnHistoryEmission) pendingOwnHistoryEmission = null
+                        val ownEmissionIndex = pendingOwnEmissions.indexOf(loadedHistory)
+                        val isOwnHistoryEmission = ownEmissionIndex >= 0
+                        repeat(ownEmissionIndex + 1) { pendingOwnEmissions.removeFirstOrNull() }
                         val interruptedActiveTurn =
                             !isInitialEmission && !isOwnHistoryEmission && runningJob?.isActive == true
                         if (interruptedActiveTurn) {
@@ -63,22 +68,8 @@ class ChatViewModel
                         // tool cards in order), so rebuilding it from the saved history would only
                         // regroup the cards after the texts.
                         if (!isOwnHistoryEmission) {
-                            mutableState.update { state ->
-                                val messages =
-                                    if (isInitialEmission) {
-                                        loadedHistory.toChatMessages() + state.messages
-                                    } else if (loadedHistory.isEmpty()) {
-                                        emptyList()
-                                    } else {
-                                        val toolMessages =
-                                            if (interruptedActiveTurn) {
-                                                emptyList()
-                                            } else {
-                                                state.messages.filter { it.role == ChatRole.TOOL }
-                                            }
-                                        loadedHistory.toChatMessages() + toolMessages
-                                    }
-                                state.copy(messages = messages)
+                            mutableState.update {
+                                it.withLoadedHistory(loadedHistory, isInitialEmission, dropToolCards = interruptedActiveTurn)
                             }
                         }
                         initialHistoryLoaded.complete(Unit)
@@ -105,10 +96,7 @@ class ChatViewModel
             }
         }
 
-        private fun submit(
-            text: String,
-            savedHistoryBefore: List<HistoryItem>? = null,
-        ) {
+        private fun submit(text: String) {
             if (text.isBlank() || mutableState.value.isRunning) return
             val trimmed = text.trim()
 
@@ -124,15 +112,18 @@ class ChatViewModel
             runningJob =
                 viewModelScope.launch {
                     initialHistoryLoaded.await()
-                    savedHistoryBefore?.let { persist(it) }
+                    // Saved before the model is asked, so a process killed mid-answer keeps the
+                    // question; the finished turn replaces this provisional item with the real ones.
+                    persist(history + HistoryItem.UserMessage(PENDING_USER_MESSAGE_ID, trimmed))
                     collectTurn(trimmed)
                 }
         }
 
         /**
-         * Redoes the turn that just failed: the failed exchange (the user message and whatever the
-         * model managed to produce) is dropped from memory, screen and saved history first, so the
-         * text is sent once and a Stop during the retry cannot bring the failed attempt back.
+         * Redoes the turn that just failed (or was cut short by a closed app): the failed exchange
+         * (the user message and whatever the model managed to produce) is dropped from memory and
+         * screen first, and [submit] saves the question alone, so the text is sent once and a Stop
+         * during the retry cannot bring the failed attempt back.
          */
         private fun retry() {
             val current = mutableState.value
@@ -144,18 +135,18 @@ class ChatViewModel
 
             history = keptHistory
             mutableState.update { it.copy(messages = keptMessages, error = null, canRetry = false) }
-            submit(failedUser.text, savedHistoryBefore = keptHistory)
+            submit(failedUser.text)
         }
 
         private suspend fun persist(items: List<HistoryItem>) {
-            pendingOwnHistoryEmission = items
+            pendingOwnEmissions.addLast(items)
             try {
                 conversationRepository.replace(items)
             } catch (exception: CancellationException) {
-                pendingOwnHistoryEmission = null
+                pendingOwnEmissions.remove(items)
                 throw exception
             } catch (_: Exception) {
-                pendingOwnHistoryEmission = null
+                pendingOwnEmissions.remove(items)
                 mutableState.update {
                     it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
                 }
@@ -242,15 +233,6 @@ class ChatViewModel
         private fun nextId(): String = (++nextMessageId).toString()
     }
 
-private fun List<HistoryItem>.toChatMessages(): List<ChatMessage> =
-    mapNotNull { item ->
-        when (item) {
-            is HistoryItem.UserMessage -> ChatMessage(item.id, ChatRole.USER, item.text)
-            is HistoryItem.AssistantMessage -> ChatMessage(item.id, ChatRole.ASSISTANT, item.text)
-            is HistoryItem.ToolCallItem, is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
-        }
-    }
-
 private fun ToolOutcome.toCardStatus(
     toolName: String,
     fileHitCount: Int,
@@ -274,3 +256,5 @@ private fun ToolOutcome.toCardStatus(
     }
 
 private const val SEARCH_FILES_TOOL_NAME = "search_files"
+
+private const val PENDING_USER_MESSAGE_ID = "pending-user-message"
