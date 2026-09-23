@@ -1,21 +1,16 @@
 package com.example.phoneagent.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.AssistantMessage
+import com.example.phoneagent.ui.designsystem.components.EmptyState
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallCard
 import com.example.phoneagent.ui.designsystem.components.UserMessage
@@ -26,10 +21,21 @@ internal fun MessageList(
     messages: List<ChatMessage>,
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
+    onSuggestionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    inlineError: (@Composable () -> Unit)? = null,
 ) {
     if (messages.isEmpty()) {
-        EmptyChat(modifier)
+        EmptyState(
+            suggestions =
+                listOf(
+                    stringResource(R.string.chat_suggestion_alarm),
+                    stringResource(R.string.chat_suggestion_find_file),
+                    stringResource(R.string.chat_suggestion_notify),
+                ),
+            onSuggestionClick = onSuggestionClick,
+            modifier = modifier,
+        )
     } else {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
@@ -37,6 +43,8 @@ internal fun MessageList(
             contentPadding = PaddingValues(AppTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
         ) {
+            // The feed is reversed: the first item is drawn last, i.e. after the newest message.
+            inlineError?.let { error -> item(key = INLINE_ERROR_KEY, contentType = INLINE_ERROR_KEY) { error() } }
             items(
                 items = messages.asReversed(),
                 key = ChatMessage::id,
@@ -44,27 +52,6 @@ internal fun MessageList(
             ) { message ->
                 Message(message, onEvent, onOpenFile)
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptyChat(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Column(
-            modifier = Modifier.padding(AppTheme.spacing.extraLarge),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
-        ) {
-            Text(
-                text = stringResource(R.string.chat_empty_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = stringResource(R.string.chat_empty_body),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
-            )
         }
     }
 }
@@ -100,3 +87,5 @@ private fun Message(
         }
     }
 }
+
+private const val INLINE_ERROR_KEY = "inline_error"

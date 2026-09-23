@@ -68,6 +68,26 @@ class ChatScreenScreenshotTest {
             ),
         )
 
+    private val asked = listOf(ChatMessage("1", ChatRole.USER, "Найди договор аренды"))
+
     @Test
-    fun offlineError() = screen("offline", ChatUiState(error = AgentError.Offline))
+    fun offlineBanner() = screen("offline", ChatUiState(messages = asked, error = AgentError.Offline, canRetry = true))
+
+    @Test
+    fun sessionExpiredBanner() = screen("session_expired", ChatUiState(messages = asked, error = AgentError.SessionExpired))
+
+    @Test
+    fun timeoutInline() =
+        screen(
+            "timeout_inline",
+            ChatUiState(messages = asked, error = AgentError.Timeout, canRetry = true),
+            listOf(Variant.Light, Variant.Dark, Variant.LargeFont),
+        )
+
+    @Test
+    fun rateLimitedInline() =
+        screen("rate_limited_inline", ChatUiState(messages = asked, error = AgentError.RateLimited(30), canRetry = true))
+
+    @Test
+    fun forbiddenInlineWithoutRetry() = screen("forbidden_inline", ChatUiState(messages = asked, error = AgentError.Forbidden))
 }
