@@ -16,9 +16,11 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,11 +39,17 @@ private val DarkColors =
         secondaryContainer = IndigoContainerDark,
     )
 
+// inter.ttf is a variable font: without an explicit `wght` value every entry below would render at
+// the file's default weight, so Medium titles and **bold** text would look like Regular.
+@OptIn(ExperimentalTextApi::class)
+private fun inter(weight: FontWeight) =
+    Font(R.font.inter, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
+
 private val Inter =
     FontFamily(
-        Font(R.font.inter, FontWeight.Normal),
-        Font(R.font.inter, FontWeight.Medium),
-        Font(R.font.inter, FontWeight.Bold),
+        inter(FontWeight.Normal),
+        inter(FontWeight.Medium),
+        inter(FontWeight.Bold),
     )
 
 val AppMonospace: FontFamily = FontFamily(Font(R.font.jetbrains_mono, FontWeight.Normal))
