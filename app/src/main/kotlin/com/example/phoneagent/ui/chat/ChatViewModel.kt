@@ -72,7 +72,7 @@ class ChatViewModel
         }
 
         private fun submit(text: String) {
-            if (text.isBlank() || mutableState.value.isRunning) return
+            if (text.isBlank() || mutableState.value.isRunning || mutableState.value.isClearing) return
             val trimmed = text.trim()
 
             mutableState.update {
