@@ -2,13 +2,16 @@ package com.example.phoneagent.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +25,7 @@ class ChatViewModel
     @Inject
     constructor(
         private val agentLoop: AgentLoop,
+        private val conversationRepository: ConversationRepository,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
         private var nextMessageId = 0L
@@ -31,11 +35,29 @@ class ChatViewModel
         // values (TurnCompleted/TurnFailed) — ChatMessage below is a UI-only rendering concern and
         // is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
+        private val historyLoadJob =
+            viewModelScope.launch {
+                try {
+                    val loadedHistory = conversationRepository.load()
+                    if (!clearRequested) {
+                        history = loadedHistory
+                        val restoredMessages = history.toChatMessages()
+                        mutableState.update { state -> state.copy(messages = restoredMessages + state.messages) }
+                    }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    mutableState.update {
+                        it.copy(error = AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"))
+                    }
+                }
+            }
         private val toolMessageIdByCallId = mutableMapOf<String, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
         // the one an ApprovalRequested (which carries no call id of its own) belongs to.
         private var lastToolMessageId: String? = null
+        private var clearRequested = false
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
 
@@ -43,6 +65,7 @@ class ChatViewModel
             when (event) {
                 is ChatUiEvent.Submit -> submit(event.text)
                 ChatUiEvent.Stop -> runningJob?.cancel()
+                ChatUiEvent.ClearHistory -> clearHistory()
                 is ChatUiEvent.ToggleToolCallDetails -> toggleToolCallDetails(event.messageId)
                 ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null) }
             }
@@ -61,7 +84,10 @@ class ChatViewModel
             }
 
             runningJob =
-                viewModelScope.launch { collectTurn(trimmed) }
+                viewModelScope.launch {
+                    historyLoadJob.join()
+                    collectTurn(trimmed)
+                }
         }
 
         private suspend fun collectTurn(text: String) {
@@ -69,9 +95,22 @@ class ChatViewModel
                 var assistantMessageId: String? = null
                 agentLoop.run(history, text).collect { event ->
                     assistantMessageId = handleAgentEvent(event, assistantMessageId)
+                    if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) {
+                        try {
+                            conversationRepository.replace(history)
+                        } catch (exception: CancellationException) {
+                            throw exception
+                        } catch (_: Exception) {
+                            mutableState.update {
+                                it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
+                            }
+                        }
+                    }
                 }
             } finally {
-                cancelPendingToolCalls()
+                val pendingIds = toolMessageIdByCallId.values.toList()
+                toolMessageIdByCallId.clear()
+                pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
                 mutableState.update { it.copy(isRunning = false) }
             }
         }
@@ -187,15 +226,46 @@ class ChatViewModel
             }
         }
 
-        // Stop leaves any tool call that never got a ToolCallFinished stuck showing "waiting" or
-        // "running" forever; the card's own "прервано" state exists exactly for this.
-        private fun cancelPendingToolCalls() {
-            val pendingIds = toolMessageIdByCallId.values.toList()
+        private fun clearHistory() {
+            clearRequested = true
+            val activeTurn = runningJob
+            activeTurn?.cancel()
+            runningJob = null
+            history = emptyList()
             toolMessageIdByCallId.clear()
-            pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
+            lastToolMessageId = null
+            mutableState.update { it.copy(messages = emptyList(), isClearing = true, error = null) }
+
+            viewModelScope.launch {
+                var clearError: AgentError? = null
+                try {
+                    activeTurn?.join()
+                    historyLoadJob.join()
+                    history = emptyList()
+                    conversationRepository.replace(emptyList())
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    clearError = AgentError.Unexpected("Failed to clear conversation history (${exception::class.simpleName})")
+                } finally {
+                    clearRequested = false
+                    mutableState.update {
+                        it.copy(messages = emptyList(), isRunning = false, isClearing = false, error = clearError)
+                    }
+                }
+            }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
+    }
+
+private fun List<HistoryItem>.toChatMessages(): List<ChatMessage> =
+    mapNotNull { item ->
+        when (item) {
+            is HistoryItem.UserMessage -> ChatMessage(item.id, ChatRole.USER, item.text)
+            is HistoryItem.AssistantMessage -> ChatMessage(item.id, ChatRole.ASSISTANT, item.text)
+            is HistoryItem.ToolCallItem, is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
+        }
     }
 
 private fun ToolOutcome.toCardStatus(

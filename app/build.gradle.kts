@@ -33,8 +33,10 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.room.runtime)
     implementation(libs.okhttp)
     ksp(libs.hilt.compiler)
+    ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)

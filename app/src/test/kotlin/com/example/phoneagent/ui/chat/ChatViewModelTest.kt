@@ -3,6 +3,7 @@ package com.example.phoneagent.ui.chat
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
+import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -12,6 +13,7 @@ import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
@@ -70,7 +72,7 @@ class ChatViewModelTest {
                             ModelEvent.Completed(),
                         )
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
             val states = mutableListOf<ChatUiState>()
             backgroundScope.launch { viewModel.state.collect { states += it } }
 
@@ -93,11 +95,55 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `view model restores conversation after restarting`() =
+        runTest(dispatcher.scheduler) {
+            val repository = FakeConversationRepository(emptyList())
+            val firstRun =
+                ChatViewModel(
+                    agentLoop(
+                        FakeModelGateway().apply {
+                            events = listOf(ModelEvent.TextDelta("Earlier answer"), ModelEvent.Completed())
+                        },
+                    ),
+                    repository,
+                )
+            firstRun.onEvent(ChatUiEvent.Submit("Earlier question"))
+            advanceUntilIdle()
+
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+            assertEquals(
+                listOf(ChatRole.USER to "Earlier question", ChatRole.ASSISTANT to "Earlier answer"),
+                restarted.state.value.messages
+                    .map { it.role to it.text },
+            )
+        }
+
+    @Test
+    fun `clearing history empties chat and persistent storage`() =
+        runTest(dispatcher.scheduler) {
+            val repository =
+                FakeConversationRepository(
+                    listOf(
+                        HistoryItem.UserMessage("saved-user", "Earlier question"),
+                        HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                    ),
+                )
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+            viewModel.onEvent(ChatUiEvent.ClearHistory)
+            advanceUntilIdle()
+
+            assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+            assertEquals(emptyList<HistoryItem>(), repository.load())
+        }
+
+    @Test
     fun `model failure is exposed in state without crashing`() =
         runTest(dispatcher.scheduler) {
             val expectedError = AgentError.Offline
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(expectedError)) }
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Проверка"))
             advanceUntilIdle()
@@ -110,7 +156,7 @@ class ChatViewModelTest {
     fun `stopping mid-response cancels the stream, clears running state, and keeps partial text`() =
         runTest(dispatcher.scheduler) {
             val gateway = HangingModelGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway))
+            val viewModel = createChatViewModel(agentLoop(gateway))
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
@@ -138,7 +184,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             advanceUntilIdle()
@@ -162,7 +208,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("search_files") { ToolResult.Success(result) }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("найди отчет"))
             advanceUntilIdle()
@@ -187,7 +233,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("set_alarm", risk = Risk.CONFIRM) { ToolResult.Success("set") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("поставь будильник"))
             advanceUntilIdle()
@@ -207,7 +253,7 @@ class ChatViewModelTest {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             advanceUntilIdle()
             val id =
@@ -231,7 +277,7 @@ class ChatViewModelTest {
             val call = ToolCall("call-1", "get_time", buildJsonObject {})
             val gateway = HangingAfterToolCallGateway(call)
             val registry = ToolRegistry(setOf(fakeTool("get_time") { awaitCancellation() }))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry))
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             // Not advanceUntilIdle(): ToolPipeline wraps execute() in a 5s withTimeout, and
@@ -263,6 +309,18 @@ class ChatViewModelTest {
             contextWindowPolicy = ContextWindowPolicy { it },
             idGenerator = FakeIdGenerator(),
         )
+
+    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel = ChatViewModel(agentLoop, FakeConversationRepository(emptyList()))
+
+    private class FakeConversationRepository(
+        private var items: List<HistoryItem>,
+    ) : ConversationRepository {
+        override suspend fun load(): List<HistoryItem> = items
+
+        override suspend fun replace(items: List<HistoryItem>) {
+            this.items = items
+        }
+    }
 
     private fun fakeTool(
         name: String,
