@@ -25,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,7 +114,10 @@ private fun ChatBody(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Text(
                         text = stringResource(R.string.model_working),
-                        modifier = Modifier.padding(AppTheme.spacing.small),
+                        modifier =
+                            Modifier
+                                .padding(AppTheme.spacing.small)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
