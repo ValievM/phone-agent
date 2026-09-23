@@ -1,21 +1,31 @@
-# Context7 (Serena отключён)
+# Serena и Context7 (только в этом проекте)
 
 > См. также: [stages/a-environment.md](../stages/a-environment.md) (история установки) · [architecture/testing.md](../architecture/testing.md) · [README.md](../README.md)
 
-## Serena — отключена, не использовать
-Решение 2026-09-23: Serena отключена глобально (`enabled = false` в `[mcp_servers.serena]`
-в `~/.codex/config.toml`; в Claude Code она и не была подключена). Причина — фрагильная
-Kotlin-обвязка требовала повторной ручной починки (просроченные сборки `intellij-server`,
-конфликт KSP2/KSP1, путь к JDK 17) чаще, чем реально экономила время. Не пытайтесь её
-включать и не советуйте пользователю чинить конфиг — вместо неё: `rg`/обычный grep по коду,
-`Read`/`Grep` в Claude Code, `get_symbols_overview`-подобной замены нет, читайте файл целиком
-или нужный диапазон строк. История настройки (на случай если решение пересмотрят) сохранена
-ниже в этом файле.
+## Область действия
+Решение 2026-09-23: Serena и Context7 выключены глобально (`enabled = false` в
+`~/.codex/config.toml`, чтобы не грузить их зря в остальных проектах пользователя) и
+включены обратно только для phone-agent через project-scoped `.codex/config.toml` в
+корне репозитория (Codex CLI читает его для доверенных проектов — `trust_level =
+"trusted"` в `[projects."<путь>"]` глобального конфига). Файл в git, поэтому применяется
+одинаково во всех worktree этого репозитория; **для нового worktree вне уже доверенных
+путей может понадобиться доверить его вручную** (добавить `[projects."<путь>"]
+trust_level = "trusted"` в `~/.codex/config.toml`) — Codex либо запросит это
+интерактивно, либо project-local конфиг тихо не подхватится, тогда просто работайте
+обычным поиском без вопросов пользователю.
+В Claude Code ни Serena, ни project-scoped Codex-конфиг не участвуют — здесь всегда
+обычный поиск (`Grep`/`Read`) и свой Context7 MCP, если он подключён отдельно.
 
-## Context7: актуальная документация библиотек
-Не полагайся на память для API библиотек. Перед кодом, который использует Compose, AndroidX (DataStore, Room, Keystore), OkHttp, kotlinx.serialization, kotlinx.coroutines, Navigation 3, markdown-библиотеку:
-1. `resolve-library-id` (библиотека + твой вопрос) → выбери подходящий ID.
-2. `query-docs` (ID + конкретный вопрос) → используй ответ.
+## Serena: навигация и правка кода по символам
+Используй Serena вместо чтения файлов целиком:
+- Файл незнакомый: сначала `get_symbols_overview`, потом нужный символ через `find_symbol`.
+- Перед изменением сигнатуры или поведения: `find_referencing_symbols`, чтобы увидеть, кто это использует.
+- Правка символа целиком: `replace_symbol_body`, вставка рядом: `insert_after_symbol` / `insert_before_symbol`.
+- Поиск по тексту и регуляркам: `search_for_pattern`.
+- В конце этапа сохрани короткую заметку в память Serena (этап, принятые решения, ловушки), в начале нового этапа прочитай её.
+- Kotlin в Serena работает через экспериментальный language server (настройка — см. архив ниже). Если символы не находятся или ответы пустые, переключись на обычный поиск (`rg`) и скажи пользователю об этом. Не делай вид, что Serena сработала.
+- Вызывай только инструменты, которые реально есть в списке MCP. Если имя отличается, ориентируйся на список.
+- В Codex-приложении (не CLI) в начале сессии выполни: «Activate the current dir as project using serena».
 
 ## Context7: актуальная документация библиотек
 Не полагайся на память для API библиотек. Перед кодом, который использует Compose, AndroidX (DataStore, Room, Keystore), OkHttp, kotlinx.serialization, kotlinx.coroutines, Navigation 3, markdown-библиотеку:
@@ -29,7 +39,7 @@ Kotlin-обвязка требовала повторной ручной поч�
 - Context7 только для библиотек. Контракт входа и бэкенда OpenAI берётся из `docs/backend-notes.md` (после этапа 0, раньше: [research/backend-facts.md](../research/backend-facts.md)) и исходников `openai/codex`, а не из Context7 и не из памяти.
 - Если имя инструмента отличается от `query-docs`, смотри актуальный список инструментов.
 
-## Архив: настройка Kotlin в Serena (не актуально, Serena отключена)
+## Архив: настройка Kotlin в Serena (проверено 21-22.09.2026)
 - В `.serena/project.yml` включены `language_servers: [kotlin, python]`. Serena выбирает языки при первой активации, а тогда в проекте был только Python-скрипт, поэтому Kotlin не был включён.
 - Kotlin LS (`intellij-server`) в Serena 1.7.0 закреплён на сборке `262.9593.0`, она **просрочена** («This build of intellij-server has expired»). Новая сборка задана в **глобальном** `~/.serena/serena_config.yml` (в `project.yml` эта настройка не действует):
   ```yaml

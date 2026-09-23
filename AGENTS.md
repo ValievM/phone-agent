@@ -8,7 +8,7 @@ Android-приложение (Kotlin + Compose): чат с Codex + узкие и
 - Код (`docs/architecture/`): `overview.md` модули; `core.md` порты, AgentLoop, инструменты; `adapters.md` модель, вход, хранилище; `recipes.md` как добавить инструмент, экран, вход; `testing.md` тесты.
 - UI (`docs/design/`): `layout-rules.md` вёрстка; `components.md` компоненты; `style.md` стиль; `icons-motion-copy.md` иконки и тексты; `a11y-security.md` безопасность UI.
 - Константы входа и бэкенда: `docs/backend-notes.md` (после этапа 0), раньше `docs/research/backend-facts.md`.
-- Context7 (Serena отключена, не используй): `docs/tooling/serena-context7.md`.
+- Serena, Context7 (только в этом проекте): `docs/tooling/serena-context7.md`.
 
 Документ важнее твоих знаний. Документация только в `docs/`, новый файл добавляй в `docs/README.md`. Решение изменилось: обнови документ в том же коммите и запусти `python3 scripts/check_docs.py`.
 
@@ -22,7 +22,7 @@ Android-приложение (Kotlin + Compose): чат с Codex + узкие и
 ## TDD (обязательно для логики)
 Тест-кейсы (5-10, с границами и ошибками) согласуй с пользователем. Затем цикл: **Red** (один тест, запусти, покажи, что он упал по нужной причине) → **Green** (минимальный код, покажи зелёный вывод) → **Refactor**. Баг: сначала падающий тест.
 Запрещено: код до красного теста; править, ослаблять, удалять или `@Ignore` тест ради прохождения (тест неверен: объясни и спроси); проверять внутренности вместо поведения; реальное время, сеть, случайность в тестах (`Clock`, тестовые диспетчеры, `MockWebServer`, фейки вместо моков).
-Исключение: вёрстка Compose и тонкие Android-обёртки (уведомления, intent, SAF): проверь на телефоне, добавь строку в `docs/manual-verification.md` (`[x]` там ставит только пользователь). Этапы A и 0 без TDD.
+Исключение: Compose-вёрстка и тонкие Android-обёртки: проверь на телефоне, добавь строку в `docs/manual-verification.md` (`[x]` ставит только пользователь). Этапы A и 0 без TDD.
 
 ## Команды
 ```
@@ -50,8 +50,8 @@ python3 scripts/check_docs.py
 - Токены и ключи только в `TokenStore` (DataStore + Keystore): не в логах, репозитории, `SharedPreferences`, тестах. `allowBackup="false"`. `auth.json` с компьютера не копировать. Секреты (`*.jks`, `local.properties`, `spike/auth*.json`) в `.gitignore`, перед коммитом `git diff --staged`.
 - В MVP нет `MANAGE_EXTERNAL_STORAGE`, AccessibilityService, SMS и звонков.
 
-## Context7
-Serena отключена, не включай — навигация обычным поиском (`rg`/`grep`). Context7: актуальный API библиотек (`resolve-library-id` → `query-docs`); без токенов/ключей/данных пользователя в запросе. Контракт OpenAI: `docs/backend-notes.md`.
+## Serena и Context7
+Оба включены только тут (project-scoped `.codex/config.toml`), в остальных проектах выключены — не трогай без причины. Serena — symbol-навигация, не работает — `rg`/`grep`. Context7: API библиотек (`resolve-library-id` → `query-docs`), без токенов/ключей в запросе. Контракт OpenAI: `docs/backend-notes.md`.
 
 ## Результат
 Комментарии и имена в коде на английском, тексты для пользователя русские.
