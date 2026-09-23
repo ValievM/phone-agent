@@ -18,6 +18,22 @@ android {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
 
+    buildTypes {
+        release {
+            // R8 code shrinking for stage 5.6; resource shrinking stays off until the minified
+            // build is verified to launch on a real device (docs/manual-verification.md).
+            isMinifyEnabled = true
+            isShrinkResources = false
+            // Signed with the local debug key so the minified build can be installed for the
+            // manual check; the real release signing is stage 6.
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }

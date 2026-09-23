@@ -9,7 +9,7 @@
 - [ ] 5.3 Единый обработчик ошибок и тексты в `strings.xml`.
 - [ ] 5.4 Поворот экрана и смерть процесса во время стрима не теряют историю и не падают.
 - [ ] 5.5 Логи без токенов и содержимого чата с данными файлов (проверка).
-- [ ] 5.6 R8/ProGuard правила для `kotlinx.serialization` и Room, release-сборка запускается.
+- [ ] 5.6 R8/ProGuard правила для `kotlinx.serialization` и Room, release-сборка запускается. R8 включён (`app/build.gradle.kts`, `proguard-android-optimize.txt` + `app/proguard-rules.pro`); правила только адресные: подавлены предупреждения OkHttp об опциональных TLS-провайдерах, которых нет на Android (BouncyCastle JSSE/Conscrypt/OpenJSSE — из официальной инструкции OkHttp); `kotlinx.serialization`, Room и Hilt приносят свои consumer-правила сами. Сборка: `assembleRelease` зелёный, APK 11,5 → 3,1 МБ, `mapping.txt` сохраняется для дебэкраншотов; `testReleaseUnitTest` зелёный (74 теста, UiTest/screenshot исключены по-прежнему). `shrinkResources` выключен до живой проверки. **Частично**: запуск минифицированного APK на телефоне не проверялся — строка в `manual-verification.md`; подпись APK — этап 6.
 - [ ] 5.7 Состояния по [design/components.md](../design/components.md): пустой чат с подсказками, баннеры «нет сети» и «сессия истекла», инлайн-ошибка с «Повторить».
 - [ ] 5.8 Design QA (чек-лист [design/qa.md](../design/qa.md)) пройден для всех экранов; скриншот-тесты (Roborazzi) для `Composer`, `ToolCallCard` (все состояния), `ApprovalSheet`, `AssistantMessage`; эталоны записаны после утверждения дизайна.
 
