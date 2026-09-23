@@ -23,10 +23,11 @@ android {
     }
 }
 
-// Screenshot tests need androidx.activity.ComponentActivity from ui-test-manifest, which only the
-// debug variant carries; the rendering they check does not depend on the build type.
+// Compose UI tests (screenshot/ and *UiTest) need androidx.activity.ComponentActivity from
+// ui-test-manifest, which only the debug variant carries; what they check does not depend on the
+// build type.
 tasks.withType<Test>().configureEach {
-    if (name.contains("Release")) exclude("**/screenshot/**")
+    if (name.contains("Release")) exclude("**/screenshot/**", "**/*UiTest*")
 }
 
 roborazzi {
