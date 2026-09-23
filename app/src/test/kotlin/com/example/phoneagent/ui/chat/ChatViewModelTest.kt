@@ -24,6 +24,7 @@ import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -135,6 +136,52 @@ class ChatViewModelTest {
             advanceUntilIdle()
 
             assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+            assertEquals(emptyList<HistoryItem>(), repository.load())
+        }
+
+    @Test
+    fun `submit during history clearing does not start a turn or change chat`() =
+        runTest(dispatcher.scheduler) {
+            val initialHistory: List<HistoryItem> =
+                listOf(HistoryItem.UserMessage("saved-user", "Earlier question"))
+            val clearingStarted = CompletableDeferred<Unit>()
+            val finishClearing = CompletableDeferred<Unit>()
+            val repository =
+                object : ConversationRepository {
+                    var items = initialHistory
+
+                    override suspend fun load(): List<HistoryItem> = items
+
+                    override suspend fun replace(items: List<HistoryItem>) {
+                        if (items.isEmpty()) {
+                            clearingStarted.complete(Unit)
+                            finishClearing.await()
+                        }
+                        this.items = items
+                    }
+                }
+            val gateway = FakeModelGateway()
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.ClearHistory)
+            runCurrent()
+            clearingStarted.await()
+            assertTrue(viewModel.state.value.isClearing)
+
+            try {
+                viewModel.onEvent(ChatUiEvent.Submit("Should be ignored"))
+                runCurrent()
+
+                assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
+                assertTrue(gateway.requests.isEmpty())
+                assertEquals(initialHistory, repository.load())
+            } finally {
+                finishClearing.complete(Unit)
+                advanceUntilIdle()
+            }
+
+            assertFalse(viewModel.state.value.isClearing)
             assertEquals(emptyList<HistoryItem>(), repository.load())
         }
 
