@@ -59,22 +59,27 @@ class ChatViewModel
                             runningJob = null
                         }
                         history = loadedHistory
-                        mutableState.update { state ->
-                            val messages =
-                                if (isInitialEmission) {
-                                    loadedHistory.toChatMessages() + state.messages
-                                } else if (loadedHistory.isEmpty()) {
-                                    emptyList()
-                                } else {
-                                    val toolMessages =
-                                        if (interruptedActiveTurn) {
-                                            emptyList()
-                                        } else {
-                                            state.messages.filter { it.role == ChatRole.TOOL }
-                                        }
-                                    loadedHistory.toChatMessages() + toolMessages
-                                }
-                            state.copy(messages = messages)
+                        // The screen already shows our own turn exactly as it happened (text and
+                        // tool cards in order), so rebuilding it from the saved history would only
+                        // regroup the cards after the texts.
+                        if (!isOwnHistoryEmission) {
+                            mutableState.update { state ->
+                                val messages =
+                                    if (isInitialEmission) {
+                                        loadedHistory.toChatMessages() + state.messages
+                                    } else if (loadedHistory.isEmpty()) {
+                                        emptyList()
+                                    } else {
+                                        val toolMessages =
+                                            if (interruptedActiveTurn) {
+                                                emptyList()
+                                            } else {
+                                                state.messages.filter { it.role == ChatRole.TOOL }
+                                            }
+                                        loadedHistory.toChatMessages() + toolMessages
+                                    }
+                                state.copy(messages = messages)
+                            }
                         }
                         initialHistoryLoaded.complete(Unit)
                     }
