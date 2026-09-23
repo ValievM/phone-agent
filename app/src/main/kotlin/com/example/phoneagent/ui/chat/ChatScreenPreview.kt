@@ -10,7 +10,7 @@ import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @PreviewLightDark
 @Composable
-private fun EmptyChatPreview() {
+private fun IdleComposerPreview() {
     AppTheme(useDynamicColor = false) {
         ChatScreen(ChatUiState(), {}, {})
     }
@@ -38,7 +38,7 @@ private fun ConversationChatPreview() {
 
 @PreviewLightDark
 @Composable
-private fun LoadingChatPreview() {
+private fun RunningComposerPreview() {
     AppTheme(useDynamicColor = false) {
         ChatScreen(ChatUiState(isRunning = true), {}, {})
     }

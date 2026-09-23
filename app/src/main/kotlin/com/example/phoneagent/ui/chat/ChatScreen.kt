@@ -163,7 +163,9 @@ private fun ChatBody(
             HorizontalDivider()
             ChatComposer(
                 enabled = !state.isRunning,
+                isRunning = state.isRunning,
                 onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
+                onStop = { onEvent(ChatUiEvent.Stop) },
             )
         }
     }
@@ -286,7 +288,9 @@ private fun BubbleMessage(
 @Composable
 private fun ChatComposer(
     enabled: Boolean,
+    isRunning: Boolean,
     onSubmit: (String) -> Unit,
+    onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
@@ -318,12 +322,15 @@ private fun ChatComposer(
             keyboardActions = KeyboardActions(onSend = { submit() }),
         )
         FilledIconButton(
-            onClick = submit,
-            enabled = enabled && draft.isNotBlank(),
+            onClick = { if (isRunning) onStop() else submit() },
+            enabled = isRunning || (enabled && draft.isNotBlank()),
         ) {
             Icon(
-                painter = painterResource(AppIcons.send),
-                contentDescription = stringResource(R.string.send_message),
+                painter = painterResource(if (isRunning) AppIcons.stop else AppIcons.send),
+                contentDescription =
+                    stringResource(
+                        if (isRunning) R.string.stop_generation else R.string.send_message,
+                    ),
             )
         }
     }
