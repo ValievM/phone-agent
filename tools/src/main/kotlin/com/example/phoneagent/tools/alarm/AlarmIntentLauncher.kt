@@ -10,13 +10,17 @@ import javax.inject.Inject
 
 private const val TAG = "AlarmIntentLauncher"
 
+internal interface AlarmIntentPort {
+    fun launch(spec: AlarmIntentSpec): AlarmLaunchResult
+}
+
 internal class AlarmIntentLauncher
     @Inject
     constructor(
         @param:ApplicationContext private val applicationContext: Context,
         private val logger: AppLogger,
-    ) {
-        fun launch(spec: AlarmIntentSpec): AlarmLaunchResult {
+    ) : AlarmIntentPort {
+        override fun launch(spec: AlarmIntentSpec): AlarmLaunchResult {
             val intent = spec.toAndroidIntent()
             if (intent.resolveActivity(applicationContext.packageManager) == null) {
                 return AlarmLaunchResult.NoClockApp
