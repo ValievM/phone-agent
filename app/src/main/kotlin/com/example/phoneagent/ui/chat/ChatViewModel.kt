@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.ToolOutcome
@@ -28,6 +29,9 @@ class ChatViewModel
     constructor(
         private val agentLoop: AgentLoop,
         private val conversationRepository: ConversationRepository,
+        // Default only keeps the dozens of existing test constructions unchanged; DI always passes
+        // the bound generator (see AgentModule).
+        private val idGenerator: IdGenerator = RandomIdGenerator,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
         private var nextMessageId = 0L
@@ -140,7 +144,7 @@ class ChatViewModel
             // so a Stop before the echo cannot lose it, and the next submit cannot overwrite it.
             historyBeforeTurn = history
             // The id must be unique: a stopped question stays in history, and the feed keys on it.
-            history = history + HistoryItem.UserMessage("pending-${RandomIdGenerator.newId()}", trimmed)
+            history = history + HistoryItem.UserMessage("pending-${idGenerator.newId()}", trimmed)
             // Saved in its own job: stopping the turn must not cancel the save of the question.
             val questionSnapshot = history
             viewModelScope.launch {
