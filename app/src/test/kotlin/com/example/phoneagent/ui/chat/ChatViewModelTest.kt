@@ -255,7 +255,8 @@ class ChatViewModelTest {
                 advanceUntilIdle()
 
                 assertTrue(wasCancelled)
-                assertEquals(listOf(emptyList<HistoryItem>()), repository.replacements)
+                // The question is saved when it is sent; what must never happen is a write after the clear.
+                assertEquals(emptyList<HistoryItem>(), repository.replacements.last())
                 assertEquals(emptyList<HistoryItem>(), repository.load())
             } finally {
                 viewModel.onEvent(ChatUiEvent.Stop)
@@ -298,7 +299,8 @@ class ChatViewModelTest {
                 advanceUntilIdle()
 
                 assertTrue(wasCancelled)
-                assertEquals(listOf(emptyList<HistoryItem>()), repository.replacements)
+                // The question is saved when it is sent; what must never happen is a write after the clear.
+                assertEquals(emptyList<HistoryItem>(), repository.replacements.last())
                 assertEquals(emptyList<HistoryItem>(), repository.load())
             } finally {
                 viewModel.onEvent(ChatUiEvent.Stop)
