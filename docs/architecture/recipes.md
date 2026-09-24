@@ -6,12 +6,12 @@
 
 **Новый инструмент** (пример `set_timer`):
 1. **Тесты первыми (красные):** валидация аргументов (граничные значения), сборка intent и результата, поведение при отказе.
-2. Пакет `tools/timer/`: `TimerArgs` (`@Serializable`), `TimerTool : TypedTool<TimerArgs>` со `spec` (имя, описание, схема, `Risk`), тонкая Android-обёртка. Тесты становятся зелёными.
+2. Пакет `tools/timer/`: `TimerArgs` (`@Serializable`), `TimerTool : Tool` со `spec` (имя, описание, схема через `buildJsonObject`, `Risk`), декодирование `TimerArgs` из `JsonObject`, тонкая Android-обёртка. Тесты становятся зелёными. Образец — `tools/notify/`.
 3. `TimerBindings`: `@Binds @IntoSet abstract fun tool(t: TimerTool): Tool`. Параметризованный тест реестра проходит.
 4. Строка в списке инструментов в [product/requirements.md](../product/requirements.md) и `docs/INSTALL.md`.
    Больше ничего не трогаем: ни `AgentLoop`, ни UI, ни конвейер.
 
-**Новый способ входа:** класс `AuthProvider`, `@IntoMap` регистрация, кнопка на экране входа, тесты провайдера.
+**Новый способ входа:** класс-провайдер, строка в явной карте `SessionAssemblyModule`, кнопка на экране входа, тесты провайдера.
 
 **Другая модель или бэкенд:** новый `BackendProfile` (или новая реализация `ModelGateway`), выбор в настройках. Ядро не меняется.
 
