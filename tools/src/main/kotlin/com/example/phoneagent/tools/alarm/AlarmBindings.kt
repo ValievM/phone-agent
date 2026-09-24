@@ -13,4 +13,7 @@ internal abstract class AlarmBindings {
     @Binds
     @IntoSet
     abstract fun bindAlarmTool(tool: AlarmTool): Tool
+
+    @Binds
+    abstract fun bindAlarmIntentPort(launcher: AlarmIntentLauncher): AlarmIntentPort
 }
