@@ -28,6 +28,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Тесты, TDD, автоматические правила границ | [architecture/testing.md](architecture/testing.md) |
 | Добавить инструмент, способ входа, экран | [architecture/recipes.md](architecture/recipes.md) |
 | Почему так решили, риски архитектуры | [architecture/decisions.md](architecture/decisions.md) |
+| Карта фактической архитектуры для ревью: граф модулей, DI, диаграммы классов, потоки, наблюдения | [architecture/map-overview.md](architecture/map-overview.md) → [ядро](architecture/map-core-data.md), [вход](architecture/map-auth.md), [tools и UI](architecture/map-tools-app.md), [app](architecture/map-app-infra.md), [потоки](architecture/map-flows.md) |
 | Обзор дизайна | [design/overview.md](design/overview.md) |
 | Цвет, шрифты, формы | [design/style.md](design/style.md) |
 | Иконки, анимации, тексты интерфейса | [design/icons-motion-copy.md](design/icons-motion-copy.md) |
@@ -45,7 +46,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 ## Карта документов
 - `product/`: что строим. [overview](product/overview.md), [requirements](product/requirements.md).
 - `research/`: исходные гипотезы. [backend-facts](research/backend-facts.md). Проверенные значения: [backend-notes](backend-notes.md).
-- `architecture/`: как устроено. [overview](architecture/overview.md), [core](architecture/core.md), [adapters](architecture/adapters.md), [ui](architecture/ui.md), [patterns](architecture/patterns.md), [testing](architecture/testing.md), [recipes](architecture/recipes.md), [decisions](architecture/decisions.md).
+- `architecture/`: как устроено. [overview](architecture/overview.md), [core](architecture/core.md), [adapters](architecture/adapters.md), [ui](architecture/ui.md), [patterns](architecture/patterns.md), [testing](architecture/testing.md), [recipes](architecture/recipes.md), [decisions](architecture/decisions.md). Карта по коду (снята с `main`, для ревью): [map-overview](architecture/map-overview.md), [map-core-data](architecture/map-core-data.md), [map-auth](architecture/map-auth.md), [map-tools-app](architecture/map-tools-app.md), [map-app-infra](architecture/map-app-infra.md), [map-flows](architecture/map-flows.md).
 - `design/`: как выглядит. [overview](design/overview.md), [style](design/style.md), [icons-motion-copy](design/icons-motion-copy.md), [components](design/components.md), [layout-rules](design/layout-rules.md), [a11y-security](design/a11y-security.md), [libraries](design/libraries.md), [qa](design/qa.md).
 - `stages/`: в каком порядке делаем. [README](stages/README.md), [A](stages/a-environment.md), [0](stages/0-spike.md), [1](stages/1-skeleton.md), [2](stages/2-auth.md), [3](stages/3-model-client.md), [4](stages/4-tools.md), [5](stages/5-hardening.md), [6](stages/6-release.md).
 - `tooling/`: инструменты агента. [serena-context7](tooling/serena-context7.md), [build-performance](tooling/build-performance.md), [ci](tooling/ci.md).
