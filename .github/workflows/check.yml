@@ -22,7 +22,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # The runner image already ships the Android SDK; only the licenses need accepting so
+      # Gradle can download the platform and build-tools it is missing.
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - uses: gradle/actions/setup-gradle@v4
       - name: Build, detekt, lint, unit tests
         run: ./gradlew check
