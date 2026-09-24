@@ -3,6 +3,7 @@ package com.example.phoneagent.architecture
 import com.lemonappdev.konsist.api.Konsist
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ArchitectureTest {
     private val productionFiles =
@@ -174,5 +175,105 @@ class ArchitectureTest {
             }
 
         assertTrue("Invalid Tool implementations in: $violations", violations.isEmpty())
+    }
+
+    @Test
+    fun `gradle modules depend only in the allowed direction`() {
+        val root =
+            generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+                .first { File(it, "settings.gradle.kts").isFile }
+
+        fun projectDependencies(module: String): List<String> =
+            Regex("""project\("([^"]+)"\)""")
+                .findAll(File(root, "$module/build.gradle.kts").readText())
+                .map { it.groupValues[1] }
+                .distinct()
+                .toList()
+
+        val coreDependencies = projectDependencies("core/domain")
+        assertTrue("core:domain must not depend on other project modules, found: $coreDependencies", coreDependencies.isEmpty())
+
+        // Adapters never see each other and never see the composition root (AGENTS.md).
+        for (module in listOf("data/llm", "data/auth", "tools")) {
+            val dependencies = projectDependencies(module)
+            val forbidden = dependencies.filter { it != ":core:domain" }
+            assertTrue("$module may depend only on :core:domain, found: $dependencies", forbidden.isEmpty())
+        }
+    }
+
+    @Test
+    fun `production dispatchers come only from DispatcherProvider`() {
+        // The one sanctioned place defining real dispatchers; everyone else injects the port.
+        val allowed =
+            setOf(
+                "/core/domain/src/main/kotlin/com/example/phoneagent/domain/platform/PlatformPorts.kt",
+            )
+        // Existing direct usages, kept passing on purpose. Baseline — убрать позже, когда
+        // соответствующие классы переведут на DispatcherProvider:
+        val baseline =
+            setOf(
+                "/app/src/main/kotlin/com/example/phoneagent/di/AuthBindingsModule.kt", // Dispatchers.Main.immediate для scope приложения
+                "/data/llm/src/main/kotlin/com/example/phoneagent/data/llm/ResponsesGateway.kt",
+                "/data/llm/src/main/kotlin/com/example/phoneagent/data/llm/OkHttpModelCatalog.kt",
+                "/data/llm/src/main/kotlin/com/example/phoneagent/data/llm/OkHttpApiKeyValidationGateway.kt",
+                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/OkHttpTokenRefreshGateway.kt",
+                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/ChatGptBrowserAuth.kt",
+                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/ChatGptDeviceCodeAuth.kt",
+                "/tools/src/main/kotlin/com/example/phoneagent/tools/files/SearchFilesTool.kt",
+            )
+        val violations =
+            productionFiles
+                .filter { file -> file.imports.any { it.name == "kotlinx.coroutines.Dispatchers" } }
+                .filterNot { file ->
+                    (allowed + baseline).any { suffix -> file.path.endsWith(suffix) }
+                }
+
+        assertTrue(
+            "Direct Dispatchers usage outside DispatcherProvider (new code must inject the port): ${violations.map { it.path }}",
+            violations.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `cancellation is rethrown, never swallowed`() {
+        // Every `catch (… : CancellationException)` block must contain a `throw`. The type is
+        // matched exactly, so `TimeoutCancellationException` (the tool timeout signal, converted
+        // to a Failed outcome by design in ToolPipeline) is not affected.
+        val catchPattern = Regex("""catch\s*\((?:_+\s*:\s*|\w+\s*:\s*)CancellationException\s*\)""")
+        val violations =
+            productionFiles.flatMap { file ->
+                catchPattern.findAll(file.text).mapNotNull { match ->
+                    val block = blockAfter(file.text, match.range.last) ?: return@mapNotNull file.path
+                    if ("throw" in block) null else file.path
+                }
+            }
+
+        assertTrue("Swallowed CancellationException in: ${violations.distinct()}", violations.isEmpty())
+    }
+
+    /** Text of the balanced `{ … }` block starting at the first `{` after [fromIndex], or null. */
+    private fun blockAfter(
+        text: String,
+        fromIndex: Int,
+    ): String? {
+        val start = text.indexOf('{', fromIndex)
+        val end = if (start < 0) -1 else findMatchingBrace(text, start)
+        return if (end > start) text.substring(start + 1, end) else null
+    }
+
+    /** Index of the `}` matching the `{` at [start], or -1 when the block never closes. */
+    private fun findMatchingBrace(
+        text: String,
+        start: Int,
+    ): Int {
+        var depth = 0
+        for (index in start until text.length) {
+            when (text[index]) {
+                '{' -> depth++
+                '}' -> depth--
+            }
+            if (depth == 0) return index
+        }
+        return -1
     }
 }
