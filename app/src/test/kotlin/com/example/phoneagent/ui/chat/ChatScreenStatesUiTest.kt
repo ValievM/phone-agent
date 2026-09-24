@@ -74,6 +74,17 @@ class ChatScreenStatesUiTest {
     }
 
     @Test
+    fun `an inline error is visible in an empty chat and can be dismissed`() {
+        show(ChatUiState(messages = emptyList(), error = AgentError.Timeout, canRetry = true))
+
+        composeRule.onNodeWithText(string(R.string.error_timeout)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
+        composeRule.onNodeWithText(string(R.string.dismiss_error)).performClick()
+
+        assertEquals(listOf(ChatUiEvent.Retry, ChatUiEvent.DismissError), events)
+    }
+
+    @Test
     fun `a rate limit tells the seconds to wait`() {
         show(ChatUiState(messages = userMessage(), error = AgentError.RateLimited(30), canRetry = true))
 
