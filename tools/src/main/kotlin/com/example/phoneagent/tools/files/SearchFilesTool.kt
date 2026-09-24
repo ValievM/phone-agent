@@ -51,7 +51,10 @@ internal class SearchFilesTool
                         put("required", JsonArray(listOf(JsonPrimitive("query"))))
                     },
                 risk = Risk.SAFE,
+                requiredCapabilities = setOf(Capability.FILES),
             )
+
+        override fun deniedMessage(capability: Capability): String = SearchFilesCopy.PERMISSION_DENIED
 
         override fun describe(args: JsonObject): CallDescription {
             val query = (parseAndValidate(args) as? ParsedSearchArgs.Valid)?.query?.takeIf(String::isNotBlank)

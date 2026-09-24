@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.tools
 
+import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +16,11 @@ public data class ToolSpec(
     public val description: String,
     public val inputSchema: JsonObject,
     public val risk: Risk,
+    /**
+     * Permissions the tool needs. The pipeline asks for them before the timeout starts, so the
+     * time the user spends on the system dialog does not count against it.
+     */
+    public val requiredCapabilities: Set<Capability> = emptySet(),
 )
 
 public data class CallDescription(
@@ -42,6 +48,9 @@ public interface Tool {
     public val spec: ToolSpec
 
     public fun describe(args: JsonObject): CallDescription
+
+    /** What the model is told when the user denies [capability]. */
+    public fun deniedMessage(capability: Capability): String = "permission denied: ${capability.name}"
 
     public suspend fun execute(
         args: JsonObject,

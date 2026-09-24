@@ -31,7 +31,10 @@ internal class NotifyTool
                 description = NotifyCopy.MODEL_DESCRIPTION,
                 inputSchema = notifyInputSchema,
                 risk = Risk.SAFE,
+                requiredCapabilities = setOf(Capability.NOTIFICATIONS),
             )
+
+        override fun deniedMessage(capability: Capability): String = NotifyCopy.PERMISSION_DENIED
 
         override fun describe(args: JsonObject): CallDescription {
             val notifyArgs = decodeArgs(args)

@@ -2,10 +2,14 @@ package com.example.phoneagent.domain.tools
 
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.interaction.Capability
+import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.platform.info
+import com.example.phoneagent.domain.platform.warn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
@@ -61,7 +65,12 @@ public class ToolPipeline(
      * a confirmation with details, one call at a time.
      */
     public fun batchGroups(calls: List<ToolCall>): List<List<ToolCall>> =
-        calls.filter(::needsPlainConfirmation).chunked(maxBatchSize).filter { it.size > 1 }
+        calls
+            .filter { call ->
+                val tool = registry.find(call.name)
+                tool != null && tool.spec.risk == Risk.CONFIRM && missingRequiredFields(tool.spec.inputSchema, call.arguments).isEmpty()
+            }.chunked(maxBatchSize)
+            .filter { it.size > 1 }
 
     /** Asks once for the whole [group] (from [batchGroups]); `true` approves every call, `false` declines every call. */
     public suspend fun confirmBatch(group: List<ToolCall>): Boolean {
@@ -73,11 +82,6 @@ public class ToolPipeline(
         val approved = userInteraction.confirmBatch(requests)
         logger.info(TAG, "batch confirmation answered", fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()))
         return approved
-    }
-
-    private fun needsPlainConfirmation(call: ToolCall): Boolean {
-        val tool = registry.find(call.name) ?: return false
-        return tool.spec.risk == Risk.CONFIRM && missingRequiredFields(tool.spec.inputSchema, call.arguments).isEmpty()
     }
 
     public suspend fun run(
@@ -102,9 +106,16 @@ public class ToolPipeline(
         } else if (!approve(tool, args, approval)) {
             ToolOutcome.Rejected("user declined")
         } else {
-            execute(tool, args)
+            deniedCapability(tool)?.let { ToolOutcome.Failed(tool.deniedMessage(it)) } ?: execute(tool, args)
         }
     }
+
+    /**
+     * The first required permission the user denies. Asked before [execute] so that the time the user
+     * spends on a system permission dialog does not count against the tool's timeout.
+     */
+    private suspend fun deniedCapability(tool: Tool): Capability? =
+        tool.spec.requiredCapabilities.firstOrNull { userInteraction.ensure(it) is CapabilityResult.Denied }
 
     private suspend fun approve(
         tool: Tool,
@@ -131,6 +142,13 @@ public class ToolPipeline(
             }
         } catch (_: TimeoutCancellationException) {
             ToolOutcome.Failed("timed out after ${timeoutMillis}ms")
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (exception: Exception) {
+            // A bug in one tool must not end the whole turn: the model gets a normal failure. Only the
+            // exception type is reported, its message can carry user data (paths, file names).
+            logger.warn(TAG, "tool threw", fields = mapOf("name" to tool.spec.name), throwable = exception)
+            ToolOutcome.Failed("tool failed: ${exception::class.simpleName}")
         }
 
     private fun truncate(text: String): String {
