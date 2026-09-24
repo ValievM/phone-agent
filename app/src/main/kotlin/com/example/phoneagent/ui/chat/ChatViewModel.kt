@@ -37,6 +37,10 @@ class ChatViewModel
         private var nextMessageId = 0L
         private var runningJob: Job? = null
 
+        // Identity of the newest submitted turn: a cancelled turn's finally runs later and must
+        // not touch the state of a turn submitted after it (Stop clears isRunning right away).
+        private var currentTurn: Any? = null
+
         // Persisted snapshots are authoritative for history; ChatMessage remains a UI-only rendering
         // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
@@ -151,10 +155,14 @@ class ChatViewModel
                 initialHistoryLoaded.await()
                 persist(questionSnapshot)
             }
+            // The token is set before the launch: the turn's finally uses it to tell "I am still
+            // the newest turn" from "a newer submit happened while I was being cancelled".
+            val turnToken = Any()
+            currentTurn = turnToken
             runningJob =
                 viewModelScope.launch {
                     initialHistoryLoaded.await()
-                    collectTurn(trimmed)
+                    collectTurn(trimmed, turnToken)
                 }
         }
 
@@ -197,7 +205,10 @@ class ChatViewModel
             }
         }
 
-        private suspend fun collectTurn(text: String) {
+        private suspend fun collectTurn(
+            text: String,
+            turnToken: Any,
+        ) {
             try {
                 var assistantMessageId: String? = null
                 agentLoop.run(historyBeforeTurn, text).collect { event ->
@@ -216,7 +227,9 @@ class ChatViewModel
                 val pendingIds = toolMessageIdByCallId.values.toList()
                 toolMessageIdByCallId.clear()
                 mutableState.update { state -> pendingIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.Cancelled) } }
-                mutableState.update { it.copy(isRunning = false) }
+                // A submit right after Stop starts a new turn before this cancelled turn's finally
+                // runs; only the newest turn may clear the running flag.
+                mutableState.update { state -> if (currentTurn === turnToken) state.copy(isRunning = false) else state }
             }
         }
 
