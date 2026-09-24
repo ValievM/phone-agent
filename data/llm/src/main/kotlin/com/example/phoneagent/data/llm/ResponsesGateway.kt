@@ -76,12 +76,14 @@ public class ResponsesGateway(
             val activeCall = AtomicReference<Call?>(null)
             launch {
                 try {
-                    val ready = credentialsProvider.current()
-                    if (ready !is CredentialsResult.Ready) {
-                        channel.send(ModelEvent.Failed(AgentError.SessionExpired))
-                        return@launch
+                    when (val ready = credentialsProvider.current()) {
+                        is CredentialsResult.Ready -> channel.streamWithRetry(request, ready.credentials, activeCall)
+
+                        CredentialsResult.SignedOut -> channel.send(ModelEvent.Failed(AgentError.SessionExpired))
+
+                        // A refresh that failed for a temporary reason must not look like a lost session.
+                        CredentialsResult.Unavailable -> channel.send(ModelEvent.Failed(AgentError.Offline))
                     }
-                    channel.streamWithRetry(request, ready.credentials, activeCall)
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Exception) {

@@ -3,9 +3,12 @@ package com.example.phoneagent.data.auth
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -148,16 +151,79 @@ class SessionManagerTest {
             assertEquals(true, logged.contains("sign-in failed"))
         }
 
+    @Test
+    fun `a refresh that finishes after sign out does not bring the tokens back`() =
+        runTest {
+            val store = InMemoryTokenStore(tokens(accountId = "before"))
+            val gate = CompletableDeferred<RefreshResult>()
+            val manager =
+                sessionManager(
+                    provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER),
+                    store = store,
+                    gateway = GatedRefreshGateway(gate),
+                )
+
+            val refresh = async { manager.refreshAfterUnauthorized() }
+            advanceUntilIdle()
+            manager.signOut()
+            gate.complete(RefreshResult.Success(tokens(accountId = "late")))
+
+            assertEquals(null, refresh.await())
+            assertEquals(null, store.stored)
+            assertEquals(AuthState.SignedOut, manager.state.value)
+            assertEquals(CredentialsResult.SignedOut, manager.current())
+        }
+
+    @Test
+    fun `a refresh that finishes after a new sign in does not overwrite the new tokens`() =
+        runTest {
+            val store = InMemoryTokenStore(tokens(accountId = "old"))
+            val fresh = tokens(accountId = "fresh")
+            val gate = CompletableDeferred<RefreshResult>()
+            val manager =
+                sessionManager(
+                    provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER, AuthResult.Success(fresh)),
+                    store = store,
+                    gateway = GatedRefreshGateway(gate),
+                )
+
+            val refresh = async { manager.refreshAfterUnauthorized() }
+            advanceUntilIdle()
+            manager.signIn(AuthMethod.CHATGPT_BROWSER)
+            gate.complete(RefreshResult.Success(tokens(accountId = "stale")))
+            refresh.await()
+
+            assertEquals(fresh, store.stored)
+        }
+
+    @Test
+    fun `a network failure while refreshing is temporary unavailability, not a sign out`() =
+        runTest {
+            val stored = tokens(accountId = "a")
+            val store = InMemoryTokenStore(stored)
+            val manager =
+                sessionManager(
+                    provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER),
+                    store = store,
+                    refreshResult = RefreshResult.Failure(AuthFailure.Network("offline")),
+                    clock = FakeClock(epochMillis = 400_000L),
+                )
+
+            assertEquals(CredentialsResult.Unavailable, manager.current())
+            assertEquals(stored, store.stored)
+        }
+
     private fun sessionManager(
         provider: AuthProvider,
         store: InMemoryTokenStore = InMemoryTokenStore(),
         refreshResult: RefreshResult = RefreshResult.Success(tokens()),
         logger: FakeAppLogger = FakeAppLogger(),
+        gateway: TokenRefreshGateway = FakeRefreshGateway(refreshResult),
+        clock: FakeClock = FakeClock(),
     ): SessionManager =
         SessionManager(
             providers = mapOf(provider.method to provider),
-            tokenStore = store,
-            tokenRefresher = TokenRefresher(store, FakeRefreshGateway(refreshResult), FakeClock()),
+            tokenRefresher = TokenRefresher(store, gateway, clock),
             logger = logger,
         )
 
@@ -193,6 +259,12 @@ class SessionManagerTest {
         private val results = results.iterator()
 
         override suspend fun signIn(): AuthResult = results.next()
+    }
+
+    private class GatedRefreshGateway(
+        private val gate: CompletableDeferred<RefreshResult>,
+    ) : TokenRefreshGateway {
+        override suspend fun refresh(refreshToken: String): RefreshResult = gate.await()
     }
 
     private class FakeRefreshGateway(

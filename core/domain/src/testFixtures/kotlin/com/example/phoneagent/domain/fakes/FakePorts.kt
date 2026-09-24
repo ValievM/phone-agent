@@ -100,12 +100,19 @@ public class FakeDispatcherProvider(
 public class FakeUserInteraction : UserInteraction {
     public val approvalRequests: MutableList<ApprovalRequest> = mutableListOf()
     public val capabilityRequests: MutableList<Capability> = mutableListOf()
+    public val batchRequests: MutableList<List<ApprovalRequest>> = mutableListOf()
     public var approvalResult: Boolean = true
+    public var batchApprovalResult: Boolean = true
     public var capabilityResult: CapabilityResult = CapabilityResult.Available
 
     override suspend fun confirm(request: ApprovalRequest): Boolean {
         approvalRequests += request
         return approvalResult
+    }
+
+    override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
+        batchRequests += requests
+        return batchApprovalResult
     }
 
     override suspend fun ensure(capability: Capability): CapabilityResult {

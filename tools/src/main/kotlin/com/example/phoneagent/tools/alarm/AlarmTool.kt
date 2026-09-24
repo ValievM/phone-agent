@@ -6,6 +6,9 @@ import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -15,12 +18,22 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.putJsonObject
 import javax.inject.Inject
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
+
+private val LAUNCH_SPACING: Duration = 1_000.milliseconds
 
 internal class AlarmTool
-    @Inject
-    constructor(
-        private val intentLauncher: AlarmIntentLauncher,
+    internal constructor(
+        private val intentLauncher: AlarmIntentPort,
+        private val spacing: Duration,
+        private val timeSource: TimeSource,
     ) : Tool {
+        @Inject
+        constructor(intentLauncher: AlarmIntentPort) : this(intentLauncher, LAUNCH_SPACING, TimeSource.Monotonic)
+
         override val spec: ToolSpec =
             ToolSpec(
                 name = "set_alarm",
@@ -42,20 +55,34 @@ internal class AlarmTool
         override suspend fun execute(
             args: JsonObject,
             context: ToolContext,
-        ): ToolResult = decodeArgs(args)?.let(::executeAlarm) ?: ToolResult.Failed(AlarmCopy.RESULT_INVALID_ARGS)
+        ): ToolResult = decodeArgs(args)?.let { executeAlarm(it) } ?: ToolResult.Failed(AlarmCopy.RESULT_INVALID_ARGS)
 
-        private fun executeAlarm(alarmArgs: AlarmArgs): ToolResult =
+        private val launchLock = Mutex()
+        private var lastLaunch: TimeMark? = null
+
+        private suspend fun executeAlarm(alarmArgs: AlarmArgs): ToolResult =
             when (val validation = validateAlarmArgs(alarmArgs)) {
-                is AlarmValidationResult.Invalid -> {
-                    ToolResult.Failed(validation.reason)
-                }
+                is AlarmValidationResult.Invalid -> ToolResult.Failed(validation.reason)
+                AlarmValidationResult.Valid -> launchSpaced(alarmArgs)
+            }
 
-                AlarmValidationResult.Valid -> {
-                    when (intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))) {
-                        AlarmLaunchResult.Started -> ToolResult.Success(AlarmCopy.RESULT_SUCCESS)
-                        AlarmLaunchResult.NoClockApp -> ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
-                        AlarmLaunchResult.Failed -> ToolResult.Failed(AlarmCopy.RESULT_FAILED)
-                    }
+        /**
+         * The clock app takes an alarm request as an activity launch and reports nothing back. Several
+         * launches within milliseconds (a confirmed batch) make it keep only the first, while this tool
+         * still reports success for all of them. So consecutive launches are at least [spacing] apart.
+         */
+        private suspend fun launchSpaced(alarmArgs: AlarmArgs): ToolResult =
+            launchLock.withLock {
+                lastLaunch?.let { previous ->
+                    val remaining = spacing - previous.elapsedNow()
+                    if (remaining.isPositive()) delay(remaining)
+                }
+                val result = intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))
+                lastLaunch = timeSource.markNow()
+                when (result) {
+                    AlarmLaunchResult.Started -> ToolResult.Success(AlarmCopy.RESULT_SUCCESS)
+                    AlarmLaunchResult.NoClockApp -> ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
+                    AlarmLaunchResult.Failed -> ToolResult.Failed(AlarmCopy.RESULT_FAILED)
                 }
             }
     }

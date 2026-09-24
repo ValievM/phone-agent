@@ -179,8 +179,7 @@ internal object SessionAssemblyModule {
     @Singleton
     fun provideSessionManager(
         providers: Map<AuthMethod, @JvmSuppressWildcards AuthProvider>,
-        tokenStore: TokenStore,
         tokenRefresher: TokenRefresher,
         logger: AppLogger,
-    ): SessionManager = SessionManager(providers, tokenStore, tokenRefresher, logger)
+    ): SessionManager = SessionManager(providers, tokenRefresher, logger)
 }

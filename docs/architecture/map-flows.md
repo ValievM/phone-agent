@@ -158,7 +158,7 @@ TR-->>SM: Failed(failure)
 SM->>SM: state = Error
 end
 end
-SM-->>GW: CredentialsResult Ready or SignedOut
+SM-->>GW: CredentialsResult Ready, SignedOut or Unavailable
 GW->>GW: POST /responses
 opt HTTP 401
 GW->>SM: refreshAfterUnauthorized()

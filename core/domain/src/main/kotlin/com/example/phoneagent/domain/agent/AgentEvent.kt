@@ -25,6 +25,11 @@ public sealed interface AgentEvent {
         public val request: ApprovalRequest,
     ) : AgentEvent
 
+    /** The tool cards of [callIds] wait for one shared answer (see [com.example.phoneagent.domain.tools.ToolPipeline.confirmBatch]). */
+    public data class BatchApprovalRequested(
+        public val callIds: List<String>,
+    ) : AgentEvent
+
     public data class ToolCallFinished(
         public val call: ToolCall,
         public val outcome: ToolOutcome,

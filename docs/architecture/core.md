@@ -40,11 +40,12 @@ public interface Tool {
 
 public interface UserInteraction {
     public suspend fun confirm(request: ApprovalRequest): Boolean
+    public suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean   // один вопрос на пачку вызовов одного ответа (ADR 0004)
     public suspend fun ensure(capability: Capability): CapabilityResult   // Capability: Notifications и т.п.
 }
 
 public interface CredentialsProvider {        // то, что нужно клиенту модели от слоя входа
-    public suspend fun current(): CredentialsResult // Ready(токен + accountId либо API-ключ) или SignedOut
+    public suspend fun current(): CredentialsResult // Ready(токен + accountId либо API-ключ), SignedOut или Unavailable (временный сбой обновления, сессия не потеряна)
     public suspend fun refreshAfterUnauthorized(): Credentials?
 }
 ```
@@ -70,7 +71,7 @@ public interface CredentialsProvider {        // то, что нужно кли�
 **Конвейер.** Один класс `ToolPipeline`: имя ищется в реестре, дальше — подтверждение по `Risk`, таймаут, вызов инструмента, обрезка вывода до 4 КБ, лог без секретов. Инструмент этого не реализует. Готовых ступеней-«миддлварей» нет — порядок зашит в `ToolPipeline`, расширение новым шагом означает правку этого класса.
 
 - Обязательные аргументы (`required` в схеме) проверяет `ToolPipeline`; остальную валидацию (диапазоны, лимиты длин) делают сами инструменты через sealed-результаты валидации.
-- `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
+- `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`; несколько `CONFIRM`-вызовов одного ответа модели подтверждаются одним вопросом «всё или ничего», до 15 за раз: `ToolPipeline.batchGroups` и `confirmBatch`, [ADR 0004](../adr/0004-batch-approval.md)), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
 - Результат: `ToolOutcome = Success(text) | Rejected(reason) | Failed(error)`. Это итог всего конвейера, включая отказ пользователя и таймаут; `ToolResult` — только то, что вернул сам инструмент. Любой исход превращается в `function_call_output` для модели.
 
 Так безопасность, лимиты и логирование живут в одном месте и применяются ко **всем** инструментам, включая будущие.
