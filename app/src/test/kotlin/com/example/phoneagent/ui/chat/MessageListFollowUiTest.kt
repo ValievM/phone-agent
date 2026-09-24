@@ -5,9 +5,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -126,6 +128,36 @@ class MessageListFollowUiTest {
             }
 
         assertTrue("Expected ascending tops but was $tops", tops == tops.sorted() && tops.distinct().size == tops.size)
+    }
+
+    @Test
+    fun `user and assistant messages are separate semantics nodes, one per bubble`() {
+        // If bubbles ever merged into one node, TalkBack would read the whole chat as one blob.
+        val userNodes = composeRule.onAllNodesWithText("Message 39").fetchSemanticsNodes()
+        val assistantNodes = composeRule.onAllNodesWithText("Message 40").fetchSemanticsNodes()
+
+        assertTrue(userNodes.size == 1)
+        assertTrue(assistantNodes.size == 1)
+    }
+
+    @Test
+    fun `the scroll-to-bottom chip is a clickable control announced by its description`() {
+        scrollFarFromBottom()
+        append(ChatRole.ASSISTANT, "New reply")
+        composeRule.waitForIdle()
+
+        val chip = composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP)
+        chip.assertHasClickAction()
+        val description =
+            chip
+                .fetchSemanticsNode()
+                .config
+                .getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { null }
+                ?.firstOrNull()
+        assertTrue(
+            "chip must have a content description for TalkBack, was: $description",
+            description == "Прокрутить к новым сообщениям",
+        )
     }
 
     private fun scrollFarFromBottom() {
