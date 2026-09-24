@@ -7,6 +7,8 @@ import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.tools.Tool
@@ -33,6 +35,9 @@ internal abstract class AgentBindingsModule {
 internal object AgentModule {
     @Provides
     fun provideIdGenerator(): IdGenerator = RandomIdGenerator
+
+    @Provides
+    fun provideDispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider
 
     // Every Tool registered anywhere (Hilt @IntoSet, see AlarmBindings/FilesBindings/NotifyBindings)
     // is aggregated into this one Set<Tool> automatically; ToolRegistry never knows the concrete types.

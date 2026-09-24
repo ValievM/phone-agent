@@ -2,9 +2,16 @@ package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +21,9 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class FindFilesToolTest {
     private val clock = FakeClock()
@@ -149,6 +159,77 @@ class FindFilesToolTest {
         assertEquals("Поиск файлов", description.title)
         assertTrue(description.summary.isNotBlank())
     }
+
+    @Test
+    fun `cancelling during the walk surfaces CancellationException instead of a failure`() =
+        runTest {
+            val walkerReachedBlockedNode = CountDownLatch(1)
+            val releaseWalker = CountDownLatch(1)
+            val turnCancelled =
+                java.util.concurrent.atomic
+                    .AtomicBoolean(false)
+            val blockedNode =
+                object : FakeDocumentNode("blocked", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> {
+                        walkerReachedBlockedNode.countDown()
+                        releaseWalker.await(5, TimeUnit.SECONDS)
+                        if (turnCancelled.get()) throw CancellationException("walk interrupted by stop")
+                        return emptyList()
+                    }
+                }
+            val io = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+            try {
+                val deferred =
+                    async(io) {
+                        FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), blockedNode)), dispatchersOf(io))
+                            .execute(args("report"), context)
+                    }
+
+                val reached =
+                    walkerReachedBlockedNode.await(5, TimeUnit.SECONDS)
+                assertTrue("walker did not reach the blocked node within the timeout", reached)
+                deferred.cancel()
+                turnCancelled.set(true)
+                releaseWalker.countDown()
+
+                val outcome = runCatching { deferred.await() }
+                assertTrue(
+                    "expected CancellationException to surface, got $outcome",
+                    outcome.exceptionOrNull() is CancellationException,
+                )
+            } finally {
+                io.close()
+            }
+        }
+
+    @Test
+    fun `the walk runs on the dispatcher provided by the port, not on the caller`() =
+        runTest {
+            val seenThreads = mutableListOf<String>()
+            val blockingNode =
+                object : FakeDocumentNode("io", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> {
+                        seenThreads += Thread.currentThread().name
+                        return emptyList()
+                    }
+                }
+            val io = Executors.newSingleThreadExecutor { r -> Thread(r, "find-files-test-io") }.asCoroutineDispatcher()
+            try {
+                val tool = FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), blockingNode)), dispatchersOf(io))
+
+                val result = tool.execute(args("report"), context)
+
+                assertTrue(result is ToolResult.Success)
+                assertTrue(
+                    "expected the walk on the provided io dispatcher, saw $seenThreads",
+                    seenThreads.isNotEmpty() && seenThreads.all { it == "find-files-test-io" },
+                )
+            } finally {
+                io.close()
+            }
+        }
+
+    private fun dispatchersOf(io: CoroutineDispatcher): DispatcherProvider = FakeDispatcherProvider(main = io, io = io, default = io)
 
     private class FakeSelectedFolder(
         private val rootNode: FakeDocumentNode?,
