@@ -35,7 +35,16 @@ class ChatViewModel
         // Persisted snapshots are authoritative for history; ChatMessage remains a UI-only rendering
         // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
+
+        // What `history` was before the running turn appended its provisional question; the
+        // finished turn rebuilds history from this, so the question is saved exactly once.
+        private var historyBeforeTurn: List<HistoryItem> = emptyList()
         private val initialHistoryLoaded = CompletableDeferred<Unit>()
+
+        // Set while the last persist() failed, so the next successful save knows to clear the
+        // (now stale) save error - and only that error, never a newer turn error.
+        private var saveFailed = false
+        private val saveError = AgentError.Unexpected("Failed to save conversation history")
 
         // Every history we wrote and have not yet seen come back through observe(); a turn now saves
         // twice (the question, then the finished turn), so one slot could mistake the first echo for
@@ -88,11 +97,28 @@ class ChatViewModel
 
         fun onEvent(event: ChatUiEvent) {
             when (event) {
-                is ChatUiEvent.Submit -> submit(event.text)
-                ChatUiEvent.Stop -> runningJob?.cancel()
-                is ChatUiEvent.ToggleToolCallDetails -> mutableState.update { it.withToolCallToggled(event.messageId) }
-                ChatUiEvent.Retry -> retry()
-                ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null, canRetry = false) }
+                is ChatUiEvent.Submit -> {
+                    submit(event.text)
+                }
+
+                ChatUiEvent.Stop -> {
+                    runningJob?.cancel()
+                    // A cancel racing the very first step of the turn never runs collectTurn's
+                    // finally, so the flag is cleared here; the finally just repeats it harmlessly.
+                    mutableState.update { it.copy(isRunning = false) }
+                }
+
+                is ChatUiEvent.ToggleToolCallDetails -> {
+                    mutableState.update { it.withToolCallToggled(event.messageId) }
+                }
+
+                ChatUiEvent.Retry -> {
+                    retry()
+                }
+
+                ChatUiEvent.DismissError -> {
+                    mutableState.update { it.copy(error = null, canRetry = false) }
+                }
             }
         }
 
@@ -109,12 +135,19 @@ class ChatViewModel
                 )
             }
 
+            // The question enters the in-memory history immediately - not via the storage echo -
+            // so a Stop before the echo cannot lose it, and the next submit cannot overwrite it.
+            historyBeforeTurn = history
+            history = history + HistoryItem.UserMessage(PENDING_USER_MESSAGE_ID, trimmed)
+            // Saved in its own job: stopping the turn must not cancel the save of the question.
+            val questionSnapshot = history
+            viewModelScope.launch {
+                initialHistoryLoaded.await()
+                persist(questionSnapshot)
+            }
             runningJob =
                 viewModelScope.launch {
                     initialHistoryLoaded.await()
-                    // Saved before the model is asked, so a process killed mid-answer keeps the
-                    // question; the finished turn replaces this provisional item with the real ones.
-                    persist(history + HistoryItem.UserMessage(PENDING_USER_MESSAGE_ID, trimmed))
                     collectTurn(trimmed)
                 }
         }
@@ -142,23 +175,36 @@ class ChatViewModel
             pendingOwnEmissions.addLast(items)
             try {
                 conversationRepository.replace(items)
+                if (saveFailed) {
+                    // A later successful save clears the stale save error - but only it, never a
+                    // newer error that arrived in between.
+                    saveFailed = false
+                    mutableState.update { state -> if (state.error == saveError) state.copy(error = null) else state }
+                }
             } catch (exception: CancellationException) {
                 pendingOwnEmissions.remove(items)
                 throw exception
             } catch (_: Exception) {
                 pendingOwnEmissions.remove(items)
-                mutableState.update {
-                    it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
-                }
+                saveFailed = true
+                mutableState.update { it.copy(error = saveError) }
             }
         }
 
         private suspend fun collectTurn(text: String) {
             try {
                 var assistantMessageId: String? = null
-                agentLoop.run(history, text).collect { event ->
+                agentLoop.run(historyBeforeTurn, text).collect { event ->
                     assistantMessageId = handleAgentEvent(event, assistantMessageId)
                     if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) persist(history)
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                // A bug in the loop, a gateway or a tool must not take the app down: keep the
+                // question in history and offer a retry of the whole turn.
+                mutableState.update {
+                    it.copy(error = AgentError.Unexpected("turn failed (${exception::class.simpleName})"), canRetry = true)
                 }
             } finally {
                 val pendingIds = toolMessageIdByCallId.values.toList()
@@ -206,12 +252,14 @@ class ChatViewModel
                 }
 
                 is AgentEvent.TurnCompleted -> {
-                    history = history + event.newItems
+                    // Rebuild from before the turn: newItems carries the real user message, which
+                    // replaces the provisional one saved on submit.
+                    history = historyBeforeTurn + event.newItems
                     assistantMessageId
                 }
 
                 is AgentEvent.TurnFailed -> {
-                    history = history + event.newItems
+                    history = historyBeforeTurn + event.newItems
                     val presentation = event.error.toPresentation()
                     mutableState.update {
                         it.copy(

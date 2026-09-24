@@ -30,6 +30,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -171,6 +172,105 @@ class ChatViewModelProcessDeathTest {
             assertFalse(viewModel.state.value.canRetry)
         }
 
+    @Test
+    fun `a stop right after submit still keeps the question for the next turn and a restart`() =
+        runTest(dispatcher.scheduler) {
+            val repository = Repository()
+            val gateway = HangingRecordingGateway()
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Первый"))
+            viewModel.onEvent(ChatUiEvent.Stop)
+            advanceUntilIdle()
+            assertFalse(viewModel.state.value.isRunning)
+            assertEquals(0, gateway.requests.size)
+
+            viewModel.onEvent(ChatUiEvent.Submit("Второй"))
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf("Первый", "Второй"),
+                repository.load().filterIsInstance<HistoryItem.UserMessage>().map(HistoryItem.UserMessage::text),
+            )
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+            assertEquals(
+                listOf("Первый", "Второй"),
+                restarted.state.value.messages
+                    .filter { it.role == ChatRole.USER }
+                    .map(ChatMessage::text),
+            )
+        }
+
+    @Test
+    fun `a finished turn replaces the provisional question exactly once`() =
+        runTest(dispatcher.scheduler) {
+            // A channel-based repository does not conflate saves, so every intermediate write is
+            // delivered back - like Room does in production.
+            val repository = EagerRepository()
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            advanceUntilIdle()
+
+            assertEquals(listOf("Привет", "Ответ"), repository.load().map(::textOf))
+        }
+
+    @Test
+    fun `an unexpected exception in the turn surfaces an error with retry instead of crashing`() =
+        runTest(dispatcher.scheduler) {
+            val repository = Repository()
+            val gateway = ThrowThenCompleteGateway()
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertFalse(state.isRunning)
+            assertNotNull(state.error)
+            assertTrue(state.canRetry)
+
+            viewModel.onEvent(ChatUiEvent.Retry)
+            advanceUntilIdle()
+
+            assertNull(viewModel.state.value.error)
+            assertEquals(listOf("Привет", "Ответ"), repository.load().map(::textOf))
+        }
+
+    @Test
+    fun `a failed question save is cleared once the finished turn saves`() =
+        runTest(dispatcher.scheduler) {
+            val repository = FailFirstSaveRepository()
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            advanceUntilIdle()
+
+            assertNull(viewModel.state.value.error)
+            assertEquals(listOf("Привет", "Ответ"), repository.load().map(::textOf))
+        }
+
+    @Test
+    fun `a failed final save still shows the save error`() =
+        runTest(dispatcher.scheduler) {
+            val repository = FailLastSaveRepository()
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            advanceUntilIdle()
+
+            assertNotNull(viewModel.state.value.error)
+            assertEquals(listOf("Привет"), repository.load().map(::textOf))
+        }
+
     private fun textOf(item: HistoryItem): String =
         when (item) {
             is HistoryItem.UserMessage -> item.text
@@ -204,5 +304,88 @@ class ChatViewModelProcessDeathTest {
 
     private class HangingGateway : ModelGateway {
         override fun stream(request: ModelRequest): Flow<ModelEvent> = flow { awaitCancellation() }
+    }
+
+    private class HangingRecordingGateway : ModelGateway {
+        val requests = mutableListOf<ModelRequest>()
+
+        override fun stream(request: ModelRequest): Flow<ModelEvent> =
+            flow {
+                requests += request
+                awaitCancellation()
+            }
+    }
+
+    /** Delivers every save back to collectors, unlike a conflating MutableStateFlow. */
+    private class EagerRepository : ConversationRepository {
+        private val changes = kotlinx.coroutines.channels.Channel<List<HistoryItem>>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        private var items: List<HistoryItem> = emptyList()
+
+        override suspend fun load(): List<HistoryItem> = items
+
+        override fun observe(): Flow<List<HistoryItem>> =
+            flow {
+                emit(items)
+                for (change in changes) emit(change)
+            }
+
+        override suspend fun replace(items: List<HistoryItem>) {
+            this.items = items
+            changes.send(items)
+            // Room re-queries on its own dispatcher, so the echo interleaves with the turn;
+            // yield() reproduces that instead of letting one coroutine run to completion.
+            kotlinx.coroutines.yield()
+        }
+    }
+
+    private class FailFirstSaveRepository : ConversationRepository {
+        private var items: List<HistoryItem> = emptyList()
+        private val mutableItems = MutableStateFlow(items)
+        private var failed = false
+
+        override suspend fun load(): List<HistoryItem> = items
+
+        override fun observe(): Flow<List<HistoryItem>> = mutableItems
+
+        override suspend fun replace(items: List<HistoryItem>) {
+            if (!failed) {
+                failed = true
+                throw java.io.IOException("disk is full")
+            }
+            this.items = items
+            mutableItems.value = items
+        }
+    }
+
+    private class FailLastSaveRepository : ConversationRepository {
+        private var items: List<HistoryItem> = emptyList()
+        private val mutableItems = MutableStateFlow(items)
+        private var writes = 0
+
+        override suspend fun load(): List<HistoryItem> = items
+
+        override fun observe(): Flow<List<HistoryItem>> = mutableItems
+
+        override suspend fun replace(items: List<HistoryItem>) {
+            writes++
+            if (writes > 1) throw java.io.IOException("disk is full again")
+            this.items = items
+            mutableItems.value = items
+        }
+    }
+
+    /** The first turn explodes mid-stream; the retry answers normally. */
+    private class ThrowThenCompleteGateway : ModelGateway {
+        var calls = 0
+
+        override fun stream(request: ModelRequest): Flow<ModelEvent> =
+            flow {
+                if (calls++ == 0) {
+                    emit(ModelEvent.TextDelta("частичный ответ"))
+                    error("gateway exploded")
+                }
+                emit(ModelEvent.TextDelta("Ответ"))
+                emit(ModelEvent.Completed())
+            }
     }
 }
