@@ -35,7 +35,7 @@ tools/
 ├─ notify/   NotifyTool, NotifyArgs, Notifier, NotifyBindings
 └─ files/    FindFilesTool и SearchFilesTool (ADR 0003), их Args, SAF-обход, SelectedFolder, FilesBindings
 ```
-- Пакет `common/` не понадобился — общих помощников пока нет. Файловых инструментов два: `find_files` по выбранной SAF-папке и `search_files` по глобальному MediaStore. Часть типов `files/` (`SelectedFolder`, `DocumentNode`, аргументы) `public`: их держат `:app` (настройки, DI), остальное `internal`. Пакеты инструментов **не импортируют друг друга** (проверяет тест).
+- Пакет `common/` не понадобился — общих помощников пока нет. Файловых инструментов два: `find_files` по выбранной SAF-папке и `search_files` по глобальному MediaStore (ADR 0003). Всё `internal`, наружу торчит только регистрация; пакеты инструментов **не импортируют друг друга** (проверяет тест).
 - **Humble object.** Вызовы Android API вынесены в тонкие классы (`Notifier`, запуск intent, `SafTreeWalker`), логика (сборка intent, валидация, лимиты обхода) — в чистые функции, которые тестируются без устройства.
 - Папку для поиска пользователь выбирает **заранее в настройках** (хранится в `SettingsRepository`). Если не выбрана, `find_files` возвращает `Failed(NeedsSetup)`, и UI предлагает открыть настройки. Так инструменту не нужен Activity-результат в момент работы.
 
