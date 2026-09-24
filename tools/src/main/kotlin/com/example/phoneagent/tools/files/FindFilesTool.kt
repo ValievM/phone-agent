@@ -1,11 +1,15 @@
 package com.example.phoneagent.tools.files
 
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -25,6 +29,9 @@ internal class FindFilesTool
     @Inject
     constructor(
         private val selectedFolder: SelectedFolder,
+        // Default keeps the existing manual test constructions compiling; DI injects the bound
+        // provider (see the app's AgentModule).
+        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
     ) : Tool {
         override val spec: ToolSpec =
             ToolSpec(
@@ -70,7 +77,9 @@ internal class FindFilesTool
                 }
 
                 is ParsedArgs.Valid -> {
-                    when (val root = selectedFolder.root()) {
+                    // ContentResolver calls block their thread, and the agent loop runs on Main:
+                    // both the folder lookup and the walk must leave the caller's dispatcher.
+                    when (val root = withContext(dispatchers.io) { selectedFolder.root() }) {
                         null -> ToolResult.Failed(FindFilesCopy.REASON_NOT_SELECTED)
                         else -> searchSafely(root, parsed.query, context)
                     }
@@ -78,14 +87,20 @@ internal class FindFilesTool
             }
         }
 
-        private fun searchSafely(
+        private suspend fun searchSafely(
             root: DocumentNode,
             query: String,
             context: ToolContext,
         ): ToolResult =
             try {
-                val result = SafTreeWalker(context.clock).search(root, query)
+                val result =
+                    withContext(dispatchers.io) {
+                        SafTreeWalker(context.clock).search(root, query)
+                    }
                 ToolResult.Success(result.toModelText())
+            } catch (cancellation: CancellationException) {
+                // A Stop during the walk must stay a cancellation, not become a failure report.
+                throw cancellation
             } catch (exception: Exception) {
                 ToolResult.Failed(FindFilesCopy.fileSystemQueryFailed(exception.message))
             }

@@ -1,6 +1,7 @@
 package com.example.phoneagent.domain.platform
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import java.util.UUID
 
 public fun interface Clock {
@@ -12,6 +13,17 @@ public interface DispatcherProvider {
     public val io: CoroutineDispatcher
     public val default: CoroutineDispatcher
 }
+
+/**
+ * Production dispatchers. `main` resolves lazily: JVM unit tests never touch it, and resolving it
+ * eagerly would fail where no Main dispatcher engine is on the classpath.
+ */
+public val DefaultDispatcherProvider: DispatcherProvider =
+    object : DispatcherProvider {
+        override val main: CoroutineDispatcher by lazy { Dispatchers.Main }
+        override val io: CoroutineDispatcher by lazy { Dispatchers.IO }
+        override val default: CoroutineDispatcher by lazy { Dispatchers.Default }
+    }
 
 /** Ids for new [com.example.phoneagent.domain.conversation.HistoryItem]s; a port so tests get deterministic ids. */
 public fun interface IdGenerator {

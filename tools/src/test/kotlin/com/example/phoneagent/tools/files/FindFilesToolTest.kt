@@ -2,9 +2,16 @@ package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +21,9 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class FindFilesToolTest {
     private val clock = FakeClock()
@@ -149,6 +159,59 @@ class FindFilesToolTest {
         assertEquals("Поиск файлов", description.title)
         assertTrue(description.summary.isNotBlank())
     }
+
+    @Test
+    fun `a cancellation raised during the walk propagates out of the tool instead of becoming a failure`() =
+        runTest {
+            val stoppedNode =
+                object : FakeDocumentNode("stopped", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> = throw CancellationException("walk interrupted by stop")
+                }
+            val io = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+            try {
+                val tool = FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), stoppedNode)), dispatchersOf(io))
+
+                // runCatching inside the same coroutine: the result must come from the tool itself,
+                // not from the cancelled state of an outer Deferred (which would mask a swallowed cancellation).
+                val outcome = runCatching { tool.execute(args("report"), context) }
+
+                assertTrue(
+                    "expected the tool to rethrow the cancellation, got $outcome",
+                    outcome.exceptionOrNull() is CancellationException,
+                )
+            } finally {
+                io.close()
+            }
+        }
+
+    @Test
+    fun `the walk runs on the dispatcher provided by the port, not on the caller`() =
+        runTest {
+            val seenThreads = mutableListOf<String>()
+            val blockingNode =
+                object : FakeDocumentNode("io", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> {
+                        seenThreads += Thread.currentThread().name
+                        return emptyList()
+                    }
+                }
+            val io = Executors.newSingleThreadExecutor { r -> Thread(r, "find-files-test-io") }.asCoroutineDispatcher()
+            try {
+                val tool = FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), blockingNode)), dispatchersOf(io))
+
+                val result = tool.execute(args("report"), context)
+
+                assertTrue(result is ToolResult.Success)
+                assertTrue(
+                    "expected the walk on the provided io dispatcher, saw $seenThreads",
+                    seenThreads.isNotEmpty() && seenThreads.all { it == "find-files-test-io" },
+                )
+            } finally {
+                io.close()
+            }
+        }
+
+    private fun dispatchersOf(io: CoroutineDispatcher): DispatcherProvider = FakeDispatcherProvider(main = io, io = io, default = io)
 
     private class FakeSelectedFolder(
         private val rootNode: FakeDocumentNode?,
