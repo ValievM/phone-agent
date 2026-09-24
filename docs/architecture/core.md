@@ -6,14 +6,13 @@
 ```
 com.example.phoneagent.domain
 ├── agent/         AgentLoop, AgentEvent, AgentConfig, AgentError
-├── conversation/  Message (HistoryItem), ToolCall, ContextWindowPolicy
-├── model/         ModelGateway (порт), ModelRequest, ModelEvent
-├── tools/         Tool, TypedTool, ToolSpec, JsonSchema (DSL), Risk,
-│                  ToolRegistry, ToolPipeline + middleware, ToolOutcome
-├── auth/          AuthProvider, CredentialsProvider (порты), Session, AuthState, AuthMethod
+├── conversation/  HistoryItem, ToolCall, ContextWindowPolicy
+├── model/         ModelGateway (порт), ModelRequest, ModelEvent, ModelCatalog (порт)
+├── tools/         Tool, ToolSpec, Risk, ToolRegistry, ToolPipeline, ToolOutcome
+├── auth/          CredentialsProvider, Credentials, ApiKeyValidationGateway (порты)
 ├── interaction/   UserInteraction (порт), ApprovalRequest
 ├── storage/       ConversationRepository, SettingsRepository (порты), AppSettings
-└── platform/      Clock, DispatcherProvider, IdGenerator, AppLogger (порты)
+└── platform/      Clock, DispatcherProvider, IdGenerator, AppLogger, LogRedaction
 ```
 Разрешённые библиотеки: kotlin-stdlib, `kotlinx-coroutines-core`, `kotlinx-serialization-json`. Запрещены: `android.*`, `androidx.*`, OkHttp, Room, Dagger/Hilt, Compose.
 
@@ -51,21 +50,16 @@ public interface CredentialsProvider {        // то, что нужно кли�
 ```
 `Capability` — понятие ядра («нужны уведомления»). В Android-разрешения его переводит `:app`, ядро про них не знает.
 
-## Цикл агента (`AgentLoop`) — конечный автомат
+## Цикл агента (`AgentLoop`) — императивный Flow
 
-`AgentLoop.run(history, input): Flow<AgentEvent>` — **холодный Flow**, не привязан ни к ViewModel, ни к Android. Его можно позже запустить из сервиса или фоновой задачи без переписывания.
+`AgentLoop.run(history, input): Flow<AgentEvent>` — **холодный Flow**, не привязан ни к ViewModel, ни к Android. Его можно позже запустить из сервиса или фоновой задачи без переписывания. Внутри — императивный `flow { while (true) }` по шагам модели; автомата с `reduce(state, event)` нет, поведение то же, что задумывалось:
 
-```
-Idle ──user message──▶ AwaitingModel ──TextDelta──▶ AwaitingModel (накапливаем текст)
-                            │
-                            ├─ ToolCallRequested ─▶ RunningTools ──(все результаты)──▶ AwaitingModel  (step + 1)
-                            ├─ Completed без вызовов ─▶ Done
-                            ├─ Failed / ошибка инструмента-фатал ─▶ Failed(error)
-                            ├─ step > maxSteps ─▶ Failed(StepLimit)
-                            └─ отмена ─▶ Cancelled (Flow отменён, сеть и инструмент прерваны)
-```
+- шаг: запрос модели → текст и вызовы инструментов; шагов не больше `maxSteps`, иначе `TurnFailed(StepLimit)`;
+- ошибка запроса → `TurnFailed(error)`; ответ без вызовов → `TurnCompleted(newItems)`;
+- отмена собирающего — обычная отмена корутины: сеть и инструмент прерываются, `CancellationException` не глотается.
+
 - Ответ модели может содержать **несколько вызовов**: выполняем по порядку, все результаты добавляем в историю, только потом следующий запрос. Параллелить можно только `SAFE`-инструменты, и не в MVP.
-- Переход состояния описан **чистой функцией** `reduce(state, event) → state`. Тесты автомата не требуют ни сети, ни корутин.
+- Тесты цикла — на `AgentLoop` с фейковым `ModelGateway`, без сети; логика шагов и лимитов та же, что задумывалась для автомата.
 - `AgentEvent` (для UI): `TextDelta`, `ToolCallStarted`, `ApprovalRequested`, `ToolCallFinished`, `TurnCompleted(newItems)`, `TurnFailed(error)`.
 - История между запросами передаётся целиком (`store=false`); сколько отправлять, решает `ContextWindowPolicy` (стратегия, заменяемая: «последние N», «по размеру», позже «с суммаризацией»).
 
@@ -73,17 +67,15 @@ Idle ──user message──▶ AwaitingModel ──TextDelta──▶ Awaiting
 
 **Регистрация.** `ToolRegistry` собирается из `Set<Tool>`, который даёт DI (Hilt multibinding). Цикл агента про конкретные инструменты не знает.
 
-**Конвейер (middleware, цепочка ответственности).** Каждый вызов проходит одинаковые ступени, инструмент их не реализует:
-```
-ValidateArgs → ApprovalPolicy → Timeout → RunTool → TruncateOutput(4 КБ) → Log(без секретов)
-```
-- `ValidateArgs`: имя есть в реестре, аргументы соответствуют схеме, лимиты длин.
+**Конвейер.** Один класс `ToolPipeline`: имя ищется в реестре, дальше — подтверждение по `Risk`, таймаут, вызов инструмента, обрезка вывода до 4 КБ, лог без секретов. Инструмент этого не реализует. Готовых ступеней-«миддлварей» нет — порядок зашит в `ToolPipeline`, расширение новым шагом означает правку этого класса.
+
+- Обязательные аргументы (`required` в схеме) проверяет `ToolPipeline`; остальную валидацию (диапазоны, лимиты длин) делают сами инструменты через sealed-результаты валидации.
 - `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
 - Результат: `ToolOutcome = Success(text) | Rejected(reason) | Failed(error)`. Это итог всего конвейера, включая отказ пользователя и таймаут; `ToolResult` — только то, что вернул сам инструмент. Любой исход превращается в `function_call_output` для модели.
 
 Так безопасность, лимиты и логирование живут в одном месте и применяются ко **всем** инструментам, включая будущие.
 
-**Типизированные аргументы.** `TypedTool<A>` — базовая помощь: декодирует JSON в `@Serializable`-класс `A`, инструмент получает готовый объект. Схема описывается небольшим DSL и проверяется тестом на соответствие классу.
+**Типизированные аргументы.** Каждый инструмент сам описывает JSON-схему (`buildJsonObject`) и декодирует аргументы в свой `@Serializable`-класс (`AlarmArgs`, `NotifyArgs`, …); декодирование падает в `ToolOutcome.Failed`, не в исключение. Общего `TypedTool<A>` и DSL схем нет — при 3–5 инструментах это было бы лишним слоем; заводим, когда инструментов станет заметно больше.
 
 ## История и «непрозрачные» элементы
 История — не только текст. Модель со `store=false` может возвращать служебные элементы (например, зашифрованные reasoning-блоки), которые нужно вернуть в следующем запросе. Поэтому `HistoryItem` включает `Opaque(provider, payload)`: ядро их не понимает, но хранит и отдаёт обратно адаптеру. Нужно ли это для нашего бэкенда — проверяется на этапе 0 (пункт 0.3). Закладываем слот сейчас, чтобы не менять формат хранения потом.
@@ -91,11 +83,10 @@ ValidateArgs → ApprovalPolicy → Timeout → RunTool → TruncateOutput(4 К�
 ## Ошибки
 ```
 AgentError
-├─ Auth:      SessionExpired · Forbidden
-├─ Network:   Offline · Timeout
-├─ Limits:    RateLimited(retryAfter?)
-├─ Backend:   ProtocolChanged · Server(code)
-├─ Tool:      Validation · PermissionDenied · Timeout · Failed(reason)
-└─ Agent:     StepLimit · Cancelled · Unexpected
+├─ SessionExpired · Forbidden · Offline · Timeout
+├─ RateLimited(retryAfter?) · ProtocolChanged · Server(code)
+├─ ToolFailure(reason) · StepLimit · Interrupted
+└─ Cancelled · Unexpected(details)
 ```
+Плоский список без групп-обёрток (не иерархия `Auth`/`Network`/`Tool`):sealed-типов меньше, а исчерпывающий `when` в UI всё равно заставляет обработать каждый. Отдельных `Validation`/`PermissionDenied` нет: отказ валидации приходит как `ToolFailure`, а «запрещено» — это `Forbidden` или исход `ToolOutcome.Rejected` (отказ пользователя), отдельного кода не нужно.
 В ядре ошибки без текста для людей. Тексты на русском, `strings.xml`, подставляет UI-слой. `CancellationException` всегда пробрасывается дальше и никогда не глотается.
