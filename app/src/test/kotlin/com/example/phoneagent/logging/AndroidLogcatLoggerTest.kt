@@ -47,8 +47,11 @@ class AndroidLogcatLoggerTest {
         assertFalse(logcatText.contains(secretUserText))
         assertFalse(fileText.contains(secretFileName))
         assertFalse(fileText.contains(secretUserText))
-        // Diagnosis survives: the exception type and the frames are still there.
-        assertEquals("RuntimeException", logcat.single().throwable?.let { it::class.simpleName })
+        // Diagnosis survives: the ORIGINAL type name is present in both sinks (rendered as
+        // "SanitizedThrowable: <originalType>" with the frames), while the original message and
+        // the causes are gone.
+        val originalTypeName = failure::class.java.name
+        assertTrue("logcat must show the original type, was: $logcatText", logcatText.contains(originalTypeName))
         assertTrue(
             logcat
                 .single()
@@ -56,7 +59,7 @@ class AndroidLogcatLoggerTest {
                 ?.stackTrace
                 ?.size!! > 0,
         )
-        assertTrue(fileText.contains("RuntimeException"))
+        assertTrue("file must record the original type, was: $fileText", fileText.contains(originalTypeName))
     }
 
     @Test

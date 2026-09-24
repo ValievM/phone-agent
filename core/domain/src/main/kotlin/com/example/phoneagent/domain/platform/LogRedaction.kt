@@ -42,17 +42,13 @@ public object LogRedaction {
     public fun isSensitiveFieldName(name: String): Boolean = name.lowercase() in SENSITIVE_KEY_NAMES
 
     /**
-     * A copy of [throwable] that is safe to log: the original class and stack trace are kept for
-     * diagnosis, but the message and the whole cause chain are dropped — exception text routinely
-     * embeds user input (file names, request fragments) that no regex can reliably scrub.
+     * A copy of [throwable] that is safe to log: the original type NAME and stack trace are kept
+     * for diagnosis, but the message and the whole cause chain are dropped — exception text
+     * routinely embeds user input (file names, request fragments) that no regex can reliably
+     * scrub. Already sanitized throwables pass through untouched.
      */
     public fun sanitizedThrowable(throwable: Throwable): Throwable {
-        val blank =
-            try {
-                throwable::class.java.getDeclaredConstructor().newInstance()
-            } catch (_: ReflectiveOperationException) {
-                Throwable("no no-arg constructor on ${throwable::class.simpleName}")
-            }
-        return blank.apply { stackTrace = throwable.stackTrace }
+        if (throwable is SanitizedThrowable) return throwable
+        return SanitizedThrowable(throwable::class.java.name).apply { stackTrace = throwable.stackTrace }
     }
 }

@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.LogLevel
 import com.example.phoneagent.domain.platform.LogRedaction
 import com.example.phoneagent.domain.platform.RingLog
+import com.example.phoneagent.domain.platform.SanitizedThrowable
 import java.io.File
 import java.io.IOException
 
@@ -75,9 +76,14 @@ public class AndroidLogcatLogger
             fullMessage: String,
             throwable: Throwable?,
         ): String {
-            // The throwable is already sanitized, so the file deliberately records only its type —
-            // never a message, which is where untrusted input hides.
-            val throwableText = throwable?.let { " | ${it::class.simpleName}" }.orEmpty()
+            // The throwable is already sanitized, so the file deliberately records only the
+            // ORIGINAL type name — never a message, which is where untrusted input hides.
+            val throwableText =
+                when (throwable) {
+                    null -> ""
+                    is SanitizedThrowable -> " | ${throwable.originalType}"
+                    else -> " | ${throwable::class.simpleName}"
+                }
             return "${System.currentTimeMillis()} $level/$tag: $fullMessage$throwableText"
         }
 
