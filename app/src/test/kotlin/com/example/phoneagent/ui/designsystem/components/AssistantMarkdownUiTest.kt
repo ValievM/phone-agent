@@ -171,5 +171,27 @@ class AssistantMarkdownUiTest {
         assertEquals(emptyList<String>(), opened)
     }
 
+    @Test
+    fun `a raw html link from the answer stays inert text and never reports a uri`() {
+        show("""Вот файл: <a href="https://evil.example/download?token=secret">скачать отчёт</a> <script>alert(1)</script>""")
+
+        // The parser must treat raw HTML as text: whatever the anchor renders as, tapping it
+        // must not open anything and must not report a URI for confirmation either.
+        composeRule.waitUntil(PARSE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasText("скачать отчёт", substring = true)).fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodes(hasText("Вот файл:", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitForIdle()
+
+        val anchorNodes = composeRule.onAllNodes(hasText("скачать отчёт", substring = true)).fetchSemanticsNodes()
+        if (anchorNodes.isNotEmpty()) {
+            composeRule.onNodeWithText("скачать отчёт", substring = true).performClick()
+            composeRule.waitForIdle()
+        }
+
+        assertEquals(emptyList<String>(), openedLinks)
+        composeRule.onNodeWithText(string(R.string.link_open_confirm_title)).assertDoesNotExist()
+    }
+
     private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
 }
