@@ -32,3 +32,6 @@ app/src/test/screenshots/
 
 # OS
 .DS_Store
+
+# Kotlin Gradle plugin session data (any module)
+.kotlin/
