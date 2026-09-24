@@ -4,8 +4,8 @@
 
 **Цель:** приложение не ломается на неидеальных сценариях.
 
-- [ ] 5.1 История чата в Room, кнопка «Очистить».
-- [ ] 5.2 Экран настроек: способ входа и статус, папка для поиска, модель, выход.
+- [x] 5.1 История чата в Room, кнопка «Очистить». Хранение: `RoomConversationRepository` + `ConversationDao` (`observe()`/`replace()`), покрыто `RoomConversationRepositoryTest` и тестами `ChatViewModel` (восстановление после перезапуска, очистка, отправка во время очистки, внешняя очистка отменяет активный ход и не даёт ему восстановить историю — `external empty history emission cancels active turn and clears chat`, `completed/failed cancelled turn cannot restore history after external clear`). Кнопка «Очистить» — только на экране настроек, с диалогом подтверждения; из TopAppBar чата убрана. Живой перезапуск на телефоне — строка в `manual-verification.md`.
+- [x] 5.2 Экран настроек: способ входа и статус, папка для поиска, модель, выход. Покрыто тестами: `SettingsViewModelTest` (выбор модели, реальный способ входа из `SessionAuthCoordinator`, выход, SAF-папка, очистка истории), `PreferencesSettingsRepositoryTest` (модель, `searchFolderUri`, значения по умолчанию), `OkHttpModelCatalogTest` (оба формата `/models`, отказ). Живая проверка входа/выхода/SAF-папки на телефоне — `manual-verification.md`.
 - [ ] 5.3 Единый обработчик ошибок и тексты в `strings.xml`.
 - [ ] 5.4 Поворот экрана и смерть процесса во время стрима не теряют историю и не падают.
 - [ ] 5.5 Логи без токенов и содержимого чата с данными файлов (проверка).
