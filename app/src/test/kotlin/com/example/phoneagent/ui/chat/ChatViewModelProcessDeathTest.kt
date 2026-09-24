@@ -173,6 +173,31 @@ class ChatViewModelProcessDeathTest {
         }
 
     @Test
+    fun `two stopped questions keep distinct ids so the restored feed has unique keys`() =
+        runTest(dispatcher.scheduler) {
+            val repository = Repository()
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Первый"))
+            runCurrent()
+            viewModel.onEvent(ChatUiEvent.Stop)
+            advanceUntilIdle()
+            viewModel.onEvent(ChatUiEvent.Submit("Второй"))
+            runCurrent()
+            viewModel.onEvent(ChatUiEvent.Stop)
+            advanceUntilIdle()
+
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            advanceUntilIdle()
+
+            val messages = restarted.state.value.messages
+            assertEquals(listOf("Первый", "Второй"), messages.map(ChatMessage::text))
+            // The feed uses the message id as its LazyColumn key: duplicates crash the screen.
+            assertEquals(messages.size, messages.map(ChatMessage::id).toSet().size)
+        }
+
+    @Test
     fun `a stop right after submit still keeps the question for the next turn and a restart`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()

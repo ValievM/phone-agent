@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
@@ -138,7 +139,8 @@ class ChatViewModel
             // The question enters the in-memory history immediately - not via the storage echo -
             // so a Stop before the echo cannot lose it, and the next submit cannot overwrite it.
             historyBeforeTurn = history
-            history = history + HistoryItem.UserMessage(PENDING_USER_MESSAGE_ID, trimmed)
+            // The id must be unique: a stopped question stays in history, and the feed keys on it.
+            history = history + HistoryItem.UserMessage("pending-${RandomIdGenerator.newId()}", trimmed)
             // Saved in its own job: stopping the turn must not cancel the save of the question.
             val questionSnapshot = history
             viewModelScope.launch {
@@ -304,5 +306,3 @@ private fun ToolOutcome.toCardStatus(
     }
 
 private const val SEARCH_FILES_TOOL_NAME = "search_files"
-
-private const val PENDING_USER_MESSAGE_ID = "pending-user-message"
