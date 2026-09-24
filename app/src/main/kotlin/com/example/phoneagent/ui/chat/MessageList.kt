@@ -1,13 +1,20 @@
 package com.example.phoneagent.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
@@ -30,9 +37,13 @@ import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.AssistantMessage
 import com.example.phoneagent.ui.designsystem.components.EmptyState
 import com.example.phoneagent.ui.designsystem.components.FileHit
+import com.example.phoneagent.ui.designsystem.components.PreparingIndicator
 import com.example.phoneagent.ui.designsystem.components.ScrollToBottomChip
 import com.example.phoneagent.ui.designsystem.components.ToolCallCard
 import com.example.phoneagent.ui.designsystem.components.UserMessage
+import com.example.phoneagent.ui.designsystem.layout.contentColumn
+import com.example.phoneagent.ui.designsystem.layout.screenMargin
+import com.example.phoneagent.ui.designsystem.theme.AppMotion
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -49,6 +60,7 @@ internal fun MessageList(
     onSuggestionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenLink: (String) -> Unit = {},
+    preparing: Boolean = false,
     inlineError: (@Composable () -> Unit)? = null,
 ) {
     if (messages.isEmpty()) {
@@ -65,10 +77,11 @@ internal fun MessageList(
                 onSuggestionClick = onSuggestionClick,
                 modifier = Modifier.weight(1f),
             )
+            if (preparing) PreparingIndicator(Modifier.padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small))
             inlineError?.invoke()
         }
     } else {
-        FollowingFeed(messages, onEvent, onOpenFile, onOpenLink, inlineError, modifier)
+        FollowingFeed(messages, FeedActions(onEvent, onOpenFile, onOpenLink), preparing, inlineError, modifier)
     }
 }
 
@@ -79,9 +92,8 @@ internal fun MessageList(
 @Composable
 private fun FollowingFeed(
     messages: List<ChatMessage>,
-    onEvent: (ChatUiEvent) -> Unit,
-    onOpenFile: (FileHit) -> Unit,
-    onOpenLink: (String) -> Unit,
+    actions: FeedActions,
+    preparing: Boolean,
     inlineError: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -115,35 +127,62 @@ private fun FollowingFeed(
     }
 
     Box(modifier = modifier.fillMaxWidth()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().testTag(ChatTestTags.MESSAGE_LIST),
-            state = listState,
-            reverseLayout = true,
-            contentPadding = PaddingValues(AppTheme.spacing.medium),
-            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+        FeedColumn(messages, actions, preparing, inlineError, listState)
+        AnimatedVisibility(
+            visible = isNewMessagesChipVisible(atBottom, hasUnseenMessages),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(AppTheme.spacing.medium),
+            enter =
+                fadeIn(tween(AppMotion.STATUS_CROSSFADE_MILLIS)) + scaleIn(tween(AppMotion.STATUS_CROSSFADE_MILLIS), initialScale = 0.9f),
+            exit = fadeOut(tween(AppMotion.STATUS_CROSSFADE_MILLIS)),
         ) {
-            // The feed is reversed: the first item is drawn last, i.e. after the newest message.
-            inlineError?.let { error -> item(key = INLINE_ERROR_KEY, contentType = INLINE_ERROR_KEY) { error() } }
-            items(
-                items = messages.asReversed(),
-                key = ChatMessage::id,
-                contentType = ChatMessage::role,
-            ) { message ->
-                Message(message, onEvent, onOpenFile, onOpenLink)
-            }
-        }
-        if (isNewMessagesChipVisible(atBottom, hasUnseenMessages)) {
             ScrollToBottomChip(
                 onClick = {
                     hasUnseenMessages = false
                     scope.launch { listState.animateScrollToItem(0) }
                 },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(AppTheme.spacing.medium)
-                        .testTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP),
+                modifier = Modifier.testTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP),
             )
+        }
+    }
+}
+
+/** What a message in the feed can ask the screen to do. */
+private class FeedActions(
+    val onEvent: (ChatUiEvent) -> Unit,
+    val onOpenFile: (FileHit) -> Unit,
+    val onOpenLink: (String) -> Unit,
+)
+
+/**
+ * The reversed list: the newest item sits at the bottom and the list does not jump when it grows.
+ * Items fade in and slide into place (`animateItem`), the reading column stays 640dp wide.
+ */
+@Composable
+private fun FeedColumn(
+    messages: List<ChatMessage>,
+    actions: FeedActions,
+    preparing: Boolean,
+    inlineError: (@Composable () -> Unit)?,
+    listState: LazyListState,
+) {
+    LazyColumn(
+        modifier = Modifier.contentColumn().fillMaxHeight().testTag(ChatTestTags.MESSAGE_LIST),
+        state = listState,
+        reverseLayout = true,
+        contentPadding = PaddingValues(horizontal = screenMargin(), vertical = AppTheme.spacing.medium),
+        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+    ) {
+        // The feed is reversed: the first item is drawn last, i.e. after the newest message.
+        if (preparing) item(key = PREPARING_KEY, contentType = PREPARING_KEY) { PreparingIndicator(Modifier.animateItem()) }
+        inlineError?.let { error ->
+            item(key = INLINE_ERROR_KEY, contentType = INLINE_ERROR_KEY) { Box(Modifier.animateItem()) { error() } }
+        }
+        items(
+            items = messages.asReversed(),
+            key = ChatMessage::id,
+            contentType = ChatMessage::role,
+        ) { message ->
+            Message(message, actions, Modifier.animateItem())
         }
     }
 }
@@ -153,9 +192,7 @@ private val AT_BOTTOM_TOLERANCE = 4.dp
 @Composable
 private fun Message(
     message: ChatMessage,
-    onEvent: (ChatUiEvent) -> Unit,
-    onOpenFile: (FileHit) -> Unit,
-    onOpenLink: (String) -> Unit,
+    actions: FeedActions,
     modifier: Modifier = Modifier,
 ) {
     val toolCall = message.toolCall
@@ -166,10 +203,10 @@ private fun Message(
                 description = toolCall.description,
                 arguments = toolCall.arguments,
                 expanded = toolCall.expanded,
-                onExpandToggle = { onEvent(ChatUiEvent.ToggleToolCallDetails(message.id)) },
+                onExpandToggle = { actions.onEvent(ChatUiEvent.ToggleToolCallDetails(message.id)) },
                 modifier = modifier,
                 fileHits = toolCall.fileHits,
-                onOpenFile = onOpenFile,
+                onOpenFile = actions.onOpenFile,
             )
         }
 
@@ -178,9 +215,10 @@ private fun Message(
         }
 
         else -> {
-            AssistantMessage(message.text, modifier, onOpenLink)
+            AssistantMessage(message.text, modifier, actions.onOpenLink)
         }
     }
 }
 
 private const val INLINE_ERROR_KEY = "inline_error"
+private const val PREPARING_KEY = "preparing"

@@ -1,32 +1,28 @@
 package com.example.phoneagent.ui.settings
 
-import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,11 +32,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.auth.AppSignInMethod
+import com.example.phoneagent.ui.designsystem.components.PrimaryButton
+import com.example.phoneagent.ui.designsystem.components.QuietButton
+import com.example.phoneagent.ui.designsystem.components.SecondaryButton
+import com.example.phoneagent.ui.designsystem.components.StatusMessage
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
+import com.example.phoneagent.ui.designsystem.layout.contentColumn
+import com.example.phoneagent.ui.designsystem.layout.screenMargin
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,13 +74,19 @@ fun SettingsScreen(
                 },
             )
         },
-    ) { contentPadding ->
+    ) { insets ->
+        val direction = LocalLayoutDirection.current
+        val margin = screenMargin()
+        // The list scrolls under the system bars: the insets are content padding, not a frame around it.
         LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding)
-                    .padding(horizontal = AppTheme.spacing.large),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = insets.calculateStartPadding(direction) + margin,
+                    end = insets.calculateEndPadding(direction) + margin,
+                    top = insets.calculateTopPadding() + AppTheme.spacing.small,
+                    bottom = insets.calculateBottomPadding() + AppTheme.spacing.large,
+                ),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
         ) {
             item { AccountSection(state, onEvent) }
@@ -82,7 +94,7 @@ fun SettingsScreen(
             item { ModelSection(state, onEvent) }
             item { SearchFolderSection(state, onChooseFolder) }
             item { HistorySection(state) { showClearHistoryConfirmation = true } }
-            item { if (state.settingsUnavailable) SettingsError() }
+            if (state.settingsUnavailable) item { StatusMessage(stringResource(R.string.settings_unavailable), Modifier.contentColumn()) }
         }
     }
 
@@ -111,7 +123,7 @@ private fun AccountSection(
             }
         Text(stringResource(accountText), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.isSignedIn) {
-            OutlinedButton(onClick = { onEvent(SettingsUiEvent.SignOut) }) {
+            SecondaryButton(onClick = { onEvent(SettingsUiEvent.SignOut) }) {
                 Text(stringResource(R.string.sign_out))
             }
         }
@@ -127,9 +139,9 @@ private fun ModelSection(
     SettingsSection(title = stringResource(R.string.settings_model_title)) {
         Text(stringResource(R.string.settings_model_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
-            OutlinedButton(
+            SecondaryButton(
                 onClick = { expanded = true },
-                enabled = !state.isLoading && !state.isLoadingModels && !state.settingsUnavailable,
+                enabled = state.canEditSettings && !state.isLoadingModels,
             ) {
                 Text(state.model ?: stringResource(R.string.settings_model_default))
             }
@@ -148,7 +160,7 @@ private fun ModelSection(
         }
         when {
             state.isLoadingModels -> {
-                Text(stringResource(R.string.settings_models_loading))
+                Text(stringResource(R.string.settings_models_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             state.modelCatalogUnavailable -> {
@@ -193,7 +205,7 @@ private fun SearchFolderSection(
                 R.string.settings_search_folder_choose
             }
         Text(stringResource(status), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onChooseFolder, enabled = !state.isLoading && !state.settingsUnavailable) {
+        PrimaryButton(onClick = onChooseFolder, enabled = state.canEditSettings) {
             Text(stringResource(action))
         }
         if (state.folderPermissionUnavailable) {
@@ -212,16 +224,13 @@ private fun HistorySection(
 ) {
     SettingsSection(title = stringResource(R.string.settings_history_title)) {
         Text(stringResource(R.string.settings_history_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = onClear) { Text(stringResource(R.string.settings_history_clear)) }
+        QuietButton(onClick = onClear, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+            Text(stringResource(R.string.settings_history_clear))
+        }
         if (state.historyClearUnavailable) {
             Text(stringResource(R.string.settings_history_clear_error), color = MaterialTheme.colorScheme.error)
         }
     }
-}
-
-@Composable
-private fun SettingsError() {
-    Text(stringResource(R.string.settings_unavailable), color = MaterialTheme.colorScheme.error)
 }
 
 @Composable
@@ -234,32 +243,35 @@ private fun ClearHistoryConfirmation(
         title = { Text(stringResource(R.string.settings_history_confirm_title)) },
         text = { Text(stringResource(R.string.settings_history_confirm_message)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.settings_history_clear))
+            QuietButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Text(stringResource(R.string.settings_history_confirm_action))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            QuietButton(onClick = onDismiss) {
                 Text(stringResource(R.string.file_cancel_action))
             }
         },
     )
 }
 
+/** A group of settings on `surfaceContainer`; on a tablet or in landscape the groups keep the reading width. */
 @Composable
 internal fun SettingsSection(
     title: String,
     content: @Composable () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    Surface(
+        modifier = Modifier.contentColumn(),
+        shape = AppTheme.shapeTokens.card,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            modifier = Modifier.padding(AppTheme.spacing.large),
-            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
+            modifier = Modifier.padding(AppTheme.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.compact),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             content()
         }
     }

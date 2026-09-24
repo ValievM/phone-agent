@@ -29,3 +29,16 @@ private fun SettingsHistoryClearUnavailablePreview() = SettingsPreviewFrame(Read
 @PreviewLightDark
 @Composable
 private fun SettingsUnavailablePreview() = SettingsPreviewFrame(ReadyState.copy(settingsUnavailable = true))
+
+@PreviewLightDark
+@Composable
+private fun SettingsThemeSaveFailedPreview() = SettingsPreviewFrame(ReadyState.copy(themeSaveFailed = true))
+
+@PreviewLightDark
+@Composable
+private fun SettingsLoadFailedPreview() =
+    SettingsPreviewFrame(SettingsUiState(isLoading = false, settingsUnavailable = true, settingsLoadFailed = true))
+
+@PreviewLightDark
+@Composable
+private fun SettingsDarkThemeChosenPreview() = SettingsPreviewFrame(ReadyState.copy(themeMode = ThemeMode.DARK))

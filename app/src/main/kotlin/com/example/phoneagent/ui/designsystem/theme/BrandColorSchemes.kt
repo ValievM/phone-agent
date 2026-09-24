@@ -121,6 +121,7 @@ internal val BrandLightExtendedColors =
         onWarning = Color(0xFFFFFFFF),
         warningContainer = Color(0xFFFFE3AB),
         onWarningContainer = Color(0xFF2B1B00),
+        brandMark = Color(0xFF753E4A),
     )
 
 internal val BrandDarkExtendedColors =
@@ -133,4 +134,5 @@ internal val BrandDarkExtendedColors =
         onWarning = Color(0xFF402D03),
         warningContainer = Color(0xFF5D410B),
         onWarningContainer = Color(0xFFFFE3AB),
+        brandMark = Color(0xFFEDB4BF),
     )

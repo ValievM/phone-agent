@@ -33,7 +33,7 @@ internal fun FileOpenConfirmationSheet(
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ConfirmationSheet(onDismissRequest = onDismiss) {
         FileOpenConfirmationContent(
             fileHit = fileHit,
             onOpen = onOpen,
@@ -49,32 +49,21 @@ internal fun FileOpenConfirmationContent(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val titleFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { titleFocus.requestFocus() }
     val sizeLabel =
         fileHit.size?.let { size ->
             stringResource(R.string.file_size_format, Formatter.formatShortFileSize(context, size))
         } ?: stringResource(R.string.file_size_unknown)
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppTheme.spacing.large)
-                .padding(bottom = AppTheme.spacing.large),
-        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+    SheetLayout(
+        title = stringResource(R.string.file_open_confirm_title),
+        footer = {
+            ButtonPair(
+                spacing = AppTheme.spacing.medium,
+                secondary = { SecondaryButton(onClick = onDismiss) { Text(stringResource(R.string.file_cancel_action)) } },
+                primary = { PrimaryButton(onClick = onOpen) { Text(stringResource(R.string.file_open_action)) } },
+            )
+        },
     ) {
-        Text(
-            text = stringResource(R.string.file_open_confirm_title),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .focusRequester(titleFocus)
-                    .focusable()
-                    .semantics { heading() },
-        )
         Text(
             text = fileHit.name,
             style = MaterialTheme.typography.bodyLarge,
@@ -85,19 +74,5 @@ internal fun FileOpenConfirmationContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium)) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.file_cancel_action))
-            }
-            Button(
-                onClick = onOpen,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.file_open_action))
-            }
-        }
     }
 }

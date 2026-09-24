@@ -1,38 +1,25 @@
 package com.example.phoneagent.ui.designsystem.components
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
-import com.example.phoneagent.ui.designsystem.theme.AppMonospace
+import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -57,7 +44,7 @@ fun ApprovalSheet(
     modifier: Modifier = Modifier,
     initialDetailsExpanded: Boolean = false,
 ) {
-    ModalBottomSheet(
+    ConfirmationSheet(
         onDismissRequest = onReject,
         modifier = modifier,
     ) {
@@ -79,30 +66,19 @@ private fun SheetContent(
     onReject: () -> Unit,
     initialDetailsExpanded: Boolean,
 ) {
-    val titleFocus = remember { FocusRequester() }
     var detailsExpanded by rememberSaveable { mutableStateOf(initialDetailsExpanded) }
-    LaunchedEffect(Unit) { titleFocus.requestFocus() }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppTheme.spacing.large)
-                .padding(bottom = AppTheme.spacing.large),
-        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+    SheetLayout(
+        title = stringResource(R.string.approval_sheet_title),
+        footer = {
+            ButtonPair(
+                spacing = AppTheme.spacing.medium,
+                secondary = { SecondaryButton(onClick = onReject) { Text(stringResource(R.string.approval_reject)) } },
+                primary = { PrimaryButton(onClick = onApprove) { Text(stringResource(R.string.approval_approve)) } },
+            )
+        },
     ) {
-        Text(
-            text = stringResource(R.string.approval_sheet_title),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .focusRequester(titleFocus)
-                    .focusable()
-                    .semantics { heading() },
-        )
         DescriptionBlock(description = request.description)
-        TextButton(onClick = { detailsExpanded = !detailsExpanded }) {
+        QuietButton(onClick = { detailsExpanded = !detailsExpanded }) {
             Text(stringResource(R.string.approval_sheet_details))
             Icon(
                 painter = painterResource(AppIcons.expandMore),
@@ -116,10 +92,6 @@ private fun SheetContent(
                 details = request.description.details,
             )
         }
-        ApprovalButtons(
-            onApprove = onApprove,
-            onReject = onReject,
-        )
     }
 }
 
@@ -133,8 +105,8 @@ private fun DescriptionBlock(description: CallDescription) {
         )
         Text(
             text = description.summary,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -147,36 +119,15 @@ private fun ExpandedDetails(
     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
         Text(
             text = arguments.toPrettyString(),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
+            style = AppCodeTextStyle,
             color = MaterialTheme.colorScheme.onSurface,
         )
         details.forEach { detail ->
             Text(
                 text = detail,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun ApprovalButtons(
-    onApprove: () -> Unit,
-    onReject: () -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium)) {
-        OutlinedButton(
-            onClick = onReject,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(stringResource(R.string.approval_reject))
-        }
-        Button(
-            onClick = onApprove,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(stringResource(R.string.approval_approve))
         }
     }
 }

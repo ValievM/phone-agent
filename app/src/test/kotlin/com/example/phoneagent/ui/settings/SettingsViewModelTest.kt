@@ -202,6 +202,133 @@ class SettingsViewModelTest {
             assertEquals(true, viewModel.state.value.useSystemColors)
         }
 
+    @Test
+    fun `a failed theme save keeps the previous choice and reports it`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings(useDarkTheme = true))
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+            repository.failSaves = true
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.LIGHT))
+            advanceUntilIdle()
+
+            assertEquals(ThemeMode.DARK, viewModel.state.value.themeMode)
+            assertTrue(viewModel.state.value.themeSaveFailed)
+        }
+
+    @Test
+    fun `a failed model save is not reported as a theme error`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+            repository.failSaves = true
+
+            viewModel.onEvent(SettingsUiEvent.SelectModel("gpt-5.6-terra"))
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.themeSaveFailed)
+            assertTrue(viewModel.state.value.settingsUnavailable)
+        }
+
+    @Test
+    fun `a later successful save clears the theme error`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+            repository.failSaves = true
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+
+            repository.failSaves = false
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.themeSaveFailed)
+            assertEquals(ThemeMode.DARK, viewModel.state.value.themeMode)
+        }
+
+    @Test
+    fun `a failed save does not change what the next save is based on`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings(useDarkTheme = null, model = "gpt-5.6-luna"))
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+            repository.failSaves = true
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+            repository.failSaves = false
+
+            viewModel.onEvent(SettingsUiEvent.SelectModel("gpt-5.6-terra"))
+            advanceUntilIdle()
+
+            assertEquals(listOf(AppSettings(useDarkTheme = null, model = "gpt-5.6-terra")), repository.savedSettings)
+        }
+
+    @Test
+    fun `two quick theme choices are saved in order and the last one wins`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.LIGHT))
+            advanceUntilIdle()
+
+            assertEquals(listOf(true, false), repository.savedSettings.map { it.useDarkTheme })
+            assertEquals(ThemeMode.LIGHT, viewModel.state.value.themeMode)
+        }
+
+    @Test
+    fun `nothing is written after the settings failed to load, so model and folder are never overwritten with defaults`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings(model = "gpt-5.6-luna", searchFolderUri = "content://tree/1"))
+            repository.failLoad = true
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            viewModel.onEvent(SettingsUiEvent.SetSystemColors(true))
+            viewModel.onEvent(SettingsUiEvent.SelectModel("gpt-5.6-terra"))
+            advanceUntilIdle()
+
+            assertTrue(repository.savedSettings.isEmpty())
+            assertTrue(viewModel.state.value.settingsLoadFailed)
+            assertFalse(viewModel.state.value.canEditSettings)
+        }
+
+    @Test
+    fun `nothing is written while the settings are still loading`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            assertFalse(viewModel.state.value.canEditSettings)
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+
+            assertTrue(repository.savedSettings.isEmpty())
+            assertTrue(viewModel.state.value.canEditSettings)
+        }
+
+    @Test
+    fun `a cancelled save is not reported as a failure`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+            repository.cancelSaves = true
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.themeSaveFailed)
+            assertFalse(viewModel.state.value.settingsUnavailable)
+        }
+
     private fun viewModelWith(settingsRepository: SettingsRepository) =
         SettingsViewModel(
             authCoordinator = FakeAuthCoordinator(),
@@ -214,10 +341,18 @@ class SettingsViewModelTest {
         private var current: AppSettings,
     ) : SettingsRepository {
         val savedSettings = mutableListOf<AppSettings>()
+        var failSaves = false
+        var failLoad = false
+        var cancelSaves = false
 
-        override suspend fun load(): AppSettings = current
+        override suspend fun load(): AppSettings {
+            if (failLoad) throw java.io.IOException("cannot read settings")
+            return current
+        }
 
         override suspend fun save(settings: AppSettings) {
+            if (cancelSaves) throw kotlinx.coroutines.CancellationException("save cancelled")
+            if (failSaves) throw java.io.IOException("cannot write settings")
             savedSettings += settings
             current = settings
         }

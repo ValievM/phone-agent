@@ -23,8 +23,8 @@ class ThemeGeometryTest {
     }
 
     @Test
-    fun `the tool card is 16dp on every corner`() {
-        assertEquals(listOf(16f, 16f, 16f, 16f), AppShapeTokens().toolCard.radii())
+    fun `the card is 16dp on every corner`() {
+        assertEquals(listOf(16f, 16f, 16f, 16f), AppShapeTokens().card.radii())
     }
 
     @Test

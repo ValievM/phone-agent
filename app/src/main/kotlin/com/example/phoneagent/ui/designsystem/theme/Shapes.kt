@@ -23,7 +23,8 @@ internal val AppShapes =
 data class AppShapeTokens(
     /** The user's message: round, with a small 4dp "tail" in the bottom end corner. */
     val userBubble: RoundedCornerShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomEnd = 4.dp, bottomStart = 20.dp),
-    val toolCard: RoundedCornerShape = RoundedCornerShape(16.dp),
+    /** Tool cards, settings groups, banners and other 16dp containers. */
+    val card: RoundedCornerShape = RoundedCornerShape(16.dp),
     val sheet: RoundedCornerShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     val button: RoundedCornerShape = RoundedCornerShape(16.dp),
     val composer: RoundedCornerShape = RoundedCornerShape(24.dp),

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
+import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppMonospace
 import com.mikepenz.markdown.compose.components.MarkdownComponents
 import com.mikepenz.markdown.compose.components.markdownComponents
@@ -78,10 +79,10 @@ private fun assistantMarkdownColors(): MarkdownColors {
     val colors = MaterialTheme.colorScheme
     return markdownColor(
         text = colors.onSurface,
-        codeBackground = colors.surfaceVariant,
-        inlineCodeBackground = colors.surfaceVariant,
+        codeBackground = colors.surfaceContainerHigh,
+        inlineCodeBackground = colors.surfaceContainerHigh,
         dividerColor = colors.outlineVariant,
-        tableBackground = colors.surfaceVariant,
+        tableBackground = colors.surfaceContainer,
     )
 }
 
@@ -95,7 +96,7 @@ private fun assistantMarkdownTypography(): MarkdownTypography {
         h4 = typography.titleSmall,
         h5 = typography.labelLarge,
         h6 = typography.labelLarge,
-        code = typography.bodyMedium.copy(fontFamily = AppMonospace),
+        code = AppCodeTextStyle,
         inlineCode = typography.bodyLarge.copy(fontFamily = AppMonospace, fontSize = TextUnit.Unspecified),
         textLink =
             TextLinkStyles(

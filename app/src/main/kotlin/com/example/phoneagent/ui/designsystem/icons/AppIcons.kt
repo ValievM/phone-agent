@@ -36,5 +36,8 @@ object AppIcons {
     val stop: Int = R.drawable.ic_stop
 
     @get:DrawableRes
+    val close: Int = R.drawable.ic_close
+
+    @get:DrawableRes
     val arrowDownward: Int = R.drawable.ic_arrow_downward
 }

@@ -72,7 +72,7 @@ class SettingsViewModel
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (_: Exception) {
-                    mutableState.update { it.copy(isLoading = false, settingsUnavailable = true) }
+                    mutableState.update { it.copy(isLoading = false, settingsUnavailable = true, settingsLoadFailed = true) }
                 }
             }
         }
@@ -84,11 +84,11 @@ class SettingsViewModel
                 }
 
                 is SettingsUiEvent.SelectThemeMode -> {
-                    if (!mutableState.value.isLoading) updateSettings { it.copy(useDarkTheme = event.mode.toDarkThemeFlag()) }
+                    updateSettings(onFailure = { it.copy(themeSaveFailed = true) }) { it.copy(useDarkTheme = event.mode.toDarkThemeFlag()) }
                 }
 
                 is SettingsUiEvent.SetSystemColors -> {
-                    if (!mutableState.value.isLoading) updateSettings { it.copy(useDynamicColors = event.enabled) }
+                    updateSettings(onFailure = { it.copy(themeSaveFailed = true) }) { it.copy(useDynamicColors = event.enabled) }
                 }
 
                 SettingsUiEvent.SignOut -> {
@@ -121,17 +121,20 @@ class SettingsViewModel
             }
         }
 
-        private fun selectModel(model: String?) {
-            if (mutableState.value.isLoading) return
-            updateSettings { it.copy(model = model) }
-        }
+        private fun selectModel(model: String?) = updateSettings { it.copy(model = model) }
 
-        private fun saveSearchFolder(uri: String?) {
-            if (mutableState.value.isLoading) return
-            updateSettings { it.copy(searchFolderUri = uri) }
-        }
+        private fun saveSearchFolder(uri: String?) = updateSettings { it.copy(searchFolderUri = uri) }
 
-        private fun updateSettings(transform: (AppSettings) -> AppSettings) {
+        /**
+         * The only writer of the settings. Nothing is written until they have been read successfully:
+         * saving on top of defaults would erase the saved model and folder. [onFailure] says which
+         * error the screen shows when this particular save fails.
+         */
+        private fun updateSettings(
+            onFailure: (SettingsUiState) -> SettingsUiState = { it.copy(settingsUnavailable = true) },
+            transform: (AppSettings) -> AppSettings,
+        ) {
+            if (!mutableState.value.canEditSettings) return
             viewModelScope.launch {
                 settingsMutex.withLock {
                     val updatedSettings = transform(currentSettings)
@@ -147,12 +150,13 @@ class SettingsViewModel
                                 searchFolderSelected = updatedSettings.searchFolderUri != null,
                                 folderPermissionUnavailable = false,
                                 settingsUnavailable = false,
+                                themeSaveFailed = false,
                             )
                         }
                     } catch (exception: CancellationException) {
                         throw exception
                     } catch (_: Exception) {
-                        mutableState.update { it.copy(settingsUnavailable = true) }
+                        mutableState.update(onFailure)
                     }
                 }
             }

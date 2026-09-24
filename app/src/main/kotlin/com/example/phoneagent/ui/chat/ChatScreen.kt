@@ -4,10 +4,15 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.plus
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -40,7 +45,10 @@ import com.example.phoneagent.ui.designsystem.components.ComposerMode
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.InlineError
 import com.example.phoneagent.ui.designsystem.components.StatusBanner
+import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
+import com.example.phoneagent.ui.designsystem.layout.contentColumn
+import com.example.phoneagent.ui.designsystem.layout.screenMargin
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @Composable
@@ -73,6 +81,8 @@ fun ChatScreen(
 ) {
     Scaffold(
         modifier = modifier,
+        // The bottom is left to the composer: its bar runs under the navigation bar and rises with the keyboard.
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.chat_title)) },
@@ -97,7 +107,7 @@ fun ChatScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChatBody(
     state: ChatUiState,
@@ -109,70 +119,49 @@ private fun ChatBody(
     var draft by rememberSaveable { mutableStateOf("") }
     val error = state.error?.toPresentation()
     val retry = if (state.canRetry) ({ onEvent(ChatUiEvent.Retry) }) else null
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .widthIn(max = ContentMaxWidth),
-        ) {
-            if (state.isRunning) RunningIndicator()
-            MessageList(
-                messages = state.messages,
-                onEvent = onEvent,
-                onOpenFile = onOpenFile,
-                onOpenLink = onOpenLink,
-                onSuggestionClick = { draft = it },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .imeNestedScroll(),
-                inlineError =
-                    error?.takeIf { it.placement == ErrorPlacement.Inline }?.let { presentation ->
-                        {
-                            InlineError(
-                                message = presentation.text(),
-                                onDismiss = { onEvent(ChatUiEvent.DismissError) },
-                                onRetry = retry,
-                            )
-                        }
-                    },
-            )
-            error?.takeIf { it.placement == ErrorPlacement.StatusBanner }?.let { presentation ->
-                StatusBanner(
-                    message = presentation.text(),
-                    onDismiss = { onEvent(ChatUiEvent.DismissError) },
-                    onRetry = retry,
-                )
-            }
-            HorizontalDivider()
-            Composer(
-                draft = draft,
-                onDraftChange = { draft = it },
-                mode = if (state.isRunning) ComposerMode.Running else ComposerMode.Ready,
-                onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
-                onStop = { onEvent(ChatUiEvent.Stop) },
+    Column(modifier = modifier.fillMaxSize()) {
+        MessageList(
+            messages = state.messages,
+            onEvent = onEvent,
+            onOpenFile = onOpenFile,
+            onOpenLink = onOpenLink,
+            onSuggestionClick = { draft = it },
+            preparing = state.isPreparingAnswer(),
+            modifier = Modifier.weight(1f).imeNestedScroll(),
+            inlineError =
+                error?.takeIf { it.placement == ErrorPlacement.Inline }?.let { presentation ->
+                    {
+                        InlineError(
+                            message = presentation.text(),
+                            onDismiss = { onEvent(ChatUiEvent.DismissError) },
+                            onRetry = retry,
+                        )
+                    }
+                },
+        )
+        error?.takeIf { it.placement == ErrorPlacement.StatusBanner }?.let { presentation ->
+            StatusBanner(
+                message = presentation.text(),
+                onDismiss = { onEvent(ChatUiEvent.DismissError) },
+                onRetry = retry,
+                modifier = Modifier.contentColumn().padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
             )
         }
+        Composer(
+            draft = draft,
+            onDraftChange = { draft = it },
+            mode = if (state.isRunning) ComposerMode.Running else ComposerMode.Ready,
+            onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
+            onStop = { onEvent(ChatUiEvent.Stop) },
+        )
     }
 }
 
-private val ContentMaxWidth = 640.dp
-
-@Composable
-private fun RunningIndicator(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        Text(
-            text = stringResource(R.string.model_working),
-            modifier =
-                Modifier
-                    .padding(AppTheme.spacing.small)
-                    .semantics { liveRegion = LiveRegionMode.Polite },
-            style = MaterialTheme.typography.labelMedium,
-        )
-    }
+/**
+ * "Готовлю ответ" is shown while the model is preparing or writing its text. While a tool call waits for
+ * the user's decision or runs, that call's own card says so, so the indicator steps aside.
+ */
+private fun ChatUiState.isPreparingAnswer(): Boolean {
+    val lastToolStatus = messages.lastOrNull()?.toolCall?.status
+    return isRunning && lastToolStatus != ToolCallStatus.AwaitingApproval && lastToolStatus != ToolCallStatus.Running
 }

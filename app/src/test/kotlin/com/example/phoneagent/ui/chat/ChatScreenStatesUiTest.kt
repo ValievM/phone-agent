@@ -50,7 +50,7 @@ class ChatScreenStatesUiTest {
 
         composeRule.onNodeWithText(string(R.string.error_offline)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
-        composeRule.onNodeWithText(string(R.string.dismiss_error)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.dismiss_error)).performClick()
 
         assertEquals(listOf(ChatUiEvent.Retry, ChatUiEvent.DismissError), events)
     }
@@ -79,7 +79,7 @@ class ChatScreenStatesUiTest {
 
         composeRule.onNodeWithText(string(R.string.error_timeout)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
-        composeRule.onNodeWithText(string(R.string.dismiss_error)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.dismiss_error)).performClick()
 
         assertEquals(listOf(ChatUiEvent.Retry, ChatUiEvent.DismissError), events)
     }

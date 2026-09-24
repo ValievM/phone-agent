@@ -41,7 +41,10 @@ class BatchApprovalSheetUiTest {
         }
     }
 
-    private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
+    private fun string(
+        id: Int,
+        vararg args: Any,
+    ): String = ApplicationProvider.getApplicationContext<Context>().getString(id, *args)
 
     private fun request(time: String) =
         ApprovalRequest(CallDescription("Поставить будильник", "На $time"), Risk.CONFIRM, buildJsonObject {})
@@ -58,7 +61,7 @@ class BatchApprovalSheetUiTest {
     fun `approve all and reject all report exactly one answer`() {
         show(listOf("06:00", "06:15"))
 
-        composeRule.onNodeWithText(string(R.string.batch_approval_approve_all)).performClick()
+        composeRule.onNodeWithText(string(R.string.batch_approval_approve_all, 2)).performClick()
 
         assertEquals(listOf("approve"), answers)
     }

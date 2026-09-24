@@ -1,21 +1,28 @@
 package com.example.phoneagent.ui.designsystem.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,15 +31,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
-import com.example.phoneagent.ui.designsystem.theme.AppMonospace
+import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
+import com.example.phoneagent.ui.designsystem.theme.AppMotion
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -41,11 +52,15 @@ private val prettyJson = Json { prettyPrint = true }
 
 private fun JsonObject.toPrettyString(): String = prettyJson.encodeToString(JsonObject.serializer(), this)
 
+private val StatusIconSize = 20.dp
+private const val COLLAPSED_SUMMARY_LINES = 2
+private const val CHEVRON_EXPANDED_DEGREES = 180f
+
 /**
- * A tool call shown in the chat feed. Collapsed by default: tool-defined [CallDescription]
- * title plus a one-line summary, status icon in the top-right corner and a status label.
- * Expanding reveals the call arguments (monospace) and the description details. Everything
- * rendered comes from structured data produced by the tool itself — never from model text.
+ * A tool call shown in the chat feed. Collapsed by default: the tool-defined [CallDescription] title
+ * and summary plus a status pill. Expanding reveals the description details and the call arguments
+ * (monospace). Everything rendered comes from structured data produced by the tool itself, never from
+ * model text. The status is always an icon plus words, never a color alone.
  */
 @Composable
 fun ToolCallCard(
@@ -59,35 +74,23 @@ fun ToolCallCard(
     onOpenFile: (FileHit) -> Unit = {},
 ) {
     var selectedFile by remember { mutableStateOf<FileHit?>(null) }
-    OutlinedCard(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .animateContentSize()
-                .clickable(
-                    onClickLabel = stringResource(R.string.tool_call_toggle_arguments),
-                    onClick = onExpandToggle,
-                ),
-        border =
-            if (state is ToolCallStatus.AwaitingApproval) {
-                BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.primary)
-            } else {
-                CardDefaults.outlinedCardBorder()
-            },
+    val shape = AppTheme.shapeTokens.card
+    Surface(
+        modifier = modifier.fillMaxWidth().animateContentSize(tween(AppMotion.EXPAND_MILLIS, easing = AppMotion.Standard)),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            modifier = Modifier.padding(AppTheme.spacing.medium),
+            modifier =
+                Modifier
+                    .clip(shape)
+                    .clickable(onClickLabel = stringResource(R.string.tool_call_toggle_arguments), onClick = onExpandToggle)
+                    .padding(AppTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
         ) {
-            ToolCallCardHeader(title = description.title, state = state)
-            Text(
-                text = description.summary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (expanded) Int.MAX_VALUE else 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            StatusLabel(state)
+            ToolCallCardHeader(description = description, expanded = expanded)
+            StatusPill(state)
             if (expanded) {
                 ExpandedDetails(
                     description = description,
@@ -112,31 +115,42 @@ fun ToolCallCard(
 
 @Composable
 private fun ToolCallCardHeader(
-    title: String,
-    state: ToolCallStatus,
+    description: CallDescription,
+    expanded: Boolean,
 ) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) CHEVRON_EXPANDED_DEGREES else 0f,
+        animationSpec = tween(AppMotion.EXPAND_MILLIS, easing = AppMotion.Standard),
+        label = "chevron",
+    )
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        StatusVisual(state)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = description.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = description.summary,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_SUMMARY_LINES,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Icon(
             painter = painterResource(AppIcons.expandMore),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.rotate(chevronRotation),
         )
     }
 }
 
-/** Monospace arguments and the tool-provided detail lines, shown when the card is expanded. */
+/** The tool-provided detail lines, then the call arguments in a horizontally scrollable code block. */
 @Composable
 private fun ExpandedDetails(
     description: CallDescription,
@@ -144,12 +158,12 @@ private fun ExpandedDetails(
     fileHits: List<FileHit>,
     onFileHitClick: (FileHit) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         description.details.forEach { detail ->
             Text(
                 text = detail,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -160,8 +174,10 @@ private fun ExpandedDetails(
         )
         Text(
             text = arguments.toPrettyString(),
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
+            style = AppCodeTextStyle,
             color = MaterialTheme.colorScheme.onSurface,
+            softWrap = false,
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         )
         if (fileHits.isNotEmpty()) {
             Text(
@@ -169,120 +185,123 @@ private fun ExpandedDetails(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            fileHits.forEach { fileHit ->
-                AssistChip(
-                    onClick = { onFileHitClick(fileHit) },
-                    label = {
-                        Text(
-                            text = fileHit.name,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            fileHits.forEach { fileHit -> FileHitRow(fileHit = fileHit, onClick = { onFileHitClick(fileHit) }) }
         }
     }
 }
 
-/** Status mark in the card corner: an icon, or a small progress indicator while running. */
+/** A found file: the whole name stays readable (it may wrap) and the row is a 48dp touch target. */
 @Composable
-private fun StatusVisual(state: ToolCallStatus) {
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    when (state) {
-        ToolCallStatus.AwaitingApproval -> {
-            Icon(
-                painter = painterResource(AppIcons.hourglassEmpty),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+private fun FileHitRow(
+    fileHit: FileHit,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Text(
+            text = fileHit.name,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = AppTheme.spacing.compact, vertical = AppTheme.spacing.compact),
+        )
+    }
+}
 
-        ToolCallStatus.Running -> {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-                color = onSurfaceVariant,
-                trackColor = Color.Transparent,
-            )
-        }
-
-        is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> {
-            Icon(
-                painter = painterResource(AppIcons.checkCircle),
-                contentDescription = null,
-                tint = AppTheme.extendedColors.success,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        is ToolCallStatus.Failed -> {
-            Icon(
-                painter = painterResource(AppIcons.error),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        ToolCallStatus.Rejected -> {
-            Icon(
-                painter = painterResource(AppIcons.block),
-                contentDescription = null,
-                tint = onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        ToolCallStatus.Cancelled -> {
-            Icon(
-                painter = painterResource(AppIcons.stop),
-                contentDescription = null,
-                tint = onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
+/**
+ * The status of the call as an icon plus words on the role color of that status (warning, primary,
+ * success, error). Refused and interrupted are neutral, not errors: they are the user's decision.
+ * A change of status cross-fades instead of jumping.
+ */
+@Composable
+private fun StatusPill(state: ToolCallStatus) {
+    AnimatedContent(
+        targetState = state,
+        transitionSpec = {
+            fadeIn(tween(AppMotion.STATUS_CROSSFADE_MILLIS)) togetherWith fadeOut(tween(AppMotion.STATUS_CROSSFADE_MILLIS))
+        },
+        label = "toolCallStatus",
+    ) { status ->
+        val look = status.look()
+        val filled = look.container != Color.Transparent
+        Row(
+            modifier =
+                Modifier
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(look.container)
+                    .padding(
+                        horizontal = if (filled) AppTheme.spacing.compact else 0.dp,
+                        vertical = AppTheme.spacing.small,
+                    ).semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
+        ) {
+            StatusMark(status, look.content)
+            Text(
+                text = status.label(),
+                style = MaterialTheme.typography.labelLarge,
+                color = look.content,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
     }
 }
 
-/** Status text next to the icon mark: the status is never conveyed by color alone. */
+private class StatusLook(
+    val container: Color,
+    val content: Color,
+)
+
 @Composable
-private fun StatusLabel(state: ToolCallStatus) {
-    val (text, color) =
+private fun ToolCallStatus.look(): StatusLook {
+    val colors = MaterialTheme.colorScheme
+    val extended = AppTheme.extendedColors
+    return when (this) {
+        ToolCallStatus.AwaitingApproval -> StatusLook(extended.warningContainer, extended.onWarningContainer)
+        ToolCallStatus.Running -> StatusLook(colors.primaryContainer, colors.onPrimaryContainer)
+        is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> StatusLook(extended.successContainer, extended.onSuccessContainer)
+        is ToolCallStatus.Failed -> StatusLook(colors.errorContainer, colors.onErrorContainer)
+        ToolCallStatus.Rejected, ToolCallStatus.Cancelled -> StatusLook(Color.Transparent, colors.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ToolCallStatus.label(): String =
+    when (this) {
+        ToolCallStatus.AwaitingApproval -> stringResource(R.string.tool_call_status_awaiting)
+        ToolCallStatus.Running -> stringResource(R.string.tool_call_status_running)
+        is ToolCallStatus.Done -> summary
+        is ToolCallStatus.FilesFound -> stringResource(R.string.file_search_completed, count)
+        is ToolCallStatus.Failed -> reason
+        ToolCallStatus.Rejected -> stringResource(R.string.tool_call_status_rejected)
+        ToolCallStatus.Cancelled -> stringResource(R.string.tool_call_status_cancelled)
+    }
+
+/** The status icon: a clock, an open ring while running, a tick, an exclamation mark, a crossed circle or a stop square. */
+@Composable
+private fun StatusMark(
+    state: ToolCallStatus,
+    tint: Color,
+) {
+    if (state == ToolCallStatus.Running) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(StatusIconSize),
+            strokeWidth = 2.dp,
+            color = tint,
+            trackColor = Color.Transparent,
+        )
+        return
+    }
+    val icon =
         when (state) {
-            ToolCallStatus.AwaitingApproval -> {
-                stringResource(R.string.tool_call_status_awaiting) to MaterialTheme.colorScheme.primary
-            }
-
-            ToolCallStatus.Running -> {
-                stringResource(R.string.tool_call_status_running) to MaterialTheme.colorScheme.onSurfaceVariant
-            }
-
-            is ToolCallStatus.Done -> {
-                state.summary to AppTheme.extendedColors.success
-            }
-
-            is ToolCallStatus.FilesFound -> {
-                stringResource(R.string.file_search_completed, state.count) to AppTheme.extendedColors.success
-            }
-
-            is ToolCallStatus.Failed -> {
-                state.reason to MaterialTheme.colorScheme.error
-            }
-
-            ToolCallStatus.Rejected -> {
-                stringResource(R.string.tool_call_status_rejected) to MaterialTheme.colorScheme.onSurfaceVariant
-            }
-
-            ToolCallStatus.Cancelled -> {
-                stringResource(R.string.tool_call_status_cancelled) to MaterialTheme.colorScheme.onSurfaceVariant
-            }
+            ToolCallStatus.AwaitingApproval -> AppIcons.hourglassEmpty
+            is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> AppIcons.checkCircle
+            is ToolCallStatus.Failed -> AppIcons.error
+            ToolCallStatus.Rejected -> AppIcons.block
+            else -> AppIcons.stop
         }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = color,
-    )
+    Icon(painter = painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(StatusIconSize))
 }

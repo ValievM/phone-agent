@@ -23,10 +23,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.phoneagent.R
-import com.example.phoneagent.ui.designsystem.theme.AppMonospace
+import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
-
-private const val URL_MAX_LINES = 3
 
 /**
  * Confirmation before opening a link from a model reply. It is drawn from the parsed link
@@ -40,7 +38,7 @@ fun LinkConfirmationSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = modifier) {
+    ConfirmationSheet(onDismissRequest = onDismiss, modifier = modifier) {
         LinkConfirmationContent(decision = decision, onOpen = onOpen, onDismiss = onDismiss)
     }
 }
@@ -52,41 +50,33 @@ fun LinkConfirmationContent(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val titleFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { titleFocus.requestFocus() }
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppTheme.spacing.large)
-                .padding(bottom = AppTheme.spacing.large),
-        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+    SheetLayout(
+        title =
+            stringResource(
+                if (decision is LinkDecision.Confirm) R.string.link_open_confirm_title else R.string.link_blocked_title,
+            ),
+        modifier = modifier,
+        footer = {
+            when (decision) {
+                is LinkDecision.Confirm -> {
+                    ButtonPair(
+                        spacing = AppTheme.spacing.medium,
+                        secondary = { SecondaryButton(onClick = onDismiss) { Text(stringResource(R.string.link_cancel_action)) } },
+                        primary = { PrimaryButton(onClick = { onOpen(decision.url) }) { Text(stringResource(R.string.link_open_action)) } },
+                    )
+                }
+
+                LinkDecision.Blocked -> {
+                    PrimaryButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.link_close_action))
+                    }
+                }
+            }
+        },
     ) {
-        Text(
-            text =
-                stringResource(
-                    if (decision is LinkDecision.Confirm) R.string.link_open_confirm_title else R.string.link_blocked_title,
-                ),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .focusRequester(titleFocus)
-                    .focusable()
-                    .semantics { heading() },
-        )
         when (decision) {
             is LinkDecision.Confirm -> {
                 ConfirmDetails(decision)
-                Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium)) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.link_cancel_action))
-                    }
-                    Button(onClick = { onOpen(decision.url) }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.link_open_action))
-                    }
-                }
             }
 
             LinkDecision.Blocked -> {
@@ -95,9 +85,6 @@ fun LinkConfirmationContent(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.link_close_action))
-                }
             }
         }
     }
@@ -120,10 +107,8 @@ private fun ConfirmDetails(decision: LinkDecision.Confirm) {
         }
         Text(
             text = decision.url,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = AppMonospace),
+            style = AppCodeTextStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = URL_MAX_LINES,
-            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = stringResource(R.string.link_open_confirm_hint),

@@ -30,7 +30,7 @@ class ChatScreenLiveRegionUiTest {
 
         val liveRegion =
             composeRule
-                .onNodeWithText("Модель отвечает…")
+                .onNodeWithText("Готовлю ответ")
                 .fetchSemanticsNode()
                 .config
                 .getOrElseNullable(SemanticsProperties.LiveRegion) { null }

@@ -37,6 +37,8 @@ data class AppExtendedColors(
     val onWarning: Color,
     val warningContainer: Color,
     val onWarningContainer: Color,
+    /** Tint of the brand mark inside the UI: the brand color, or `onSurface` when system colors are on. */
+    val brandMark: Color,
 )
 
 private val LocalSpacing = staticCompositionLocalOf { AppSpacing() }
@@ -64,14 +66,17 @@ fun AppTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val colorScheme =
+    val dynamic = useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val targetScheme =
         when {
-            useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && darkTheme -> dynamicDarkColorScheme(context)
-            useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
+            dynamic && darkTheme -> dynamicDarkColorScheme(context)
+            dynamic -> dynamicLightColorScheme(context)
             darkTheme -> BrandDarkColorScheme
             else -> BrandLightColorScheme
         }
-    val extendedColors = if (darkTheme) BrandDarkExtendedColors else BrandLightExtendedColors
+    val colorScheme = targetScheme.animated()
+    val brandExtended = if (darkTheme) BrandDarkExtendedColors else BrandLightExtendedColors
+    val extendedColors = (if (dynamic) brandExtended.copy(brandMark = targetScheme.onSurface) else brandExtended).animated()
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalSpacing provides AppSpacing(),

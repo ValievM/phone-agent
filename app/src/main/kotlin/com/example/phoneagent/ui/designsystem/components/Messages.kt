@@ -27,7 +27,8 @@ fun UserMessage(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // A user bubble never runs the full width: the gap on the left tells it from a model reply.
+        modifier = modifier.fillMaxWidth().padding(start = AppTheme.spacing.extraLarge),
         horizontalArrangement = Arrangement.End,
     ) {
         Text(
@@ -35,11 +36,11 @@ fun UserMessage(
             modifier =
                 Modifier
                     .widthIn(max = MessageMaxWidth)
-                    .clip(MaterialTheme.shapes.large)
+                    .clip(AppTheme.shapeTokens.userBubble)
                     .background(MaterialTheme.colorScheme.secondaryContainer)
                     .padding(
                         horizontal = AppTheme.spacing.medium,
-                        vertical = AppTheme.spacing.small,
+                        vertical = AppTheme.spacing.compact,
                     ),
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             style = MaterialTheme.typography.bodyLarge,

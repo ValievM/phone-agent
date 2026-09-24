@@ -39,6 +39,7 @@ class BrandThemeTokensTest {
                     "onWarning" to extended.onWarning,
                     "warningContainer" to extended.warningContainer,
                     "onWarningContainer" to extended.onWarningContainer,
+                    "primary" to extended.brandMark,
                 )
             val mismatches = actual.filter { (role, value) -> value != color(expected, role) }.keys
             assertTrue("$mode extended colors differ from the tokens: $mismatches", mismatches.isEmpty())

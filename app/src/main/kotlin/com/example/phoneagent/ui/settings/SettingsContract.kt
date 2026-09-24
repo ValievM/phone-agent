@@ -38,7 +38,14 @@ data class SettingsUiState(
     val folderPermissionUnavailable: Boolean = false,
     val historyClearUnavailable: Boolean = false,
     val settingsUnavailable: Boolean = false,
+    /** Reading the saved settings failed: nothing may be written, or defaults would overwrite the model and folder. */
+    val settingsLoadFailed: Boolean = false,
+    val themeSaveFailed: Boolean = false,
     val isSignedIn: Boolean = false,
     val sessionExpired: Boolean = false,
     val signInMethod: AppSignInMethod? = null,
 )
+
+/** Editing is off until the saved settings are known, and stays off if reading them failed. */
+val SettingsUiState.canEditSettings: Boolean
+    get() = !isLoading && !settingsLoadFailed

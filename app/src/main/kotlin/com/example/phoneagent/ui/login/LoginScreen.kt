@@ -2,14 +2,19 @@ package com.example.phoneagent.ui.login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -18,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,10 +39,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
+import com.example.phoneagent.ui.designsystem.components.NoticeTone
+import com.example.phoneagent.ui.designsystem.components.PrimaryButton
+import com.example.phoneagent.ui.designsystem.components.QuietButton
+import com.example.phoneagent.ui.designsystem.components.SecondaryButton
+import com.example.phoneagent.ui.designsystem.components.StatusMessage
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
+import com.example.phoneagent.ui.designsystem.layout.contentColumn
+import com.example.phoneagent.ui.designsystem.layout.screenMargin
+import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @Composable
@@ -98,21 +113,27 @@ fun LoginScreen(
     modifier: Modifier = Modifier,
 ) {
     Scaffold(modifier = modifier) { contentPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding)
-                    .padding(AppTheme.spacing.medium)
-                    .imePadding(),
-            contentAlignment = Alignment.Center,
-        ) {
-            LoginContent(state, form, onEvent)
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(contentPadding).imePadding()) {
+            val viewport = maxHeight
+            // The content is centered when it is short and scrolls when it is not (large font, landscape, keyboard).
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                Column(
+                    modifier =
+                        Modifier
+                            .heightIn(min = viewport)
+                            .contentColumn(maxWidth = LOGIN_MAX_WIDTH)
+                            .padding(horizontal = screenMargin(), vertical = AppTheme.spacing.large),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    LoginContent(state, form, onEvent)
+                }
+            }
         }
     }
 }
 
 private val BRAND_MARK_SIZE = 64.dp
+private val LOGIN_MAX_WIDTH = 480.dp
 
 @Composable
 private fun LoginContent(
@@ -121,7 +142,7 @@ private fun LoginContent(
     onEvent: (LoginUiEvent) -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
     ) {
@@ -129,23 +150,32 @@ private fun LoginContent(
             painter = painterResource(AppIcons.brandMark),
             contentDescription = null,
             modifier = Modifier.size(BRAND_MARK_SIZE),
-            tint = MaterialTheme.colorScheme.primary,
+            tint = AppTheme.extendedColors.brandMark,
         )
         Text(
             text = stringResource(R.string.login_title),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
             text = stringResource(R.string.login_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        // What is stored and what is sent comes before the buttons, so the choice is an informed one.
+        Text(
+            text = stringResource(R.string.login_storage_notice),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
 
         if (state.sessionExpired) {
-            StatusCard(stringResource(R.string.login_session_expired))
+            StatusMessage(stringResource(R.string.login_session_expired), tone = NoticeTone.Warning)
         }
-        state.error?.let { error -> ErrorCard(stringResource(error.messageResource())) }
+        state.error?.let { error -> StatusMessage(stringResource(error.messageResource())) }
         state.deviceCode?.let { code ->
             DeviceCodeCard(
                 code = code,
@@ -157,18 +187,11 @@ private fun LoginContent(
         LoginActions(state, form, onEvent)
 
         if (state.showDeviceCodeFallback) {
-            TextButton(onClick = { onEvent(LoginUiEvent.DeviceCodeSignIn) }, enabled = !state.isLoading) {
+            QuietButton(onClick = { onEvent(LoginUiEvent.DeviceCodeSignIn) }, enabled = !state.isLoading) {
                 Text(stringResource(R.string.login_use_device_code))
             }
         }
         if (state.isLoading && state.deviceCode == null) CircularProgressIndicator()
-        Spacer(Modifier.weight(1f, fill = false))
-        Text(
-            text = stringResource(R.string.login_storage_notice),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
@@ -191,14 +214,18 @@ private fun LoginActions(
                 onSubmit = { onEvent(LoginUiEvent.ApiKeySignIn) },
             )
         } else {
-            Button(
+            PrimaryButton(
                 onClick = { onEvent(LoginUiEvent.BrowserSignIn) },
                 enabled = !state.isLoading,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(if (state.sessionExpired) R.string.login_again else R.string.login_openai))
             }
-            TextButton(onClick = { onEvent(LoginUiEvent.ShowApiKey) }, enabled = !state.isLoading) {
+            SecondaryButton(
+                onClick = { onEvent(LoginUiEvent.ShowApiKey) },
+                enabled = !state.isLoading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(stringResource(R.string.login_use_api_key))
             }
         }
@@ -219,12 +246,13 @@ private fun ApiKeyForm(
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true,
+            shape = AppTheme.shapeTokens.button,
             label = { Text(stringResource(R.string.login_api_key_label)) },
             placeholder = { Text(stringResource(R.string.login_api_key_placeholder)) },
             supportingText = { Text(stringResource(R.string.login_api_key_helper)) },
             visualTransformation = PasswordVisualTransformation(),
         )
-        Button(onClick = onSubmit, enabled = enabled && apiKey.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+        PrimaryButton(onClick = onSubmit, enabled = enabled && apiKey.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.login_api_key_submit))
         }
     }
@@ -236,33 +264,30 @@ private fun DeviceCodeCard(
     verificationUrl: String,
     onOpen: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppTheme.shapeTokens.card,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(Modifier.padding(AppTheme.spacing.medium), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small)) {
             Text(stringResource(R.string.login_device_code_title), style = MaterialTheme.typography.titleMedium)
-            Text(code, style = MaterialTheme.typography.headlineMedium)
-            Text(verificationUrl, style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.login_device_code_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.login_open_device_page)) }
+            SelectionContainer {
+                Text(code, style = AppCodeTextStyle.copy(fontSize = DEVICE_CODE_SIZE, lineHeight = DEVICE_CODE_LINE_HEIGHT))
+            }
+            Text(verificationUrl, style = AppCodeTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(R.string.login_device_code_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            PrimaryButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.login_open_device_page)) }
         }
     }
 }
 
-@Composable
-private fun StatusCard(message: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Text(message, modifier = Modifier.padding(AppTheme.spacing.medium))
-    }
-}
-
-@Composable
-private fun ErrorCard(message: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
-        Text(message, modifier = Modifier.padding(AppTheme.spacing.medium), color = MaterialTheme.colorScheme.onErrorContainer)
-    }
-}
+private val DEVICE_CODE_SIZE = 28.sp
+private val DEVICE_CODE_LINE_HEIGHT = 36.sp
 
 private fun LoginError.messageResource(): Int =
     when (this) {
