@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,16 +27,21 @@ internal fun MessageList(
     inlineError: (@Composable () -> Unit)? = null,
 ) {
     if (messages.isEmpty()) {
-        EmptyState(
-            suggestions =
-                listOf(
-                    stringResource(R.string.chat_suggestion_alarm),
-                    stringResource(R.string.chat_suggestion_find_file),
-                    stringResource(R.string.chat_suggestion_notify),
-                ),
-            onSuggestionClick = onSuggestionClick,
-            modifier = modifier,
-        )
+        // An error can happen before the first message (e.g. history failed to load); the inline
+        // error must be visible here too, not only inside a non-empty feed.
+        Column(modifier = modifier) {
+            EmptyState(
+                suggestions =
+                    listOf(
+                        stringResource(R.string.chat_suggestion_alarm),
+                        stringResource(R.string.chat_suggestion_find_file),
+                        stringResource(R.string.chat_suggestion_notify),
+                    ),
+                onSuggestionClick = onSuggestionClick,
+                modifier = Modifier.weight(1f),
+            )
+            inlineError?.invoke()
+        }
     } else {
         LazyColumn(
             modifier = modifier.fillMaxWidth(),
