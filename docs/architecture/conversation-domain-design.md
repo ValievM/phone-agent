@@ -14,7 +14,7 @@
 
 ADR 0004 / feat/batch-approval: валидные CONFIRM группируются по 2–15; SAFE/SENSITIVE/invalid/singleton вне пачки. Отказ/отмена не исполняет; карточки и ordered CallDescription публикуются до запуска. Проверено по коду/тестам: ToolPipeline.kt:57–81, AgentLoop.kt:59–127, AgentLoopBatchApprovalTest.kt:46–165, BatchApprovalSheet.kt:36–55, InteractionHost.kt:24–47.
 
-Живой API не проверялся: parallel_tool_calls=true — [проверить]. Ветку не считать уже включённой в main.
+parallel_tool_calls=true проверен на живом бэкенде 2026-09-24 (пачка из 3-4 вызовов принята), пачки подтверждений уже в main.
 
 ## Целевые типы и инварианты
 
