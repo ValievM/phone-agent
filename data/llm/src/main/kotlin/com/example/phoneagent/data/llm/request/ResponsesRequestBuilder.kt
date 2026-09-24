@@ -37,7 +37,7 @@ internal fun buildResponsesRequestBody(
         putJsonArray("input") { request.history.forEach { add(it.toInputItem()) } }
         putJsonArray("tools") { request.tools.forEach { add(it.toToolJson()) } }
         put("tool_choice", "auto")
-        put("parallel_tool_calls", false)
+        put("parallel_tool_calls", true)
         putJsonObject("reasoning") { put("effort", REASONING_EFFORT) }
         put("store", false)
         put("stream", true)

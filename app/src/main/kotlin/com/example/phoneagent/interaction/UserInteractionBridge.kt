@@ -22,6 +22,13 @@ public sealed interface PendingInteraction {
         override val deferredAny: CompletableDeferred<*> get() = deferred
     }
 
+    public data class BatchApproval(
+        public val requests: List<ApprovalRequest>,
+        public val deferred: CompletableDeferred<Boolean>,
+    ) : PendingInteraction {
+        override val deferredAny: CompletableDeferred<*> get() = deferred
+    }
+
     public data class Permission(
         public val capability: Capability,
         public val deferred: CompletableDeferred<CapabilityResult>,
@@ -55,6 +62,16 @@ public class UserInteractionBridge
             }
         }
 
+        override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
+            val deferred = CompletableDeferred<Boolean>()
+            mutablePending.value = PendingInteraction.BatchApproval(requests, deferred)
+            return try {
+                deferred.await()
+            } finally {
+                clearIfCurrent(deferred)
+            }
+        }
+
         override suspend fun ensure(capability: Capability): CapabilityResult {
             val deferred = CompletableDeferred<CapabilityResult>()
             mutablePending.value = PendingInteraction.Permission(capability, deferred)
@@ -69,6 +86,7 @@ public class UserInteractionBridge
         public fun resolvePendingAsDeclined() {
             when (val current = mutablePending.value) {
                 is PendingInteraction.Approval -> current.deferred.complete(false)
+                is PendingInteraction.BatchApproval -> current.deferred.complete(false)
                 is PendingInteraction.Permission -> current.deferred.complete(CapabilityResult.Denied)
                 null -> Unit
             }

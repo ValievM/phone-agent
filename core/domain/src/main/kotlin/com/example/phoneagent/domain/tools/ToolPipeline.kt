@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.tools
 
+import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.platform.AppLogger
@@ -12,9 +13,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Who answers the confirmation of one call: the pipeline itself, or an earlier shared question. */
+public enum class Approval { ASK, GRANTED, DECLINED }
+
 private const val TAG = "ToolPipeline"
 private const val DEFAULT_TIMEOUT_MILLIS = 5_000L
 private const val DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024
+private const val DEFAULT_MAX_BATCH_SIZE = 15
 private const val UTF8_CONTINUATION_BYTE_MASK = 0xC0
 private const val UTF8_CONTINUATION_BYTE_PATTERN = 0x80
 
@@ -31,7 +36,12 @@ public class ToolPipeline(
     private val logger: AppLogger,
     private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
+    private val maxBatchSize: Int = DEFAULT_MAX_BATCH_SIZE,
 ) {
+    init {
+        require(maxBatchSize >= 1) { "maxBatchSize must be at least 1" }
+    }
+
     /** For [com.example.phoneagent.domain.agent.AgentLoop] to advertise available tools in each model request. */
     public val specs: List<ToolSpec> get() = registry.specs
 
@@ -44,12 +54,39 @@ public class ToolPipeline(
     /** Null for an unregistered name; SAFE tools never trigger [UserInteraction.confirm]. */
     public fun riskOf(name: String): Risk? = registry.find(name)?.spec?.risk
 
+    /**
+     * Calls of one model response that deserve a single shared question: plain-[Risk.CONFIRM] calls
+     * with valid arguments, in groups of at most [maxBatchSize]. A group of one is not a batch (it
+     * gets the ordinary question), and [Risk.SENSITIVE] calls are never grouped: their doc promises
+     * a confirmation with details, one call at a time.
+     */
+    public fun batchGroups(calls: List<ToolCall>): List<List<ToolCall>> =
+        calls.filter(::needsPlainConfirmation).chunked(maxBatchSize).filter { it.size > 1 }
+
+    /** Asks once for the whole [group] (from [batchGroups]); `true` approves every call, `false` declines every call. */
+    public suspend fun confirmBatch(group: List<ToolCall>): Boolean {
+        val requests =
+            group.map { call ->
+                val tool = checkNotNull(registry.find(call.name)) { "unknown tool in a batch: ${call.name}" }
+                ApprovalRequest(tool.describe(call.arguments), tool.spec.risk, call.arguments)
+            }
+        val approved = userInteraction.confirmBatch(requests)
+        logger.info(TAG, "batch confirmation answered", fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()))
+        return approved
+    }
+
+    private fun needsPlainConfirmation(call: ToolCall): Boolean {
+        val tool = registry.find(call.name) ?: return false
+        return tool.spec.risk == Risk.CONFIRM && missingRequiredFields(tool.spec.inputSchema, call.arguments).isEmpty()
+    }
+
     public suspend fun run(
         name: String,
         args: JsonObject,
+        approval: Approval = Approval.ASK,
     ): ToolOutcome {
         val tool = registry.find(name)
-        val outcome = if (tool == null) ToolOutcome.Failed("unknown tool: $name") else runKnownTool(tool, args)
+        val outcome = if (tool == null) ToolOutcome.Failed("unknown tool: $name") else runKnownTool(tool, args, approval)
         logger.info(TAG, "tool call finished", fields = mapOf("name" to name, "outcome" to outcome.kind()))
         return outcome
     }
@@ -57,11 +94,12 @@ public class ToolPipeline(
     private suspend fun runKnownTool(
         tool: Tool,
         args: JsonObject,
+        approval: Approval,
     ): ToolOutcome {
         val missing = missingRequiredFields(tool.spec.inputSchema, args)
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
-        } else if (!approve(tool, args)) {
+        } else if (!approve(tool, args, approval)) {
             ToolOutcome.Rejected("user declined")
         } else {
             execute(tool, args)
@@ -71,10 +109,13 @@ public class ToolPipeline(
     private suspend fun approve(
         tool: Tool,
         args: JsonObject,
+        approval: Approval,
     ): Boolean =
-        when (tool.spec.risk) {
-            Risk.SAFE -> true
-            Risk.CONFIRM, Risk.SENSITIVE -> userInteraction.confirm(ApprovalRequest(tool.describe(args), tool.spec.risk, args))
+        when {
+            approval == Approval.GRANTED -> true
+            approval == Approval.DECLINED -> false
+            tool.spec.risk == Risk.SAFE -> true
+            else -> userInteraction.confirm(ApprovalRequest(tool.describe(args), tool.spec.risk, args))
         }
 
     private suspend fun execute(

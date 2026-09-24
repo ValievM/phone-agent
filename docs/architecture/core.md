@@ -41,6 +41,7 @@ public interface Tool {
 
 public interface UserInteraction {
     public suspend fun confirm(request: ApprovalRequest): Boolean
+    public suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean   // один вопрос на пачку вызовов одного ответа (ADR 0004)
     public suspend fun ensure(capability: Capability): CapabilityResult   // Capability: Notifications и т.п.
 }
 
@@ -78,7 +79,7 @@ Idle ──user message──▶ AwaitingModel ──TextDelta──▶ Awaiting
 ValidateArgs → ApprovalPolicy → Timeout → RunTool → TruncateOutput(4 КБ) → Log(без секретов)
 ```
 - `ValidateArgs`: имя есть в реестре, аргументы соответствуют схеме, лимиты длин.
-- `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
+- `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`; несколько `CONFIRM`-вызовов одного ответа модели подтверждаются одним вопросом «всё или ничего», до 15 за раз: `ToolPipeline.batchGroups` и `confirmBatch`, [ADR 0004](../adr/0004-batch-approval.md)), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
 - Результат: `ToolOutcome = Success(text) | Rejected(reason) | Failed(error)`. Это итог всего конвейера, включая отказ пользователя и таймаут; `ToolResult` — только то, что вернул сам инструмент. Любой исход превращается в `function_call_output` для модели.
 
 Так безопасность, лимиты и логирование живут в одном месте и применяются ко **всем** инструментам, включая будущие.
