@@ -146,6 +146,8 @@ flowchart LR
 3. Явная Migration(1,2), scoped DAO/replace, без destructive fallback.
 4. Тест старой БД проверяет перенос User/ToolCall/ToolOutput/Opaque, порядок/JSON; контрактный тест — два ID, одинаковые позиции, очистка одного.
 
+Правило схемы: каждое повышение `AppDatabase.version` коммитит экспортированный JSON новой версии, явную миграцию с предыдущей версии и тест, который проверяет перенос данных. `fallbackToDestructiveMigration` запрещён.
+
 Есть Room runtime/Robolectric, нет room-testing. Сначала SQL fixture; MigrationTestHelper требует новой зависимости. Не запускалось: [проверить].
 
 Downgrade 2→1 разрешать лишь для ID default; иначе завершать ошибкой без потери данных. Тестировать оба исхода; destructive downgrade запрещён. После появления нескольких чатов — только forward-fix.

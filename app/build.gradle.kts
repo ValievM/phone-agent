@@ -1,8 +1,28 @@
+@file:OptIn(com.google.devtools.ksp.KspExperimental::class)
+
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     id("phoneagent.android.application")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.roborazzi)
+}
+
+class RoomSchemaArgProvider(
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    val schemaDir: File,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf("room.schemaLocation=${schemaDir.path}")
+}
+
+ksp {
+    useKsp2.set(true)
+    arg(RoomSchemaArgProvider(File(projectDir, "schemas")))
 }
 
 android {
