@@ -28,6 +28,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Тесты, TDD, автоматические правила границ | [architecture/testing.md](architecture/testing.md) |
 | Добавить инструмент, способ входа, экран | [architecture/recipes.md](architecture/recipes.md) |
 | Почему так решили, риски архитектуры | [architecture/decisions.md](architecture/decisions.md) |
+| Домен разговора: решение и план T8 → T9 → T7 | [ADR 0005](adr/0005-conversation-domain.md) · [детальный дизайн](architecture/conversation-domain-design.md) |
 | Карта фактической архитектуры для ревью: граф модулей, DI, диаграммы классов, потоки, наблюдения | [architecture/map-overview.md](architecture/map-overview.md) → [ядро](architecture/map-core-data.md), [вход](architecture/map-auth.md), [tools и UI](architecture/map-tools-app.md), [app](architecture/map-app-infra.md), [потоки](architecture/map-flows.md) |
 | Обзор дизайна | [design/overview.md](design/overview.md) |
 | Цвет, шрифты, формы | [design/style.md](design/style.md) |
@@ -51,7 +52,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 - `stages/`: в каком порядке делаем. [README](stages/README.md), [A](stages/a-environment.md), [0](stages/0-spike.md), [1](stages/1-skeleton.md), [2](stages/2-auth.md), [3](stages/3-model-client.md), [4](stages/4-tools.md), [5](stages/5-hardening.md), [6](stages/6-release.md).
 - `tooling/`: инструменты агента. [serena-context7](tooling/serena-context7.md), [build-performance](tooling/build-performance.md), [ci](tooling/ci.md).
 - [manual-verification.md](manual-verification.md): что из сделанного реально потрогал пользователь на своём телефоне, а что нет. [log-audit.md](log-audit.md): аудит логов на токены и данные чата.
-- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md).
+- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md), [0005-conversation-domain](adr/0005-conversation-domain.md; proposed), [детали эпика](architecture/conversation-domain-design.md).
 
 **Появятся по ходу работы:**
 
