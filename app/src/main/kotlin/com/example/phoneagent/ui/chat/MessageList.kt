@@ -1,11 +1,8 @@
 package com.example.phoneagent.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
-<<<<<<< HEAD
 import androidx.compose.foundation.layout.Box
-=======
 import androidx.compose.foundation.layout.Column
->>>>>>> stage-5/error-handling
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
