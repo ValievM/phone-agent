@@ -161,40 +161,22 @@ class FindFilesToolTest {
     }
 
     @Test
-    fun `cancelling during the walk surfaces CancellationException instead of a failure`() =
+    fun `a cancellation raised during the walk propagates out of the tool instead of becoming a failure`() =
         runTest {
-            val walkerReachedBlockedNode = CountDownLatch(1)
-            val releaseWalker = CountDownLatch(1)
-            val turnCancelled =
-                java.util.concurrent.atomic
-                    .AtomicBoolean(false)
-            val blockedNode =
-                object : FakeDocumentNode("blocked", isDirectory = true) {
-                    override fun children(): List<FakeDocumentNode> {
-                        walkerReachedBlockedNode.countDown()
-                        releaseWalker.await(5, TimeUnit.SECONDS)
-                        if (turnCancelled.get()) throw CancellationException("walk interrupted by stop")
-                        return emptyList()
-                    }
+            val stoppedNode =
+                object : FakeDocumentNode("stopped", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> = throw CancellationException("walk interrupted by stop")
                 }
             val io = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
             try {
-                val deferred =
-                    async(io) {
-                        FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), blockedNode)), dispatchersOf(io))
-                            .execute(args("report"), context)
-                    }
+                val tool = FindFilesTool(FakeSelectedFolder(dir("root", file("report.txt"), stoppedNode)), dispatchersOf(io))
 
-                val reached =
-                    walkerReachedBlockedNode.await(5, TimeUnit.SECONDS)
-                assertTrue("walker did not reach the blocked node within the timeout", reached)
-                deferred.cancel()
-                turnCancelled.set(true)
-                releaseWalker.countDown()
+                // runCatching inside the same coroutine: the result must come from the tool itself,
+                // not from the cancelled state of an outer Deferred (which would mask a swallowed cancellation).
+                val outcome = runCatching { tool.execute(args("report"), context) }
 
-                val outcome = runCatching { deferred.await() }
                 assertTrue(
-                    "expected CancellationException to surface, got $outcome",
+                    "expected the tool to rethrow the cancellation, got $outcome",
                     outcome.exceptionOrNull() is CancellationException,
                 )
             } finally {
