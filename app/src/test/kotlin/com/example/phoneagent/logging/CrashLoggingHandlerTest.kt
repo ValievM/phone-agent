@@ -1,6 +1,7 @@
 package com.example.phoneagent.logging
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
+import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.LogLevel
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -33,5 +34,27 @@ class CrashLoggingHandlerTest {
         handler.uncaughtException(Thread.currentThread(), RuntimeException("boom"))
 
         assertEquals(1, logger.events.size)
+    }
+
+    @Test
+    fun `the previous handler always runs even when the logger itself throws`() {
+        val calls = mutableListOf<Pair<Thread, Throwable>>()
+        val previous = Thread.UncaughtExceptionHandler { thread, throwable -> calls += thread to throwable }
+        val logger =
+            object : AppLogger by FakeAppLogger() {
+                override fun log(
+                    level: LogLevel,
+                    tag: String,
+                    message: String,
+                    fields: Map<String, String>,
+                    throwable: Throwable?,
+                ): Unit = error("logger storage is broken")
+            }
+        val handler = crashLoggingHandler(logger, previous)
+        val failure = RuntimeException("boom")
+
+        handler.uncaughtException(Thread.currentThread(), failure)
+
+        assertEquals(listOf(Thread.currentThread() to failure), calls)
     }
 }

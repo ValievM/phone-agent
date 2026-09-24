@@ -40,4 +40,19 @@ public object LogRedaction {
             .replace(SENSITIVE_KEY_VALUE) { match -> "${match.groupValues[1]}${match.value[match.groupValues[1].length]}<redacted>" }
 
     public fun isSensitiveFieldName(name: String): Boolean = name.lowercase() in SENSITIVE_KEY_NAMES
+
+    /**
+     * A copy of [throwable] that is safe to log: the original class and stack trace are kept for
+     * diagnosis, but the message and the whole cause chain are dropped — exception text routinely
+     * embeds user input (file names, request fragments) that no regex can reliably scrub.
+     */
+    public fun sanitizedThrowable(throwable: Throwable): Throwable {
+        val blank =
+            try {
+                throwable::class.java.getDeclaredConstructor().newInstance()
+            } catch (_: ReflectiveOperationException) {
+                Throwable("no no-arg constructor on ${throwable::class.simpleName}")
+            }
+        return blank.apply { stackTrace = throwable.stackTrace }
+    }
 }

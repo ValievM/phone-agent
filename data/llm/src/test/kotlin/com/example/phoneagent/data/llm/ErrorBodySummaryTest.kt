@@ -18,10 +18,11 @@ class ErrorBodySummaryTest {
     }
 
     @Test
-    fun `a flat detail message is reported by its field name only`() {
+    fun `a flat detail message is reported by shape only, without its key name`() {
         val summary = summarizeErrorBody("""{"detail":"SECRET file name.pdf is not allowed"}""")
 
-        assertEquals("fields=detail", summary)
+        // The key name is server-controlled and can itself echo request data, so it is not logged.
+        assertEquals("json object, top-level keys: 1", summary)
         assertFalse(summary.contains("SECRET"))
     }
 
@@ -59,5 +60,20 @@ class ErrorBodySummaryTest {
     @Test
     fun `json without any error identifiers lists nothing but its shape`() {
         assertEquals("no error identifiers", summarizeErrorBody("""{"error":{"message":"SECRET"}}"""))
+    }
+
+    @Test
+    fun `a top-level key that looks like a file name is never echoed`() {
+        val summary = summarizeErrorBody("""{"private_contract.pdf":"confidential"}""")
+
+        assertFalse(summary.contains("private_contract"))
+        assertFalse(summary.contains("confidential"))
+    }
+
+    @Test
+    fun `an oversized body is reported by size alone without being parsed`() {
+        val body = """{"detail":"${"x".repeat(20_000)}"}"""
+
+        assertEquals("body of ${body.length} chars", summarizeErrorBody(body))
     }
 }
