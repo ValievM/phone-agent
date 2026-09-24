@@ -160,6 +160,56 @@ class SettingsViewModelTest {
             assertEquals(listOf(emptyList<HistoryItem>()), conversationRepository.replacements)
         }
 
+    @Test
+    fun `the stored theme choices are exposed once settings are loaded`() =
+        runTest(dispatcher.scheduler) {
+            val viewModel = viewModelWith(RecordingSettingsRepository(AppSettings(useDarkTheme = false, useDynamicColors = true)))
+            advanceUntilIdle()
+
+            assertEquals(ThemeMode.LIGHT, viewModel.state.value.themeMode)
+            assertEquals(true, viewModel.state.value.useSystemColors)
+        }
+
+    @Test
+    fun `choosing a theme mode saves the matching dark theme flag and updates the state`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.LIGHT))
+            advanceUntilIdle()
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.SYSTEM))
+            advanceUntilIdle()
+
+            assertEquals(listOf(true, false, null), repository.savedSettings.map { it.useDarkTheme })
+            assertEquals(ThemeMode.SYSTEM, viewModel.state.value.themeMode)
+        }
+
+    @Test
+    fun `switching system colors saves the choice and updates the state`() =
+        runTest(dispatcher.scheduler) {
+            val repository = RecordingSettingsRepository(AppSettings())
+            val viewModel = viewModelWith(repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SetSystemColors(true))
+            advanceUntilIdle()
+
+            assertEquals(listOf(true), repository.savedSettings.map { it.useDynamicColors })
+            assertEquals(true, viewModel.state.value.useSystemColors)
+        }
+
+    private fun viewModelWith(settingsRepository: SettingsRepository) =
+        SettingsViewModel(
+            authCoordinator = FakeAuthCoordinator(),
+            settingsRepository = settingsRepository,
+            modelCatalog = FakeModelCatalog(),
+            conversationRepository = FakeConversationRepository(),
+        )
+
     private class RecordingSettingsRepository(
         private var current: AppSettings,
     ) : SettingsRepository {

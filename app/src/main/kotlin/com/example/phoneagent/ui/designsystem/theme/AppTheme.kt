@@ -27,18 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.phoneagent.R
 
-private val LightColors =
-    lightColorScheme(
-        primary = Indigo40,
-        secondaryContainer = IndigoContainerLight,
-    )
-
-private val DarkColors =
-    darkColorScheme(
-        primary = Indigo80,
-        secondaryContainer = IndigoContainerDark,
-    )
-
 // inter.ttf is a variable font: without an explicit `wght` value every entry below would render at
 // the file's default weight, so Medium titles and **bold** text would look like Regular.
 @OptIn(ExperimentalTextApi::class)
@@ -92,14 +80,7 @@ data class AppExtendedColors(
 )
 
 private val LocalSpacing = staticCompositionLocalOf { AppSpacing() }
-private val LocalExtendedColors =
-    staticCompositionLocalOf {
-        AppExtendedColors(
-            success = SuccessLight,
-            successContainer = SuccessContainerLight,
-            onSuccessContainer = OnSuccessContainerLight,
-        )
-    }
+private val LocalExtendedColors = staticCompositionLocalOf { BrandLightExtendedColors }
 
 object AppTheme {
     val spacing: AppSpacing
@@ -116,7 +97,7 @@ object AppTheme {
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    useDynamicColor: Boolean = true,
+    useDynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -124,15 +105,10 @@ fun AppTheme(
         when {
             useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && darkTheme -> dynamicDarkColorScheme(context)
             useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
-            darkTheme -> DarkColors
-            else -> LightColors
+            darkTheme -> BrandDarkColorScheme
+            else -> BrandLightColorScheme
         }
-    val extendedColors =
-        if (darkTheme) {
-            AppExtendedColors(SuccessDark, SuccessContainerDark, OnSuccessContainerDark)
-        } else {
-            AppExtendedColors(SuccessLight, SuccessContainerLight, OnSuccessContainerLight)
-        }
+    val extendedColors = if (darkTheme) BrandDarkExtendedColors else BrandLightExtendedColors
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalSpacing provides AppSpacing(),
