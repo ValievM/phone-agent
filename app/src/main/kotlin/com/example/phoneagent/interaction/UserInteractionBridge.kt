@@ -40,61 +40,82 @@ public sealed interface PendingInteraction {
 /**
  * The bridge between the (Android-free) core asking a question via [UserInteraction] and whatever
  * is on screen answering it — see architecture/adapters.md "UserInteractionBridge — самое хитрое
- * место". The core suspends on [deferred]; a root composable (`InteractionHost`) observes
- * [pending], shows the appropriate UI, and completes it. If the collector of `pending` goes away
- * before resolving (screen destroyed, host disposed), the pending call is declined rather than
- * left hanging forever — see [resolvePendingAsDeclined].
+ * место". The core suspends on the entry's deferred; a root composable (`InteractionHost`)
+ * observes [pending], shows the appropriate UI, and completes it.
+ *
+ * Questions are served strictly one at a time in arrival order: [pending] is the head of the
+ * queue, and the next question is published as soon as the current one is answered or cancelled.
+ * Cancelling an awaiting caller removes only that caller's own entry. If the collector of
+ * [pending] goes away before resolving (screen destroyed, host disposed), every question —
+ * current and waiting — is declined via [resolvePendingAsDeclined] rather than left hanging.
  */
 @Singleton
 public class UserInteractionBridge
     @Inject
     constructor() : UserInteraction {
+        private val lock = Any()
+        private val queue = ArrayDeque<PendingInteraction>()
         private val mutablePending = MutableStateFlow<PendingInteraction?>(null)
         public val pending: StateFlow<PendingInteraction?> = mutablePending.asStateFlow()
 
         override suspend fun confirm(request: ApprovalRequest): Boolean {
-            val deferred = CompletableDeferred<Boolean>()
-            mutablePending.value = PendingInteraction.Approval(request, deferred)
-            return try {
-                deferred.await()
-            } finally {
-                clearIfCurrent(deferred)
-            }
+            val entry = PendingInteraction.Approval(request, CompletableDeferred())
+            return awaitEntry(entry) { entry.deferred.await() }
         }
 
         override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
-            val deferred = CompletableDeferred<Boolean>()
-            mutablePending.value = PendingInteraction.BatchApproval(requests, deferred)
-            return try {
-                deferred.await()
-            } finally {
-                clearIfCurrent(deferred)
-            }
+            val entry = PendingInteraction.BatchApproval(requests, CompletableDeferred())
+            return awaitEntry(entry) { entry.deferred.await() }
         }
 
         override suspend fun ensure(capability: Capability): CapabilityResult {
-            val deferred = CompletableDeferred<CapabilityResult>()
-            mutablePending.value = PendingInteraction.Permission(capability, deferred)
-            return try {
-                deferred.await()
-            } finally {
-                clearIfCurrent(deferred)
-            }
+            val entry = PendingInteraction.Permission(capability, CompletableDeferred())
+            return awaitEntry(entry) { entry.deferred.await() }
         }
 
-        /** Called by the host when it leaves composition with a question still unanswered. */
+        /** Called by the host when it leaves composition with question(s) unanswered. */
         public fun resolvePendingAsDeclined() {
-            when (val current = mutablePending.value) {
-                is PendingInteraction.Approval -> current.deferred.complete(false)
-                is PendingInteraction.BatchApproval -> current.deferred.complete(false)
-                is PendingInteraction.Permission -> current.deferred.complete(CapabilityResult.Denied)
-                null -> Unit
+            val snapshot =
+                synchronized(lock) {
+                    queue.toList()
+                }
+            for (entry in snapshot) {
+                when (entry) {
+                    is PendingInteraction.Approval -> entry.deferred.complete(false)
+                    is PendingInteraction.BatchApproval -> entry.deferred.complete(false)
+                    is PendingInteraction.Permission -> entry.deferred.complete(CapabilityResult.Denied)
+                }
             }
         }
 
-        private fun clearIfCurrent(deferred: CompletableDeferred<*>) {
-            if (mutablePending.value?.deferredAny === deferred) {
-                mutablePending.value = null
+        private suspend fun <T> awaitEntry(
+            entry: PendingInteraction,
+            await: suspend () -> T,
+        ): T {
+            enqueue(entry)
+            return try {
+                await()
+            } finally {
+                settle(entry)
+            }
+        }
+
+        private fun enqueue(entry: PendingInteraction) {
+            synchronized(lock) {
+                queue.addLast(entry)
+                if (mutablePending.value == null) mutablePending.value = entry
+            }
+            // Fires as soon as the host completes the deferred; the caller's finally is the
+            // second, idempotent settle path for cancellation, where nobody completes it.
+            entry.deferredAny.invokeOnCompletion { settle(entry) }
+        }
+
+        private fun settle(entry: PendingInteraction) {
+            synchronized(lock) {
+                queue.remove(entry)
+                if (mutablePending.value === entry) {
+                    mutablePending.value = queue.firstOrNull()
+                }
             }
         }
     }
