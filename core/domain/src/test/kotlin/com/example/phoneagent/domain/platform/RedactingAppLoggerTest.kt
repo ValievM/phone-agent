@@ -61,8 +61,13 @@ class RedactingAppLoggerTest {
                 .contains(secretUserText),
         )
         assertNull(logged.cause)
-        // Diagnosis is still possible: the exception type survives and so do the frames.
-        assertEquals(original::class, logged::class)
+        // Diagnosis is still possible: the original type NAME survives and so do the frames.
+        // (Contract change: the exception class itself is no longer preserved — a log sink must
+        // not need the original class on its classpath or rebuild instances reflectively.)
+        assertTrue(logged is SanitizedThrowable)
+        logged as SanitizedThrowable
+        assertEquals(original::class.java.name, logged.originalType)
+        assertEquals(logged.originalType, logged.message)
         assertEquals(original.stackTrace.toList(), logged.stackTrace.toList())
     }
 
