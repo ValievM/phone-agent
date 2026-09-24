@@ -63,6 +63,8 @@ class SettingsViewModel
                         it.copy(
                             isLoading = false,
                             model = currentSettings.model,
+                            themeMode = currentSettings.toThemeMode(),
+                            useSystemColors = currentSettings.useDynamicColors,
                             searchFolderSelected = currentSettings.searchFolderUri != null,
                             settingsUnavailable = false,
                         )
@@ -79,6 +81,14 @@ class SettingsViewModel
             when (event) {
                 is SettingsUiEvent.SelectModel -> {
                     selectModel(event.model)
+                }
+
+                is SettingsUiEvent.SelectThemeMode -> {
+                    if (!mutableState.value.isLoading) updateSettings { it.copy(useDarkTheme = event.mode.toDarkThemeFlag()) }
+                }
+
+                is SettingsUiEvent.SetSystemColors -> {
+                    if (!mutableState.value.isLoading) updateSettings { it.copy(useDynamicColors = event.enabled) }
                 }
 
                 SettingsUiEvent.SignOut -> {
@@ -132,6 +142,8 @@ class SettingsViewModel
                         mutableState.update {
                             it.copy(
                                 model = updatedSettings.model,
+                                themeMode = updatedSettings.toThemeMode(),
+                                useSystemColors = updatedSettings.useDynamicColors,
                                 searchFolderSelected = updatedSettings.searchFolderUri != null,
                                 folderPermissionUnavailable = false,
                                 settingsUnavailable = false,

@@ -7,6 +7,14 @@ sealed interface SettingsUiEvent {
         val model: String?,
     ) : SettingsUiEvent
 
+    data class SelectThemeMode(
+        val mode: ThemeMode,
+    ) : SettingsUiEvent
+
+    data class SetSystemColors(
+        val enabled: Boolean,
+    ) : SettingsUiEvent
+
     data object SignOut : SettingsUiEvent
 
     data class SaveSearchFolder(
@@ -21,6 +29,8 @@ sealed interface SettingsUiEvent {
 data class SettingsUiState(
     val isLoading: Boolean = true,
     val model: String? = null,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val useSystemColors: Boolean = false,
     val availableModels: List<String> = emptyList(),
     val modelCatalogUnavailable: Boolean = false,
     val isLoadingModels: Boolean = true,
