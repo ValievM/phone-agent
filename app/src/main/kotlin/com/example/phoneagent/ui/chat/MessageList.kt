@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.AssistantMessage
+import com.example.phoneagent.ui.designsystem.components.EmptyState
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ScrollToBottomChip
 import com.example.phoneagent.ui.designsystem.components.ToolCallCard
@@ -45,13 +46,29 @@ internal fun MessageList(
     messages: List<ChatMessage>,
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
+    onSuggestionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenLink: (String) -> Unit = {},
+    inlineError: (@Composable () -> Unit)? = null,
 ) {
     if (messages.isEmpty()) {
-        EmptyChat(modifier)
+        // An error can happen before the first message (e.g. history failed to load); the inline
+        // error must be visible here too, not only inside a non-empty feed.
+        Column(modifier = modifier) {
+            EmptyState(
+                suggestions =
+                    listOf(
+                        stringResource(R.string.chat_suggestion_alarm),
+                        stringResource(R.string.chat_suggestion_find_file),
+                        stringResource(R.string.chat_suggestion_notify),
+                    ),
+                onSuggestionClick = onSuggestionClick,
+                modifier = Modifier.weight(1f),
+            )
+            inlineError?.invoke()
+        }
     } else {
-        FollowingFeed(messages, onEvent, onOpenFile, modifier)
+        FollowingFeed(messages, onEvent, onOpenFile, onOpenLink, inlineError, modifier)
     }
 }
 
@@ -64,6 +81,8 @@ private fun FollowingFeed(
     messages: List<ChatMessage>,
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
+    onOpenLink: (String) -> Unit,
+    inlineError: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -103,6 +122,8 @@ private fun FollowingFeed(
             contentPadding = PaddingValues(AppTheme.spacing.medium),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
         ) {
+            // The feed is reversed: the first item is drawn last, i.e. after the newest message.
+            inlineError?.let { error -> item(key = INLINE_ERROR_KEY, contentType = INLINE_ERROR_KEY) { error() } }
             items(
                 items = messages.asReversed(),
                 key = ChatMessage::id,
@@ -128,27 +149,6 @@ private fun FollowingFeed(
 }
 
 private val AT_BOTTOM_TOLERANCE = 4.dp
-
-@Composable
-private fun EmptyChat(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Column(
-            modifier = Modifier.padding(AppTheme.spacing.extraLarge),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.small),
-        ) {
-            Text(
-                text = stringResource(R.string.chat_empty_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = stringResource(R.string.chat_empty_body),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
-}
 
 @Composable
 private fun Message(
@@ -182,3 +182,5 @@ private fun Message(
         }
     }
 }
+
+private const val INLINE_ERROR_KEY = "inline_error"

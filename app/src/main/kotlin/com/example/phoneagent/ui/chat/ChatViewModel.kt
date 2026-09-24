@@ -94,12 +94,16 @@ class ChatViewModel
             when (event) {
                 is ChatUiEvent.Submit -> submit(event.text)
                 ChatUiEvent.Stop -> runningJob?.cancel()
-                is ChatUiEvent.ToggleToolCallDetails -> toggleToolCallDetails(event.messageId)
-                ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null) }
+                is ChatUiEvent.ToggleToolCallDetails -> mutableState.update { it.withToolCallToggled(event.messageId) }
+                ChatUiEvent.Retry -> retry()
+                ChatUiEvent.DismissError -> mutableState.update { it.copy(error = null, canRetry = false) }
             }
         }
 
-        private fun submit(text: String) {
+        private fun submit(
+            text: String,
+            savedHistoryBefore: List<HistoryItem>? = null,
+        ) {
             if (text.isBlank() || mutableState.value.isRunning) return
             val trimmed = text.trim()
 
@@ -108,14 +112,49 @@ class ChatViewModel
                     messages = it.messages + ChatMessage(nextId(), ChatRole.USER, trimmed),
                     isRunning = true,
                     error = null,
+                    canRetry = false,
                 )
             }
 
             runningJob =
                 viewModelScope.launch {
                     initialHistoryLoaded.await()
+                    savedHistoryBefore?.let { persist(it) }
                     collectTurn(trimmed)
                 }
+        }
+
+        /**
+         * Redoes the turn that just failed: the failed exchange (the user message and whatever the
+         * model managed to produce) is dropped from memory, screen and saved history first, so the
+         * text is sent once and a Stop during the retry cannot bring the failed attempt back.
+         */
+        private fun retry() {
+            val current = mutableState.value
+            if (!current.canRetry || current.isRunning) return
+            val failedUserIndex = history.indexOfLast { it is HistoryItem.UserMessage }
+            val failedUser = history.getOrNull(failedUserIndex) as? HistoryItem.UserMessage ?: return
+            val keptHistory = history.take(failedUserIndex)
+            val keptMessages = current.messages.take(current.messages.indexOfLast { it.role == ChatRole.USER }.coerceAtLeast(0))
+
+            history = keptHistory
+            mutableState.update { it.copy(messages = keptMessages, error = null, canRetry = false) }
+            submit(failedUser.text, savedHistoryBefore = keptHistory)
+        }
+
+        private suspend fun persist(items: List<HistoryItem>) {
+            pendingOwnHistoryEmission = items
+            try {
+                conversationRepository.replace(items)
+            } catch (exception: CancellationException) {
+                pendingOwnHistoryEmission = null
+                throw exception
+            } catch (_: Exception) {
+                pendingOwnHistoryEmission = null
+                mutableState.update {
+                    it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
+                }
+            }
         }
 
         private suspend fun collectTurn(text: String) {
@@ -123,25 +162,12 @@ class ChatViewModel
                 var assistantMessageId: String? = null
                 agentLoop.run(history, text).collect { event ->
                     assistantMessageId = handleAgentEvent(event, assistantMessageId)
-                    if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) {
-                        pendingOwnHistoryEmission = history
-                        try {
-                            conversationRepository.replace(history)
-                        } catch (exception: CancellationException) {
-                            pendingOwnHistoryEmission = null
-                            throw exception
-                        } catch (_: Exception) {
-                            pendingOwnHistoryEmission = null
-                            mutableState.update {
-                                it.copy(error = AgentError.Unexpected("Failed to save conversation history"))
-                            }
-                        }
-                    }
+                    if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) persist(history)
                 }
             } finally {
                 val pendingIds = toolMessageIdByCallId.values.toList()
                 toolMessageIdByCallId.clear()
-                pendingIds.forEach { id -> updateToolCallStatus(id, ToolCallStatus.Cancelled) }
+                mutableState.update { state -> pendingIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.Cancelled) } }
                 mutableState.update { it.copy(isRunning = false) }
             }
         }
@@ -153,7 +179,7 @@ class ChatViewModel
             when (event) {
                 is AgentEvent.TextDelta -> {
                     val id = assistantMessageId ?: nextId()
-                    appendAssistantText(id, event.text)
+                    mutableState.update { it.withAssistantDelta(id, event.text) }
                     id
                 }
 
@@ -174,7 +200,7 @@ class ChatViewModel
                 }
 
                 is AgentEvent.ApprovalRequested -> {
-                    lastToolMessageId?.let { updateToolCallStatus(it, ToolCallStatus.AwaitingApproval) }
+                    lastToolMessageId?.let { id -> mutableState.update { it.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) } }
                     assistantMessageId
                 }
 
@@ -190,7 +216,13 @@ class ChatViewModel
 
                 is AgentEvent.TurnFailed -> {
                     history = history + event.newItems
-                    mutableState.update { it.copy(error = event.error) }
+                    val presentation = event.error.toPresentation()
+                    mutableState.update {
+                        it.copy(
+                            error = event.error.takeIf { presentation != null },
+                            canRetry = presentation?.retryable == true,
+                        )
+                    }
                     assistantMessageId
                 }
             }
@@ -198,63 +230,8 @@ class ChatViewModel
         private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
             val id = toolMessageIdByCallId.remove(event.call.id) ?: return
             val fileHits = event.toFileHits()
-            updateToolCallStatus(
-                id = id,
-                status = event.outcome.toCardStatus(event.call.name, fileHits.size),
-                fileHits = fileHits,
-            )
-        }
-
-        private fun appendAssistantText(
-            id: String,
-            delta: String,
-        ) {
-            mutableState.update { state ->
-                val existing = state.messages.firstOrNull { it.id == id }
-                val messages =
-                    if (existing == null) {
-                        state.messages + ChatMessage(id, ChatRole.ASSISTANT, delta)
-                    } else {
-                        state.messages.map { message -> if (message.id == id) message.copy(text = message.text + delta) else message }
-                    }
-                state.copy(messages = messages)
-            }
-        }
-
-        private fun updateToolCallStatus(
-            id: String,
-            status: ToolCallStatus,
-            fileHits: List<FileHit>? = null,
-        ) {
-            mutableState.update { state ->
-                state.copy(
-                    messages =
-                        state.messages.map { message ->
-                            val toolCall = message.toolCall
-                            if (message.id == id && toolCall != null) {
-                                message.copy(toolCall = toolCall.copy(status = status, fileHits = fileHits ?: toolCall.fileHits))
-                            } else {
-                                message
-                            }
-                        },
-                )
-            }
-        }
-
-        private fun toggleToolCallDetails(id: String) {
-            mutableState.update { state ->
-                state.copy(
-                    messages =
-                        state.messages.map { message ->
-                            val toolCall = message.toolCall
-                            if (message.id == id && toolCall != null) {
-                                message.copy(toolCall = toolCall.copy(expanded = !toolCall.expanded))
-                            } else {
-                                message
-                            }
-                        },
-                )
-            }
+            val status = event.outcome.toCardStatus(event.call.name, fileHits.size)
+            mutableState.update { it.withToolCallStatus(id, status, fileHits) }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()

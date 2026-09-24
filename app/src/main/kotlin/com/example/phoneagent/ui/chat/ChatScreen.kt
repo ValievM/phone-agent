@@ -20,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,7 +36,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.Composer
+import com.example.phoneagent.ui.designsystem.components.ComposerMode
 import com.example.phoneagent.ui.designsystem.components.FileHit
+import com.example.phoneagent.ui.designsystem.components.InlineError
+import com.example.phoneagent.ui.designsystem.components.StatusBanner
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
@@ -100,6 +106,9 @@ private fun ChatBody(
     onOpenLink: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var draft by rememberSaveable { mutableStateOf("") }
+    val error = state.error?.toPresentation()
+    val retry = if (state.canRetry) ({ onEvent(ChatUiEvent.Retry) }) else null
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter,
@@ -110,36 +119,40 @@ private fun ChatBody(
                     .fillMaxSize()
                     .widthIn(max = ContentMaxWidth),
         ) {
-            state.error?.let { error ->
-                ErrorBanner(error = error, onDismiss = { onEvent(ChatUiEvent.DismissError) })
-            }
-            if (state.isRunning) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    Text(
-                        text = stringResource(R.string.model_working),
-                        modifier =
-                            Modifier
-                                .padding(AppTheme.spacing.small)
-                                .semantics { liveRegion = LiveRegionMode.Polite },
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
+            if (state.isRunning) RunningIndicator()
             MessageList(
                 messages = state.messages,
                 onEvent = onEvent,
                 onOpenFile = onOpenFile,
                 onOpenLink = onOpenLink,
+                onSuggestionClick = { draft = it },
                 modifier =
                     Modifier
                         .weight(1f)
                         .imeNestedScroll(),
+                inlineError =
+                    error?.takeIf { it.placement == ErrorPlacement.Inline }?.let { presentation ->
+                        {
+                            InlineError(
+                                message = presentation.text(),
+                                onDismiss = { onEvent(ChatUiEvent.DismissError) },
+                                onRetry = retry,
+                            )
+                        }
+                    },
             )
+            error?.takeIf { it.placement == ErrorPlacement.StatusBanner }?.let { presentation ->
+                StatusBanner(
+                    message = presentation.text(),
+                    onDismiss = { onEvent(ChatUiEvent.DismissError) },
+                    onRetry = retry,
+                )
+            }
             HorizontalDivider()
             Composer(
-                enabled = !state.isRunning,
-                isRunning = state.isRunning,
+                draft = draft,
+                onDraftChange = { draft = it },
+                mode = if (state.isRunning) ComposerMode.Running else ComposerMode.Ready,
                 onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
                 onStop = { onEvent(ChatUiEvent.Stop) },
             )
@@ -148,3 +161,18 @@ private fun ChatBody(
 }
 
 private val ContentMaxWidth = 640.dp
+
+@Composable
+private fun RunningIndicator(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        Text(
+            text = stringResource(R.string.model_working),
+            modifier =
+                Modifier
+                    .padding(AppTheme.spacing.small)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
