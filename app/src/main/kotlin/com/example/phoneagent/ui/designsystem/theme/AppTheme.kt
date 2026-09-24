@@ -2,10 +2,7 @@ package com.example.phoneagent.ui.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -16,52 +13,8 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.phoneagent.R
-
-// inter.ttf is a variable font: without an explicit `wght` value every entry below would render at
-// the file's default weight, so Medium titles and **bold** text would look like Regular.
-@OptIn(ExperimentalTextApi::class)
-private fun inter(weight: FontWeight) =
-    Font(R.font.inter, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
-
-private val Inter =
-    FontFamily(
-        inter(FontWeight.Normal),
-        inter(FontWeight.Medium),
-        inter(FontWeight.Bold),
-    )
-
-val AppMonospace: FontFamily = FontFamily(Font(R.font.jetbrains_mono, FontWeight.Normal))
-
-private val AppTypography =
-    Typography(
-        bodyLarge = TextStyle(fontFamily = Inter, fontSize = 16.sp, lineHeight = 24.sp),
-        bodyMedium = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 20.sp),
-        bodySmall = TextStyle(fontFamily = Inter, fontSize = 12.sp, lineHeight = 16.sp),
-        titleLarge = TextStyle(fontFamily = Inter, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Medium),
-        titleMedium = TextStyle(fontFamily = Inter, fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium),
-        titleSmall = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
-        labelLarge = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
-        labelMedium = TextStyle(fontFamily = Inter, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    )
-
-private val AppShapes =
-    Shapes(
-        extraSmall = RoundedCornerShape(4.dp),
-        small = RoundedCornerShape(8.dp),
-        medium = RoundedCornerShape(12.dp),
-        large = RoundedCornerShape(16.dp),
-        extraLarge = RoundedCornerShape(28.dp),
-    )
 
 @Immutable
 data class AppSpacing(
@@ -70,13 +23,20 @@ data class AppSpacing(
     val medium: Dp = 16.dp,
     val large: Dp = 24.dp,
     val extraLarge: Dp = 32.dp,
+    /** The 12dp step between `small` and `medium`, for tight groups such as list rows. */
+    val compact: Dp = 12.dp,
 )
 
 @Immutable
 data class AppExtendedColors(
     val success: Color,
+    val onSuccess: Color,
     val successContainer: Color,
     val onSuccessContainer: Color,
+    val warning: Color,
+    val onWarning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
 )
 
 private val LocalSpacing = staticCompositionLocalOf { AppSpacing() }
@@ -92,6 +52,9 @@ object AppTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalExtendedColors.current
+
+    /** Radii do not depend on the color scheme or the font scale, so this is a plain constant, not a CompositionLocal. */
+    val shapeTokens: AppShapeTokens = AppShapeTokens()
 }
 
 @Composable

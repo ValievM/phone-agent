@@ -114,13 +114,23 @@ internal val BrandDarkColorScheme =
 internal val BrandLightExtendedColors =
     AppExtendedColors(
         success = Color(0xFF285A3B),
+        onSuccess = Color(0xFFFFFFFF),
         successContainer = Color(0xFFD4EBD9),
         onSuccessContainer = Color(0xFF10291A),
+        warning = Color(0xFF785211),
+        onWarning = Color(0xFFFFFFFF),
+        warningContainer = Color(0xFFFFE3AB),
+        onWarningContainer = Color(0xFF2B1B00),
     )
 
 internal val BrandDarkExtendedColors =
     AppExtendedColors(
         success = Color(0xFFA1D3AF),
+        onSuccess = Color(0xFF103821),
         successContainer = Color(0xFF214E32),
         onSuccessContainer = Color(0xFFD4EBD9),
+        warning = Color(0xFFEDC26B),
+        onWarning = Color(0xFF402D03),
+        warningContainer = Color(0xFF5D410B),
+        onWarningContainer = Color(0xFFFFE3AB),
     )

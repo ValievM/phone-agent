@@ -26,13 +26,56 @@ class BrandThemeTokensTest {
     fun `the dark scheme has exactly the brand token values`() = assertSchemeMatches("dark", BrandDarkColorScheme)
 
     @Test
-    fun `the extended success colors have the brand token values`() {
+    fun `the extended status colors have the brand token values`() {
         for ((mode, extended) in listOf("light" to BrandLightExtendedColors, "dark" to BrandDarkExtendedColors)) {
             val expected = tokens.getValue(mode).jsonObject
-            assertTrue("$mode success", extended.success == color(expected, "success"))
-            assertTrue("$mode successContainer", extended.successContainer == color(expected, "successContainer"))
-            assertTrue("$mode onSuccessContainer", extended.onSuccessContainer == color(expected, "onSuccessContainer"))
+            val actual =
+                mapOf(
+                    "success" to extended.success,
+                    "onSuccess" to extended.onSuccess,
+                    "successContainer" to extended.successContainer,
+                    "onSuccessContainer" to extended.onSuccessContainer,
+                    "warning" to extended.warning,
+                    "onWarning" to extended.onWarning,
+                    "warningContainer" to extended.warningContainer,
+                    "onWarningContainer" to extended.onWarningContainer,
+                )
+            val mismatches = actual.filter { (role, value) -> value != color(expected, role) }.keys
+            assertTrue("$mode extended colors differ from the tokens: $mismatches", mismatches.isEmpty())
         }
+    }
+
+    @Test
+    fun `status pairs keep their contrast in both themes`() {
+        val failures = mutableListOf<String>()
+        for (
+        (mode, scheme, extended) in
+        listOf(
+            Triple("light", BrandLightColorScheme, BrandLightExtendedColors),
+            Triple("dark", BrandDarkColorScheme, BrandDarkExtendedColors),
+        )
+        ) {
+            val pairs =
+                listOf(
+                    Triple("onSuccess on success", extended.onSuccess to extended.success, 4.5),
+                    Triple("onSuccessContainer on successContainer", extended.onSuccessContainer to extended.successContainer, 4.5),
+                    Triple("onWarning on warning", extended.onWarning to extended.warning, 4.5),
+                    Triple("onWarningContainer on warningContainer", extended.onWarningContainer to extended.warningContainer, 4.5),
+                    Triple("success on surface", extended.success to scheme.surface, 3.0),
+                    Triple("warning on surface", extended.warning to scheme.surface, 3.0),
+                    Triple("onSurface on surfaceContainer", scheme.onSurface to scheme.surfaceContainer, 4.5),
+                    Triple("onSurfaceVariant on surfaceContainer", scheme.onSurfaceVariant to scheme.surfaceContainer, 4.5),
+                    Triple("onSurface on surfaceContainerHigh", scheme.onSurface to scheme.surfaceContainerHigh, 4.5),
+                    Triple("onSurface on surfaceContainerLow", scheme.onSurface to scheme.surfaceContainerLow, 4.5),
+                    Triple("primary on surfaceContainerLow", scheme.primary to scheme.surfaceContainerLow, 4.5),
+                    Triple("outline on surfaceContainerHigh", scheme.outline to scheme.surfaceContainerHigh, 3.0),
+                )
+            for ((name, colors, minimum) in pairs) {
+                val ratio = contrast(colors.first, colors.second)
+                if (ratio < minimum) failures += "$mode $name = $ratio (needs $minimum)"
+            }
+        }
+        assertTrue("Contrast below the minimum: $failures", failures.isEmpty())
     }
 
     @Test
