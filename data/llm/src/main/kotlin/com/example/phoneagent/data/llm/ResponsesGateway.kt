@@ -145,12 +145,12 @@ public class ResponsesGateway(
             }
 
             !response.isSuccessful -> {
-                // RedactingAppLogger strips anything token-shaped, so logging the body is safe
-                // and is often the only way to tell a schema rejection from a quota error.
+                // Only identifiers from the error (type/code/param), never the body itself: it can echo
+                // chat text, and the redacting logger only strips token-shaped strings.
                 logger.warn(
                     TAG,
                     "model request rejected",
-                    fields = mapOf("status" to response.code.toString(), "body" to response.bodySnippet()),
+                    fields = mapOf("status" to response.code.toString(), "error" to summarizeErrorBody(response.bodyText())),
                 )
                 send(ModelEvent.Failed(response.toAgentError()))
             }
@@ -194,11 +194,11 @@ private enum class AttemptOutcome {
     Unauthorized,
 }
 
-private fun Response.bodySnippet(maxChars: Int = 500): String =
+private fun Response.bodyText(): String =
     try {
-        body.string().take(maxChars)
+        body.string()
     } catch (_: IOException) {
-        "<unreadable>"
+        ""
     }
 
 private fun Response.toAgentError(): AgentError =

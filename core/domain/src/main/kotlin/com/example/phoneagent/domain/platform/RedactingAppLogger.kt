@@ -27,10 +27,9 @@ public class RedactingAppLogger(
         )
     }
 
-    // Stack traces only carry class/method/line, never local values, so they're safe to keep;
-    // only the message text (which callers or libraries may have built from raw input) is redone.
-    private fun redacted(throwable: Throwable): Throwable =
-        Throwable(LogRedaction.redact(throwable.message.orEmpty())).apply { stackTrace = throwable.stackTrace }
+    // Frames only carry class/method/line, never local values, so they're safe to keep; the
+    // message and the cause chain are dropped entirely — exception text can embed raw user input.
+    private fun redacted(throwable: Throwable): Throwable = LogRedaction.sanitizedThrowable(throwable)
 
     private companion object {
         private const val REDACTED_VALUE: String = "<redacted>"
