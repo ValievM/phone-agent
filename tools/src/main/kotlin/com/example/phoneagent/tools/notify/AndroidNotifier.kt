@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.example.phoneagent.tools.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
@@ -25,7 +26,7 @@ internal class AndroidNotifier
             val notification =
                 NotificationCompat
                     .Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setSmallIcon(R.drawable.ic_stat_brand)
                     .setContentTitle(title)
                     .setContentText(message)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(message))

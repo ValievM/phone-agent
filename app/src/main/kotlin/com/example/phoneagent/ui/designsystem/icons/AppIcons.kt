@@ -4,6 +4,10 @@ import androidx.annotation.DrawableRes
 import com.example.phoneagent.R
 
 object AppIcons {
+    /** Single-color brand mark: tint it with `colorScheme.primary` (the mark colors in both themes). */
+    @get:DrawableRes
+    val brandMark: Int = R.drawable.ic_brand_mark
+
     @get:DrawableRes
     val send: Int = R.drawable.ic_send
 

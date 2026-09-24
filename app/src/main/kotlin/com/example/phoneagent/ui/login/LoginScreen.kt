@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -26,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
+import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @Composable
@@ -108,6 +112,8 @@ fun LoginScreen(
     }
 }
 
+private val BRAND_MARK_SIZE = 64.dp
+
 @Composable
 private fun LoginContent(
     state: LoginUiState,
@@ -119,7 +125,12 @@ private fun LoginContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
     ) {
-        Text(text = stringResource(R.string.login_logo), style = MaterialTheme.typography.titleLarge)
+        Icon(
+            painter = painterResource(AppIcons.brandMark),
+            contentDescription = null,
+            modifier = Modifier.size(BRAND_MARK_SIZE),
+            tint = MaterialTheme.colorScheme.primary,
+        )
         Text(
             text = stringResource(R.string.login_title),
             style = MaterialTheme.typography.headlineMedium,

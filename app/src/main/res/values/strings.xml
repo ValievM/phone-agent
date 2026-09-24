@@ -63,7 +63,6 @@
     <string name="preview_assistant_message">Каркас приложения готов к следующим этапам.</string>
     <string name="preview_cyrillic">Ёё Щщ Ъъ Ыы — кириллица отображается корректно</string>
     <string name="preview_code">val status = "ready"</string>
-    <string name="login_logo">PA</string>
     <string name="login_title">Вход в OpenAI</string>
     <string name="login_description">Войдите через подписку ChatGPT или используйте API-ключ.</string>
     <string name="login_openai">Войти через OpenAI</string>
