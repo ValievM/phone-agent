@@ -3,7 +3,7 @@
 ## CI на GitHub
 `.github/workflows/check.yml`: на каждый push в `main` и на каждый pull request выполняет `./gradlew check` (сборка, spotless, detekt, lint, unit- и UI-тесты в Robolectric) и `python3 scripts/check_docs.py`. Права токена только на чтение.
 
-`scripts/check.sh` в CI не используется: в нём жёстко прописан путь к JDK 17 в Homebrew (macOS). На runner'е JDK 17 ставит `actions/setup-java`.
+`scripts/check.sh` в CI не используется: в нём жёстко прописан путь к JDK 17 в Homebrew (macOS). На runner'е JDK 17 ставит `actions/setup-java`, Android SDK уже есть в образе `ubuntu-latest` (шаг `android-actions/setup-android` не используем: на новом образе он падает на пакете `tools`), принимаются только лицензии.
 
 **Статус: не проверено.** Файл написан без запуска на GitHub. Первый запуск может упасть на окружении (лицензии Android SDK, Robolectric на Linux, права); чинить по логу. Действия подключены по мажорным тегам (`@v4`), закрепление по SHA — на будущее.
 
