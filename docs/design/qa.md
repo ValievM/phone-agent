@@ -11,6 +11,8 @@
    - `./gradlew :app:recordRoborazziDebug` — записать снимки в `app/src/test/screenshots/`.
    - `./gradlew :app:verifyRoborazziDebug` — сравнить с эталонами, упасть при отличиях; `compareRoborazziDebug` — отчёт с diff.
    - **Эталоны пока не закоммичены**: дизайн ещё не утверждён, `app/src/test/screenshots/` в `.gitignore`. Когда пользователь утвердит вид: убрать строку из `.gitignore`, записать снимки, закоммитить, добавить `verifyRoborazziDebug` в проверки.
+   - Размеры: `NarrowPhoneScreenshotTest` (320dp), `TabletScreenshotTest` (840dp), `LandscapePhoneScreenshotTest` (800x360dp) рисуют чат, пустой чат и вход; экраны входа, настроек, корня и шторки при шрифте 200% в `ScreensScreenshotTest` и `*ScreenshotTest`.
+   - Поведение размеров держат обычные тесты: `SheetsAdaptiveUiTest` (кнопки шторок достижимы при 15 пунктах, шрифте 200% и 320dp), `ContentColumnUiTest` (колонка 640dp по центру).
    - Новый компонент или состояние: тест в `screenshot/` через `composeRule.snapshot("имя") { … }` (варианты Light/Dark/LargeFont, `fillScreen` для экранов, `wholeScreen` для шторок и диалогов).
 5. **Статика:** Konsist-правила (цвета-литералы только в теме, `designsystem` не импортирует экраны, нет строковых литералов в `Text(...)` **[проверить возможность]**) и `compose-rules`.
 

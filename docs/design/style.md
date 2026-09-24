@@ -14,15 +14,15 @@
 | Экран | `surface` | `onSurface` |
 | Сообщение пользователя | `secondaryContainer` | `onSecondaryContainer` |
 | Сообщение ассистента | без фона (на `surface`) | `onSurface` |
-| Карточка инструмента | `surfaceContainerLow` + рамка 1dp `outlineVariant` | `onSurface`, второстепенное `onSurfaceVariant` |
-| Композер (поле ввода) | `surfaceContainerHigh` | `onSurface` |
+| Карточка инструмента | `surfaceContainer`, без рамки, статус плашкой ниже | `onSurface`, второстепенное `onSurfaceVariant` |
+| Панель ввода | `surfaceContainerLow` на всю ширину | |
+| Поле ввода | `surfaceContainerHigh`, рамка `outline` 1dp | `onSurface` |
 | Шторка подтверждения | `surfaceContainerLow` (по умолчанию M3) | `onSurface` |
-| Успех | `successContainer` (custom) | `onSuccessContainer` |
-| Ошибка | `errorContainer` | `onErrorContainer` |
-| Баннер «нет сети», «сессия истекла» | `surfaceContainerHighest` + иконка | `onSurface` |
+| Успех, ожидание | `successContainer`, `warningContainer` (custom) | `onSuccessContainer`, `onWarningContainer` |
+| Ошибка, баннер «нет сети», «сессия истекла» | `errorContainer` + иконка | `onErrorContainer` |
 
 ## Типографика
-- Шрифт интерфейса: **Roboto Flex** (родной для Material) или **Inter**, финальный выбор по превью. Условие: кириллица (проверочная строка «Ёё Щщ Ъъ Ыы»).
+- Шрифт интерфейса: **Inter** (variable, вшит; решение «Стыка»), шкала и веса в [brand.md](brand.md). Кириллица проверена строкой «Ёё Щщ Ъъ Ыы».
 - Шрифт кода и аргументов инструментов: **JetBrains Mono**.
 - Шрифты **вшиваем** в APK (`res/font`, variable). Скачиваемые Google Fonts не подходят: variable-шрифты через них не поддерживаются, плюс нужна сеть и Google-сервисы. Variable-шрифты в Compose работают с Android 8, а у нас minSdk 26.
 - Лицензии шрифтов (OFL) и иконок (Apache 2.0): тексты сохраняем и показываем на экране «О приложении» (этап 6).
@@ -31,15 +31,15 @@
 |---|---|---|
 | Текст сообщений | `bodyLarge` (16/24) | для чтения не меньше 16sp |
 | Заголовки в markdown | h1 `titleLarge`, h2 `titleMedium`, h3 `titleSmall` | не крупнее `titleLarge`, чтобы ответы «не кричали» |
-| Название инструмента в карточке | `titleSmall` | |
-| Статус, подписи | `labelMedium` | |
-| Код и аргументы | `bodyMedium`, моно, 14sp | перенос строк включён, горизонтальный скролл для блоков кода |
-| Кнопки | `labelLarge` | |
+| Название инструмента в карточке | `titleSmall`, суть `bodyLarge` | |
+| Статус | `labelLarge` (14sp, важное не меньше 14) | |
+| Код и аргументы | `AppCodeTextStyle` (моно 14/22) | горизонтальный скролл внутри блока |
+| Кнопки | `labelLarge`, weight 600 | |
 | Заголовок шторки | `titleLarge` | |
 | Подсказки, ошибки поля | `bodySmall` | |
 
 Размеры только в `sp`, фиксированной высоты у текстовых контейнеров нет, проверка при масштабе шрифта 200%.
 
 ## Формы и глубина
-- Формы из M3 (`MaterialTheme.shapes`): композер `extraLarge`, сообщения пользователя `large` (угол у «хвоста» 4dp), карточки `medium`, шторка `extraLarge` сверху.
+- Формы из токенов `AppTheme.shapeTokens` (цифры в [brand.md](brand.md)); кнопки только через `PrimaryButton`/`SecondaryButton`/`QuietButton`, у M3 нет роли формы кнопки.
 - Глубина через тональные слои, тени почти не используем.

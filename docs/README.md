@@ -38,7 +38,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Доступность и безопасность UI (markdown, ссылки) | [design/a11y-security.md](design/a11y-security.md) |
 | Библиотеки и инструменты UI | [design/libraries.md](design/libraries.md) |
 | Скриншот-тесты, Design QA | [design/qa.md](design/qa.md) |
-| Что из сделанного пользователь ещё не проверил на своём телефоне | [manual-verification.md](manual-verification.md) (чат и ход агента), [manual-verification-tools-build.md](manual-verification-tools-build.md) (инструменты, вход, сборка, CI, логи) |
+| Что из сделанного пользователь ещё не проверил на своём телефоне | [manual-verification.md](manual-verification.md) (чат и ход агента), [manual-verification-tools-build.md](manual-verification-tools-build.md) (инструменты, вход, сборка, CI, логи), [manual-verification-brand.md](manual-verification-brand.md) (вид, размеры, движение «Стыка») |
 | Что пишется в логи и как это проверять | [log-audit.md](log-audit.md) |
 | Serena и Context7 | [tooling/serena-context7.md](tooling/serena-context7.md) |
 | Оптимизация сборки (замечания на будущее) | [tooling/build-performance.md](tooling/build-performance.md) |
