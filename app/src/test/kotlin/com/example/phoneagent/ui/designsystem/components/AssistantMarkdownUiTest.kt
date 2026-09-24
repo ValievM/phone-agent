@@ -175,19 +175,16 @@ class AssistantMarkdownUiTest {
     fun `a raw html link from the answer stays inert text and never reports a uri`() {
         show("""Вот файл: <a href="https://evil.example/download?token=secret">скачать отчёт</a> <script>alert(1)</script>""")
 
-        // The parser must treat raw HTML as text: whatever the anchor renders as, tapping it
-        // must not open anything and must not report a URI for confirmation either.
-        composeRule.waitUntil(PARSE_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(hasText("скачать отчёт", substring = true)).fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodes(hasText("Вот файл:", substring = true)).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.waitForIdle()
+        // The anchor text must be on screen at all: the renderer keeps the label visible whether
+        // it treats the markup as a link or as plain text, so a missing node is a broken render,
+        // not a pass. Without this assertion the test could pass vacuously on a bad render.
+        awaitText("скачать отчёт")
+        composeRule.onNodeWithText("скачать отчёт", substring = true).assertExists()
 
-        val anchorNodes = composeRule.onAllNodes(hasText("скачать отчёт", substring = true)).fetchSemanticsNodes()
-        if (anchorNodes.isNotEmpty()) {
-            composeRule.onNodeWithText("скачать отчёт", substring = true).performClick()
-            composeRule.waitForIdle()
-        }
+        // Whatever the anchor renders as, tapping it must not open anything and must not report
+        // a URI for confirmation either.
+        composeRule.onNodeWithText("скачать отчёт", substring = true).performClick()
+        composeRule.waitForIdle()
 
         assertEquals(emptyList<String>(), openedLinks)
         composeRule.onNodeWithText(string(R.string.link_open_confirm_title)).assertDoesNotExist()
