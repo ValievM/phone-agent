@@ -2,6 +2,7 @@ package com.example.phoneagent.domain.platform
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,6 +40,30 @@ class RedactingAppLoggerTest {
         val logged = delegate.events.single().throwable
         assertFalse(logged?.message.orEmpty().contains("super-secret-value"))
         assertEquals(original.stackTrace.toList(), logged?.stackTrace?.toList())
+    }
+
+    @Test
+    fun `an exception message and cause never reach the sink, only the type and frames`() {
+        val delegate = RecordingLogger()
+        val logger = RedactingAppLogger(delegate)
+        val secretFileName = "private_contract.pdf"
+        val secretUserText = "мой секретный пользовательский текст"
+        val original = RuntimeException(secretFileName, IllegalStateException(secretUserText))
+
+        logger.log(LogLevel.ERROR, "Model", "turn failed", throwable = original)
+
+        val logged = requireNotNull(delegate.events.single().throwable)
+        assertFalse(logged.message.orEmpty().contains(secretFileName))
+        assertFalse(
+            logged.cause
+                ?.message
+                .orEmpty()
+                .contains(secretUserText),
+        )
+        assertNull(logged.cause)
+        // Diagnosis is still possible: the exception type survives and so do the frames.
+        assertEquals(original::class, logged::class)
+        assertEquals(original.stackTrace.toList(), logged.stackTrace.toList())
     }
 
     @Test
