@@ -27,5 +27,8 @@ __pycache__/
 # Serena
 .serena/cache/
 
+# Roborazzi reference screenshots: not committed until the design is approved (docs/design/qa.md)
+app/src/test/screenshots/
+
 # OS
 .DS_Store

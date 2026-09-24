@@ -2,6 +2,7 @@ plugins {
     id("phoneagent.android.application")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -16,6 +17,20 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Screenshot tests need androidx.activity.ComponentActivity from ui-test-manifest, which only the
+// debug variant carries; the rendering they check does not depend on the build type.
+tasks.withType<Test>().configureEach {
+    if (name.contains("Release")) exclude("**/screenshot/**")
+}
+
+roborazzi {
+    outputDir.set(layout.projectDirectory.dir("src/test/screenshots"))
 }
 
 dependencies {
@@ -49,6 +64,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.konsist)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(testFixtures(project(":core:domain")))
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
