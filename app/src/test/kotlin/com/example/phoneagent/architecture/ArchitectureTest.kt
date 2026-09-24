@@ -156,7 +156,10 @@ class ArchitectureTest {
                             import.name
                                 .removePrefix("com.example.phoneagent.tools.")
                                 .substringBefore('.')
-                        import.name.startsWith("com.example.phoneagent.tools.") && importedPackage != ownPackage
+                        // The generated resource class of the :tools module is shared by all tools, not a sibling tool.
+                        import.name != "com.example.phoneagent.tools.R" &&
+                            import.name.startsWith("com.example.phoneagent.tools.") &&
+                            importedPackage != ownPackage
                     }
                 }
 
