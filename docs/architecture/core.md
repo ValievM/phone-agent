@@ -45,7 +45,7 @@ public interface UserInteraction {
 }
 
 public interface CredentialsProvider {        // то, что нужно клиенту модели от слоя входа
-    public suspend fun current(): CredentialsResult // Ready(токен + accountId либо API-ключ) или SignedOut
+    public suspend fun current(): CredentialsResult // Ready(токен + accountId либо API-ключ), SignedOut или Unavailable (временный сбой обновления, сессия не потеряна)
     public suspend fun refreshAfterUnauthorized(): Credentials?
 }
 ```

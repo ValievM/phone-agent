@@ -105,6 +105,19 @@ class ResponsesGatewayTest {
         }
 
     @Test
+    fun `temporarily unavailable credentials fail with Offline, not SessionExpired, without any HTTP call`() =
+        runTest {
+            withServer { server ->
+                val gateway = gateway(server, credentials = FakeCredentialsProvider(CredentialsResult.Unavailable))
+
+                val events = gateway.stream(request()).toList()
+
+                assertEquals(listOf(ModelEvent.Failed(AgentError.Offline)), events)
+                assertEquals(0, server.requestCount)
+            }
+        }
+
+    @Test
     fun `a successful stream sends the bearer token and account id and emits parsed events in order`() =
         runTest {
             withServer { server ->
