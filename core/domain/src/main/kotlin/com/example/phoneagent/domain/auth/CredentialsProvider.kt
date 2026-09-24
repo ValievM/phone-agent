@@ -11,6 +11,9 @@ public sealed interface CredentialsResult {
     ) : CredentialsResult
 
     public data object SignedOut : CredentialsResult
+
+    /** Credentials cannot be produced right now (e.g. the token refresh hit a network error), but the session is not lost. */
+    public data object Unavailable : CredentialsResult
 }
 
 public interface CredentialsProvider {
