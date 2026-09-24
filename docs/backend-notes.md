@@ -51,7 +51,7 @@
                             "required": ["city"], "additionalProperties": false},
              "strict": false}],
   "tool_choice": "auto",
-  "parallel_tool_calls": false,
+  "parallel_tool_calls": true,
   "reasoning": {"effort": "low"},
   "store": false,
   "stream": true,
@@ -60,6 +60,8 @@
 }
 ```
 Статус: запуск. `store=false` работает; история передаётся целиком.
+
+**`parallel_tool_calls`: `true` (изменено, ADR 0004).** В спайке стояло `false`, поэтому модель просила по одному вызову за ответ. Для пакетного подтверждения (несколько будильников одним вопросом) нужно `true`. `spike/probe.py` по-прежнему шлёт `false` — это снимок спайка. **Не проверено на живом бэкенде:** если он отвергнет запрос или начнёт вести себя странно, вернуть `false` — приложение продолжит работать по одному вызову за шаг.
 
 ## Цикл с инструментом (проверен)
 1. Ход 1: в потоке приходит элемент `function_call` (`name`, `arguments` — JSON-строка, `call_id`). Финальный элемент брать из события `response.output_item.done`.

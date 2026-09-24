@@ -24,6 +24,13 @@ class ResponsesRequestBuilderTest {
     }
 
     @Test
+    fun `the model may return several tool calls in one response`() {
+        val body = buildResponsesRequestBody(request(), profile(), "gpt-test", "session-1")
+
+        assertEquals(true, body.getValue("parallel_tool_calls").jsonPrimitive.boolean)
+    }
+
+    @Test
     fun `instructions is not empty`() {
         val body = buildResponsesRequestBody(request(), profile(instructions = "be nice"), "gpt-test", "session-1")
 

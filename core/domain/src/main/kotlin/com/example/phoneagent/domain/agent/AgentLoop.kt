@@ -8,6 +8,7 @@ import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.IdGenerator
+import com.example.phoneagent.domain.tools.Approval
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
@@ -55,9 +56,10 @@ public class AgentLoop(
                     emit(AgentEvent.TurnCompleted(newItems.toList()))
                     return@flow
                 }
+                val sharedDecisions = confirmGroups(turn.toolCalls)
                 for (call in turn.toolCalls) {
                     newItems += HistoryItem.ToolCallItem(call.itemId, call.id, call.name, call.arguments)
-                    newItems += runToolCall(call)
+                    newItems += runToolCall(call, sharedDecisions[call.id])
                 }
             }
         }
@@ -90,13 +92,37 @@ public class AgentLoop(
         return ModelTurn(text.toString(), toolCalls, failure)
     }
 
-    private suspend fun FlowCollector<AgentEvent>.runToolCall(call: ToolCall): HistoryItem.ToolOutput {
-        val description = toolPipeline.describe(call.name, call.arguments) ?: unknownToolDescription(call.name)
-        emit(AgentEvent.ToolCallStarted(call, description))
-        toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE }?.let { risk ->
-            emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
+    /**
+     * Asks one shared question per group of confirm-level calls (before anything runs), so the user
+     * answers once for a batch instead of once per call. Returns the answer for each grouped call.
+     */
+    private suspend fun FlowCollector<AgentEvent>.confirmGroups(calls: List<ToolCall>): Map<String, Approval> {
+        val decisions = mutableMapOf<String, Approval>()
+        for (group in toolPipeline.batchGroups(calls)) {
+            group.forEach { emit(AgentEvent.ToolCallStarted(it, describeCall(it))) }
+            emit(AgentEvent.BatchApprovalRequested(group.map { it.id }))
+            val decision = if (toolPipeline.confirmBatch(group)) Approval.GRANTED else Approval.DECLINED
+            group.forEach { decisions[it.id] = decision }
         }
-        val outcome = toolPipeline.run(call.name, call.arguments)
+        return decisions
+    }
+
+    private fun describeCall(call: ToolCall): CallDescription =
+        toolPipeline.describe(call.name, call.arguments) ?: unknownToolDescription(call.name)
+
+    /** [sharedDecision] is null when the call was not part of a shared question and is asked on its own. */
+    private suspend fun FlowCollector<AgentEvent>.runToolCall(
+        call: ToolCall,
+        sharedDecision: Approval?,
+    ): HistoryItem.ToolOutput {
+        if (sharedDecision == null) {
+            val description = describeCall(call)
+            emit(AgentEvent.ToolCallStarted(call, description))
+            toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE }?.let { risk ->
+                emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
+            }
+        }
+        val outcome = toolPipeline.run(call.name, call.arguments, sharedDecision ?: Approval.ASK)
         emit(AgentEvent.ToolCallFinished(call, outcome))
         return HistoryItem.ToolOutput(idGenerator.newId(), call.id, outcome.toOutputText())
     }

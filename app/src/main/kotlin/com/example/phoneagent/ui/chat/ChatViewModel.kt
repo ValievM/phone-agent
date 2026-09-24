@@ -247,6 +247,14 @@ class ChatViewModel
                     null
                 }
 
+                is AgentEvent.BatchApprovalRequested -> {
+                    val cardIds = event.callIds.mapNotNull { toolMessageIdByCallId[it] }
+                    mutableState.update { state ->
+                        cardIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) }
+                    }
+                    assistantMessageId
+                }
+
                 is AgentEvent.ApprovalRequested -> {
                     lastToolMessageId?.let { id -> mutableState.update { it.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) } }
                     assistantMessageId

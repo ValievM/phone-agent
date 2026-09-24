@@ -14,6 +14,7 @@ import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.interaction.PendingInteraction
 import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.components.ApprovalSheet
+import com.example.phoneagent.ui.designsystem.components.BatchApprovalSheet
 
 /**
  * Root-level composable that answers whatever [UserInteractionBridge] is currently waiting on —
@@ -33,6 +34,14 @@ fun InteractionHost(bridge: UserInteractionBridge) {
             ApprovalSheet(
                 request = current.request,
                 arguments = current.request.arguments,
+                onApprove = { current.deferred.complete(true) },
+                onReject = { current.deferred.complete(false) },
+            )
+        }
+
+        is PendingInteraction.BatchApproval -> {
+            BatchApprovalSheet(
+                requests = current.requests,
                 onApprove = { current.deferred.complete(true) },
                 onReject = { current.deferred.complete(false) },
             )

@@ -25,5 +25,8 @@ public data class ApprovalRequest(
 public interface UserInteraction {
     public suspend fun confirm(request: ApprovalRequest): Boolean
 
+    /** One question for several calls of the same turn: `true` approves all of them, `false` declines all. */
+    public suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean
+
     public suspend fun ensure(capability: Capability): CapabilityResult
 }

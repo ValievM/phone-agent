@@ -89,6 +89,15 @@
     <string name="approval_sheet_details">Подробности</string>
     <string name="approval_reject">Отклонить</string>
     <string name="approval_approve">Разрешить</string>
+    <plurals name="batch_approval_title">
+        <item quantity="one">Разрешить %d действие?</item>
+        <item quantity="few">Разрешить %d действия?</item>
+        <item quantity="many">Разрешить %d действий?</item>
+        <item quantity="other">Разрешить %d действия?</item>
+    </plurals>
+    <string name="batch_approval_approve_all">Разрешить все</string>
+    <string name="batch_approval_reject_all">Отклонить все</string>
+    <string name="preview_batch_alarm_summary">На %1$s</string>
     <string name="preview_tool_call_title">Будильник</string>
     <string name="preview_tool_call_summary">07:30 · «Работа»</string>
     <string name="preview_tool_call_details">Сработает один раз, сегодня</string>

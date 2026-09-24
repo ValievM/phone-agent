@@ -51,7 +51,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 - `stages/`: в каком порядке делаем. [README](stages/README.md), [A](stages/a-environment.md), [0](stages/0-spike.md), [1](stages/1-skeleton.md), [2](stages/2-auth.md), [3](stages/3-model-client.md), [4](stages/4-tools.md), [5](stages/5-hardening.md), [6](stages/6-release.md).
 - `tooling/`: инструменты агента. [serena-context7](tooling/serena-context7.md), [build-performance](tooling/build-performance.md), [ci](tooling/ci.md).
 - [manual-verification.md](manual-verification.md): что из сделанного реально потрогал пользователь на своём телефоне, а что нет. [log-audit.md](log-audit.md): аудит логов на токены и данные чата.
-- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md).
+- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md), [0004-batch-approval](adr/0004-batch-approval.md).
 
 **Появятся по ходу работы:**
 
