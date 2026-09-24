@@ -73,6 +73,29 @@ class ChatViewModelProcessDeathTest {
         }
 
     @Test
+    fun `stopped question ids are deterministic and unique per question`() =
+        runTest(dispatcher.scheduler) {
+            val repository = Repository()
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository, idGenerator = FakeIdGenerator())
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Первый"))
+            runCurrent()
+            viewModel.onEvent(ChatUiEvent.Stop)
+            runCurrent()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Второй"))
+            runCurrent()
+            viewModel.onEvent(ChatUiEvent.Stop)
+            advanceUntilIdle()
+
+            val ids = repository.load().filterIsInstance<HistoryItem.UserMessage>().map(HistoryItem.UserMessage::id)
+            // Deterministic (injected generator, testable) and unique: duplicate ids used to crash
+            // LazyColumn at startup because the feed keys messages by this id.
+            assertEquals(listOf("pending-id-1", "pending-id-2"), ids)
+        }
+
+    @Test
     fun `saving the question does not cancel the turn and the finished turn replaces it`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()
