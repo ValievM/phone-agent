@@ -82,6 +82,18 @@
     <string name="preview_tool_call_reason">Приложение «Часы» не найдено</string>
     <string name="files_found_heading">Найденные файлы</string>
     <string name="file_search_completed">Найдено файлов: %1$d</string>
+    <string name="link_open_confirm_title">Открыть ссылку?</string>
+    <string name="link_open_confirm_domain">Сайт</string>
+    <string name="link_open_confirm_hint">Адрес взят из ответа модели. Открывайте только ссылки, которым доверяете.</string>
+    <string name="link_open_action">Открыть</string>
+    <string name="link_cancel_action">Отмена</string>
+    <string name="link_blocked_title">Ссылка заблокирована</string>
+    <string name="link_blocked_body">Открываются только ссылки https. Эта ссылка не была открыта.</string>
+    <string name="link_close_action">Закрыть</string>
+    <string name="link_open_failed">Не удалось открыть ссылку: нет приложения для её открытия.</string>
+    <string name="preview_markdown_reply">Вот **план**:\n\n1. Откройте [документацию](https://developer.android.com/docs)\n2. Проверьте `AlarmClock`\n\n```kotlin\nval hour = 7\nval minute = 30\n```\n\n> Осторожно: цитата\n\n| Поле | Значение |\n|---|---|\n| hour | 7 |</string>
+    <string name="preview_markdown_unclosed_fence">Запускаю:\n\n```kotlin\nval hour = 7\nval minute =</string>
+    <string name="preview_markdown_hostile">Смотри: ![пиксель слежения](https://tracker.example/p.png) и &lt;script&gt;alert(1)&lt;/script&gt;</string>
     <string name="file_open_confirm_title">Открыть файл?</string>
     <string name="file_size_format">Размер: %1$s</string>
     <string name="file_size_unknown">Размер неизвестен</string>

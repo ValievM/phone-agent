@@ -46,6 +46,7 @@ internal fun MessageList(
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenLink: (String) -> Unit = {},
 ) {
     if (messages.isEmpty()) {
         EmptyChat(modifier)
@@ -107,7 +108,7 @@ private fun FollowingFeed(
                 key = ChatMessage::id,
                 contentType = ChatMessage::role,
             ) { message ->
-                Message(message, onEvent, onOpenFile)
+                Message(message, onEvent, onOpenFile, onOpenLink)
             }
         }
         if (isNewMessagesChipVisible(atBottom, hasUnseenMessages)) {
@@ -154,6 +155,7 @@ private fun Message(
     message: ChatMessage,
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
+    onOpenLink: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val toolCall = message.toolCall
@@ -176,7 +178,7 @@ private fun Message(
         }
 
         else -> {
-            AssistantMessage(message.text, modifier)
+            AssistantMessage(message.text, modifier, onOpenLink)
         }
     }
 }

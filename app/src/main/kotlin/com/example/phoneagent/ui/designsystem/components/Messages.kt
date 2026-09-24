@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -44,22 +47,35 @@ fun UserMessage(
     }
 }
 
-/** The model's reply: no bubble, full width, selectable. */
+/**
+ * The model's reply: no bubble, full width, rendered as markdown. A tapped link never opens on its
+ * own: it goes through [LinkConfirmationSheet] first and only then reaches [onOpenLink].
+ */
 @Composable
 fun AssistantMessage(
     text: String,
     modifier: Modifier = Modifier,
+    onOpenLink: (String) -> Unit = {},
 ) {
+    var pendingLink by remember { mutableStateOf<LinkDecision?>(null) }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start,
     ) {
-        SelectionContainer(modifier = Modifier.widthIn(max = MessageMaxWidth)) {
-            Text(
-                text = text,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
+        AssistantMarkdown(
+            text = text,
+            onLinkClick = { url -> pendingLink = evaluateLink(url) },
+            modifier = Modifier.widthIn(max = MessageMaxWidth),
+        )
+    }
+    pendingLink?.let { decision ->
+        LinkConfirmationSheet(
+            decision = decision,
+            onOpen = { url ->
+                pendingLink = null
+                onOpenLink(url)
+            },
+            onDismiss = { pendingLink = null },
+        )
     }
 }
