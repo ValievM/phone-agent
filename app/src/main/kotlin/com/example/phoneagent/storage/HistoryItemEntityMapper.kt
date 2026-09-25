@@ -1,6 +1,8 @@
 package com.example.phoneagent.storage
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -19,7 +21,7 @@ internal object HistoryItemEntityMapper {
             is HistoryItem.UserMessage -> {
                 ConversationEntity(
                     position = position,
-                    id = item.id,
+                    id = item.itemId.value,
                     type = USER_MESSAGE,
                     text = item.text,
                 )
@@ -28,7 +30,7 @@ internal object HistoryItemEntityMapper {
             is HistoryItem.AssistantMessage -> {
                 ConversationEntity(
                     position = position,
-                    id = item.id,
+                    id = item.itemId.value,
                     type = ASSISTANT_MESSAGE,
                     text = item.text,
                 )
@@ -37,9 +39,9 @@ internal object HistoryItemEntityMapper {
             is HistoryItem.ToolCallItem -> {
                 ConversationEntity(
                     position = position,
-                    id = item.id,
+                    id = item.itemId.value,
                     type = TOOL_CALL,
-                    callId = item.callId,
+                    callId = item.callId.value,
                     name = item.name,
                     argumentsJson = item.arguments.toString(),
                 )
@@ -48,9 +50,9 @@ internal object HistoryItemEntityMapper {
             is HistoryItem.ToolOutput -> {
                 ConversationEntity(
                     position = position,
-                    id = item.id,
+                    id = item.itemId.value,
                     type = TOOL_OUTPUT,
-                    callId = item.callId,
+                    callId = item.callId.value,
                     output = item.output,
                 )
             }
@@ -58,7 +60,7 @@ internal object HistoryItemEntityMapper {
             is HistoryItem.Opaque -> {
                 ConversationEntity(
                     position = position,
-                    id = item.id,
+                    id = item.itemId.value,
                     type = OPAQUE,
                     provider = item.provider,
                     payloadJson = item.payload.toString(),
@@ -69,17 +71,17 @@ internal object HistoryItemEntityMapper {
     fun toDomain(entity: ConversationEntity): HistoryItem =
         when (entity.type) {
             USER_MESSAGE -> {
-                HistoryItem.UserMessage(id = entity.id, text = requireNotNull(entity.text))
+                HistoryItem.UserMessage(itemId = ItemId(entity.id), text = requireNotNull(entity.text))
             }
 
             ASSISTANT_MESSAGE -> {
-                HistoryItem.AssistantMessage(id = entity.id, text = requireNotNull(entity.text))
+                HistoryItem.AssistantMessage(itemId = ItemId(entity.id), text = requireNotNull(entity.text))
             }
 
             TOOL_CALL -> {
                 HistoryItem.ToolCallItem(
-                    id = entity.id,
-                    callId = requireNotNull(entity.callId),
+                    itemId = ItemId(entity.id),
+                    callId = CallId(requireNotNull(entity.callId)),
                     name = requireNotNull(entity.name),
                     arguments =
                         Json.parseToJsonElement(requireNotNull(entity.argumentsJson)) as? JsonObject
@@ -89,15 +91,15 @@ internal object HistoryItemEntityMapper {
 
             TOOL_OUTPUT -> {
                 HistoryItem.ToolOutput(
-                    id = entity.id,
-                    callId = requireNotNull(entity.callId),
+                    itemId = ItemId(entity.id),
+                    callId = CallId(requireNotNull(entity.callId)),
                     output = requireNotNull(entity.output),
                 )
             }
 
             OPAQUE -> {
                 HistoryItem.Opaque(
-                    id = entity.id,
+                    itemId = ItemId(entity.id),
                     provider = requireNotNull(entity.provider),
                     payload = Json.parseToJsonElement(requireNotNull(entity.payloadJson)),
                 )

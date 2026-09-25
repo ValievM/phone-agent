@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.platform
 
+import com.example.phoneagent.domain.conversation.ItemId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.util.UUID
@@ -27,10 +28,10 @@ public val DefaultDispatcherProvider: DispatcherProvider =
 
 /** Ids for new [com.example.phoneagent.domain.conversation.HistoryItem]s; a port so tests get deterministic ids. */
 public fun interface IdGenerator {
-    public fun newId(): String
+    public fun newItemId(): ItemId
 }
 
-public val RandomIdGenerator: IdGenerator = IdGenerator { UUID.randomUUID().toString() }
+public val RandomIdGenerator: IdGenerator = IdGenerator { ItemId(UUID.randomUUID().toString()) }
 
 public enum class LogLevel {
     DEBUG,

@@ -4,6 +4,7 @@ import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
@@ -89,7 +90,7 @@ class ChatViewModelProcessDeathTest {
             viewModel.onEvent(ChatUiEvent.Stop)
             advanceUntilIdle()
 
-            val ids = repository.load().filterIsInstance<HistoryItem.UserMessage>().map(HistoryItem.UserMessage::id)
+            val ids = repository.load().filterIsInstance<HistoryItem.UserMessage>().map { it.itemId.value }
             // Deterministic (injected generator, testable) and unique: duplicate ids used to crash
             // LazyColumn at startup because the feed keys messages by this id.
             assertEquals(listOf("pending-id-1", "pending-id-2"), ids)
@@ -116,9 +117,9 @@ class ChatViewModelProcessDeathTest {
             val repository =
                 Repository(
                     listOf(
-                        HistoryItem.UserMessage("u1", "Первый вопрос"),
-                        HistoryItem.AssistantMessage("a1", "Первый ответ"),
-                        HistoryItem.UserMessage("u2", "Второй вопрос"),
+                        HistoryItem.UserMessage(ItemId("u1"), "Первый вопрос"),
+                        HistoryItem.AssistantMessage(ItemId("a1"), "Первый ответ"),
+                        HistoryItem.UserMessage(ItemId("u2"), "Второй вопрос"),
                     ),
                 )
 
@@ -138,7 +139,7 @@ class ChatViewModelProcessDeathTest {
     fun `a fully answered history restores without any error`() =
         runTest(dispatcher.scheduler) {
             val repository =
-                Repository(listOf(HistoryItem.UserMessage("u1", "Вопрос"), HistoryItem.AssistantMessage("a1", "Ответ")))
+                Repository(listOf(HistoryItem.UserMessage(ItemId("u1"), "Вопрос"), HistoryItem.AssistantMessage(ItemId("a1"), "Ответ")))
 
             val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
             advanceUntilIdle()
@@ -153,9 +154,9 @@ class ChatViewModelProcessDeathTest {
             val repository =
                 Repository(
                     listOf(
-                        HistoryItem.UserMessage("u1", "Первый вопрос"),
-                        HistoryItem.AssistantMessage("a1", "Первый ответ"),
-                        HistoryItem.UserMessage("u2", "Второй вопрос"),
+                        HistoryItem.UserMessage(ItemId("u1"), "Первый вопрос"),
+                        HistoryItem.AssistantMessage(ItemId("a1"), "Первый ответ"),
+                        HistoryItem.UserMessage(ItemId("u2"), "Второй вопрос"),
                     ),
                 )
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Второй ответ"), ModelEvent.Completed()) }
@@ -183,7 +184,7 @@ class ChatViewModelProcessDeathTest {
     @Test
     fun `clearing the history from settings also dismisses the interrupted notice`() =
         runTest(dispatcher.scheduler) {
-            val repository = Repository(listOf(HistoryItem.UserMessage("u1", "Вопрос")))
+            val repository = Repository(listOf(HistoryItem.UserMessage(ItemId("u1"), "Вопрос")))
             val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
             advanceUntilIdle()
             assertEquals(AgentError.Interrupted, viewModel.state.value.error)

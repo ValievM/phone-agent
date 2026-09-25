@@ -1,6 +1,8 @@
 package com.example.phoneagent.data.llm.sse
 
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.CallId
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.Usage
@@ -19,15 +21,36 @@ class ResponsesEventMapperTest {
             listOf(
                 ModelEvent.ToolCallRequested(
                     ToolCall(
-                        id = "call_lc67V6YnD8BFjY08ck8WFDSy",
+                        callId = CallId("call_lc67V6YnD8BFjY08ck8WFDSy"),
                         name = "get_local_time",
                         arguments = Json.parseToJsonElement("""{"city":"Москва"}""").jsonObject,
-                        itemId = "fc_01aa497345b1cc25016ab1a1767a2487d2a9e6bb5666a9d3f3",
+                        itemId = ItemId("fc_01aa497345b1cc25016ab1a1767a2487d2a9e6bb5666a9d3f3"),
                     ),
                 ),
                 ModelEvent.Completed(Usage(inputTokens = 160, outputTokens = 19)),
             ),
             events,
+        )
+    }
+
+    @Test
+    fun `empty provider identifiers are retained without validation`() {
+        val event =
+            RawSseEvent(
+                "response.output_item.done",
+                """{"item":{"id":"","call_id":"","type":"function_call","name":"get_local_time","arguments":"{}"}}""",
+            ).toModelEvent()
+
+        assertEquals(
+            ModelEvent.ToolCallRequested(
+                ToolCall(
+                    callId = CallId(""),
+                    name = "get_local_time",
+                    arguments = Json.parseToJsonElement("{}").jsonObject,
+                    itemId = ItemId(""),
+                ),
+            ),
+            event,
         )
     }
 

@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.agent
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
@@ -58,12 +59,15 @@ class AgentLoopBatchApprovalTest {
             assertTrue(interaction.approvalRequests.isEmpty())
             assertEquals(listOf("set_alarm #1", "set_alarm #2", "set_alarm #3"), executed)
             val batchIndex = events.indexOfFirst { it is AgentEvent.BatchApprovalRequested }
-            assertEquals(AgentEvent.BatchApprovalRequested(listOf("call-1", "call-2", "call-3")), events[batchIndex])
+            assertEquals(
+                AgentEvent.BatchApprovalRequested(listOf(CallId("call-1"), CallId("call-2"), CallId("call-3"))),
+                events[batchIndex],
+            )
             // All cards exist before the question, and nothing has run yet.
             assertEquals(3, events.take(batchIndex).count { it is AgentEvent.ToolCallStarted })
             assertTrue(events.take(batchIndex).none { it is AgentEvent.ToolCallFinished })
             val outputs = (events.last() as AgentEvent.TurnCompleted).newItems.filterIsInstance<HistoryItem.ToolOutput>()
-            assertEquals(listOf("call-1", "call-2", "call-3"), outputs.map { it.callId })
+            assertEquals(listOf(CallId("call-1"), CallId("call-2"), CallId("call-3")), outputs.map { it.callId })
         }
 
     @Test
@@ -120,12 +124,12 @@ class AgentLoopBatchApprovalTest {
     @Test
     fun `a call with invalid arguments is not shown in the question and fails on its own`() =
         runTest {
-            respondWith(alarm(1), ToolCall("call-bad", "set_alarm", buildJsonObject {}), alarm(2))
+            respondWith(alarm(1), ToolCall(CallId("call-bad"), "set_alarm", buildJsonObject {}), alarm(2))
 
             val events = loop(tools(alarmTool(required = listOf("n")))).run(emptyList(), "три").toList()
 
             assertEquals(listOf("set_alarm #1", "set_alarm #2"), interaction.batchRequests.single().map { it.description.summary })
-            val bad = events.filterIsInstance<AgentEvent.ToolCallFinished>().single { it.call.id == "call-bad" }
+            val bad = events.filterIsInstance<AgentEvent.ToolCallFinished>().single { it.call.callId == CallId("call-bad") }
             assertEquals(ToolOutcome.Failed("missing required fields: n"), bad.outcome)
             assertEquals(listOf("set_alarm #1", "set_alarm #2"), executed)
         }
@@ -178,7 +182,7 @@ class AgentLoopBatchApprovalTest {
     private fun call(
         n: Int,
         name: String,
-    ) = ToolCall("call-$n", name, buildJsonObject { put("n", n) })
+    ) = ToolCall(CallId("call-$n"), name, buildJsonObject { put("n", n) })
 
     private fun tools(vararg tools: Tool) = ToolRegistry(tools.toSet())
 

@@ -76,8 +76,8 @@ private fun HistoryItem.toInputItem(): JsonObject =
         is HistoryItem.ToolCallItem -> {
             buildJsonObject {
                 put("type", "function_call")
-                put("id", id)
-                put("call_id", callId)
+                put("id", itemId.value)
+                put("call_id", callId.value)
                 put("name", name)
                 put("arguments", Json.encodeToString(JsonObject.serializer(), arguments))
                 put("status", "completed")
@@ -87,7 +87,7 @@ private fun HistoryItem.toInputItem(): JsonObject =
         is HistoryItem.ToolOutput -> {
             buildJsonObject {
                 put("type", "function_call_output")
-                put("call_id", callId)
+                put("call_id", callId.value)
                 put("output", output)
             }
         }

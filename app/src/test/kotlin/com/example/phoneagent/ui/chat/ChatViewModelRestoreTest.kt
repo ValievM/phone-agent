@@ -1,8 +1,10 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
@@ -61,10 +63,10 @@ class ChatViewModelRestoreTest {
 
     private val saved =
         listOf(
-            HistoryItem.UserMessage("u1", "поставь будильник на 5 утра"),
-            HistoryItem.ToolCallItem("t1", "c1", "set_alarm", args),
-            HistoryItem.ToolOutput("o1", "c1", "Запрос на будильник отправлен"),
-            HistoryItem.AssistantMessage("a1", "Поставил будильник на 5:00."),
+            HistoryItem.UserMessage(ItemId("u1"), "поставь будильник на 5 утра"),
+            HistoryItem.ToolCallItem(ItemId("t1"), CallId("c1"), "set_alarm", args),
+            HistoryItem.ToolOutput(ItemId("o1"), CallId("c1"), "Запрос на будильник отправлен"),
+            HistoryItem.AssistantMessage(ItemId("a1"), "Поставил будильник на 5:00."),
         )
 
     private fun viewModelOver(items: List<HistoryItem>): ChatViewModel {

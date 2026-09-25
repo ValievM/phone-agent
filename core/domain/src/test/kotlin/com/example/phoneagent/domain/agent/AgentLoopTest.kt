@@ -1,7 +1,9 @@
 package com.example.phoneagent.domain.agent
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -53,7 +55,7 @@ class AgentLoopTest {
                 listOf(
                     AgentEvent.TextDelta("Hi"),
                     AgentEvent.TurnCompleted(
-                        listOf(HistoryItem.UserMessage("id-1", "hello"), HistoryItem.AssistantMessage("id-2", "Hi")),
+                        listOf(HistoryItem.UserMessage(ItemId("id-1"), "hello"), HistoryItem.AssistantMessage(ItemId("id-2"), "Hi")),
                     ),
                 ),
                 events,
@@ -63,7 +65,7 @@ class AgentLoopTest {
     @Test
     fun `a single tool call is executed and its output feeds the next model step`() =
         runTest {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {}, itemId = "fc-1")
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {}, itemId = ItemId("fc-1"))
             gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
             gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("It's noon"), ModelEvent.Completed()))
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
@@ -78,10 +80,10 @@ class AgentLoopTest {
                     AgentEvent.TextDelta("It's noon"),
                     AgentEvent.TurnCompleted(
                         listOf(
-                            HistoryItem.UserMessage("id-1", "what time is it"),
-                            HistoryItem.ToolCallItem("fc-1", "call-1", "get_time", buildJsonObject {}),
-                            HistoryItem.ToolOutput("id-2", "call-1", "noon"),
-                            HistoryItem.AssistantMessage("id-3", "It's noon"),
+                            HistoryItem.UserMessage(ItemId("id-1"), "what time is it"),
+                            HistoryItem.ToolCallItem(ItemId("fc-1"), CallId("call-1"), "get_time", buildJsonObject {}),
+                            HistoryItem.ToolOutput(ItemId("id-2"), CallId("call-1"), "noon"),
+                            HistoryItem.AssistantMessage(ItemId("id-3"), "It's noon"),
                         ),
                     ),
                 ),
@@ -95,7 +97,7 @@ class AgentLoopTest {
     @Test
     fun `a failing tool does not abort the turn — its failure is fed back to the model`() =
         runTest {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
             gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("sorry, failed"), ModelEvent.Completed()))
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Failed("network down") }))
@@ -110,7 +112,7 @@ class AgentLoopTest {
     @Test
     fun `an unknown tool name does not abort the turn either`() =
         runTest {
-            val call = ToolCall("call-1", "nonexistent", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "nonexistent", buildJsonObject {})
             gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
             gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("I can't do that"), ModelEvent.Completed()))
 
@@ -124,8 +126,8 @@ class AgentLoopTest {
     @Test
     fun `several tool calls in one response are executed in order before the next model step`() =
         runTest {
-            val callA = ToolCall("call-a", "tool_a", buildJsonObject {})
-            val callB = ToolCall("call-b", "tool_b", buildJsonObject {})
+            val callA = ToolCall(CallId("call-a"), "tool_a", buildJsonObject {})
+            val callB = ToolCall(CallId("call-b"), "tool_b", buildJsonObject {})
             gateway.responseQueue.addLast(
                 listOf(ModelEvent.ToolCallRequested(callA), ModelEvent.ToolCallRequested(callB), ModelEvent.Completed()),
             )
@@ -147,7 +149,7 @@ class AgentLoopTest {
     fun `the user declining a CONFIRM tool rejects it without executing, and the turn continues`() =
         runTest {
             interaction.approvalResult = false
-            val call = ToolCall("call-1", "set_alarm", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "set_alarm", buildJsonObject {})
             gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
             gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("ok, not setting it"), ModelEvent.Completed()))
             val registry =
@@ -165,7 +167,7 @@ class AgentLoopTest {
     @Test
     fun `a model that keeps requesting tools forever is stopped at the step limit`() =
         runTest {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             gateway.events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
             val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
 
@@ -173,7 +175,7 @@ class AgentLoopTest {
 
             val failed = events.last() as AgentEvent.TurnFailed
             assertEquals(AgentError.StepLimit, failed.error)
-            assertEquals(HistoryItem.UserMessage("id-1", "loop forever"), failed.newItems.first())
+            assertEquals(HistoryItem.UserMessage(ItemId("id-1"), "loop forever"), failed.newItems.first())
             assertEquals(3, executedCalls.size)
         }
 
@@ -187,7 +189,7 @@ class AgentLoopTest {
             assertEquals(
                 listOf(
                     AgentEvent.TextDelta("partial"),
-                    AgentEvent.TurnFailed(AgentError.Offline, listOf(HistoryItem.UserMessage("id-1", "hello"))),
+                    AgentEvent.TurnFailed(AgentError.Offline, listOf(HistoryItem.UserMessage(ItemId("id-1"), "hello"))),
                 ),
                 events,
             )
@@ -245,14 +247,14 @@ class AgentLoopTest {
     @Test
     fun `describing a call uses the description of the registered tool`() {
         val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
-        val call = ToolCall("call-1", "get_time", buildJsonObject {})
+        val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
 
         assertEquals(CallDescription("get_time", "calling get_time"), loop(registry).describe(call))
     }
 
     @Test
     fun `describing a call to an unknown tool falls back to its name`() {
-        val call = ToolCall("call-1", "vanished_tool", buildJsonObject {})
+        val call = ToolCall(CallId("call-1"), "vanished_tool", buildJsonObject {})
 
         assertEquals(CallDescription(title = "vanished_tool", summary = "Unknown tool"), loop().describe(call))
     }

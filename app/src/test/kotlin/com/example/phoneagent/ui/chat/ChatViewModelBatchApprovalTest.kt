@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
@@ -90,7 +91,7 @@ class ChatViewModelBatchApprovalTest {
             .map { it.toolCall?.status }
 
     private fun viewModelWith(interaction: UserInteraction): ChatViewModel {
-        val calls = (1..3).map { ToolCall("call-$it", "set_alarm", buildJsonObject {}) }
+        val calls = (1..3).map { ToolCall(CallId("call-$it"), "set_alarm", buildJsonObject {}) }
         val gateway =
             FakeModelGateway().apply {
                 responseQueue.addLast(calls.map { ModelEvent.ToolCallRequested(it) } + ModelEvent.Completed())

@@ -1,6 +1,8 @@
 package com.example.phoneagent.ui.chat
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
@@ -20,12 +22,12 @@ class HistoryRestoreTest {
         id: String,
         callId: String,
         name: String = "set_alarm",
-    ) = HistoryItem.ToolCallItem(id, callId, name, args)
+    ) = HistoryItem.ToolCallItem(ItemId(id), CallId(callId), name, args)
 
     private fun output(
         callId: String,
         text: String,
-    ) = HistoryItem.ToolOutput("out-$callId", callId, text)
+    ) = HistoryItem.ToolOutput(ItemId("out-$callId"), CallId(callId), text)
 
     private fun ChatMessage.card(): ToolCallMessage = requireNotNull(toolCall) { "not a card: $this" }
 
@@ -33,11 +35,11 @@ class HistoryRestoreTest {
     fun `a finished call comes back as a card between the texts around it`() {
         val messages =
             listOf(
-                HistoryItem.UserMessage("u1", "Поставь будильник"),
-                HistoryItem.AssistantMessage("a1", "Ставлю."),
+                HistoryItem.UserMessage(ItemId("u1"), "Поставь будильник"),
+                HistoryItem.AssistantMessage(ItemId("a1"), "Ставлю."),
                 call("t1", "c1"),
                 output("c1", "Будильник поставлен"),
-                HistoryItem.AssistantMessage("a2", "Готово."),
+                HistoryItem.AssistantMessage(ItemId("a2"), "Готово."),
             ).toChatMessages(describe)
 
         assertEquals(listOf("u1", "a1", "t1", "a2"), messages.map { it.id })
@@ -132,7 +134,7 @@ class HistoryRestoreTest {
                         ChatMessage("2", ChatRole.TOOL, "", ToolCallMessage(ToolCallStatus.Done("ok"), CallDescription("t", "s"), args)),
                     ),
             )
-        val loaded = listOf(HistoryItem.UserMessage("u1", "Поставь будильник"), call("t1", "c1"), output("c1", "ok"))
+        val loaded = listOf(HistoryItem.UserMessage(ItemId("u1"), "Поставь будильник"), call("t1", "c1"), output("c1", "ok"))
 
         val messages = live.withLoadedHistory(loaded, isInitial = false, describe = describe).messages
 

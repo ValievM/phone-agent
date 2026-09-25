@@ -5,6 +5,7 @@ import com.example.phoneagent.domain.auth.Credentials
 import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeSettingsRepository
 import com.example.phoneagent.domain.model.ModelEvent
@@ -338,7 +339,7 @@ class ResponsesGatewayTest {
             }
         }
 
-    private fun request(): ModelRequest = ModelRequest(history = listOf(HistoryItem.UserMessage("1", "hi")))
+    private fun request(): ModelRequest = ModelRequest(history = listOf(HistoryItem.UserMessage(ItemId("1"), "hi")))
 
     private fun profile(server: MockWebServer): BackendProfile =
         BackendProfile(baseUrl = server.url("/backend-api/codex").toString().removeSuffix("/"))
