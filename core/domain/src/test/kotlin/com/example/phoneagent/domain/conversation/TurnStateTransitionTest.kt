@@ -241,6 +241,22 @@ class TurnStateTransitionTest {
     }
 
     @Test
+    fun `retry does nothing from idle, a running or approving turn, a stopped turn or a terminal failure`() {
+        val retryId = ItemId("retry-question")
+        val request = approvalRequest("Set alarm")
+        val states =
+            listOf(
+                TurnState.Idle,
+                TurnState.Running(ItemId("q")),
+                TurnState.AwaitingApproval(ItemId("q"), PendingApproval.Single(CallId("call-1"), request)),
+                TurnState.Stopped(ItemId("q")),
+                TurnState.FailedTerminal(AgentError.Forbidden),
+            )
+
+        states.forEach { state -> assertEquals("retry must not change $state", state, transitionTurn(state, TurnEvent.Retry(retryId))) }
+    }
+
+    @Test
     fun `failure event selects retryable or terminal state`() {
         val questionId = ItemId("question-1")
         val running = TurnState.Running(questionId)
