@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -115,17 +116,33 @@ fun LoginScreen(
     Scaffold(modifier = modifier) { contentPadding ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(contentPadding).imePadding()) {
             val viewport = maxHeight
+            // Wide and low (a phone turned sideways, a tablet): the introduction and the actions go side by side.
+            val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH && maxWidth > maxHeight
             // The content is centered when it is short and scrolls when it is not (large font, landscape, keyboard).
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Column(
-                    modifier =
-                        Modifier
-                            .heightIn(min = viewport)
-                            .contentColumn(maxWidth = LOGIN_MAX_WIDTH)
-                            .padding(horizontal = screenMargin(), vertical = AppTheme.spacing.large),
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    LoginContent(state, form, onEvent)
+                val contentModifier =
+                    Modifier
+                        .heightIn(min = viewport)
+                        .contentColumn(maxWidth = if (twoPane) TWO_PANE_MAX_WIDTH else LOGIN_MAX_WIDTH)
+                        .padding(horizontal = screenMargin(), vertical = AppTheme.spacing.large)
+                if (twoPane) {
+                    Row(
+                        modifier = contentModifier,
+                        horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraLarge),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LoginIntro(Modifier.weight(1f))
+                        LoginBody(state, form, onEvent, Modifier.weight(1f))
+                    }
+                } else {
+                    Column(
+                        modifier = contentModifier,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium, Alignment.CenterVertically),
+                    ) {
+                        LoginIntro(Modifier.fillMaxWidth())
+                        LoginBody(state, form, onEvent, Modifier.fillMaxWidth())
+                    }
                 }
             }
         }
@@ -134,15 +151,14 @@ fun LoginScreen(
 
 private val BRAND_MARK_SIZE = 64.dp
 private val LOGIN_MAX_WIDTH = 480.dp
+private val TWO_PANE_MIN_WIDTH = 600.dp
+private val TWO_PANE_MAX_WIDTH = 920.dp
 
+/** The mark, the title and what is stored and sent: this comes before the buttons, so the choice is an informed one. */
 @Composable
-private fun LoginContent(
-    state: LoginUiState,
-    form: LoginFormState,
-    onEvent: (LoginUiEvent) -> Unit,
-) {
+private fun LoginIntro(modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
     ) {
@@ -164,14 +180,27 @@ private fun LoginContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        // What is stored and what is sent comes before the buttons, so the choice is an informed one.
         Text(
             text = stringResource(R.string.login_storage_notice),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
 
+@Composable
+private fun LoginBody(
+    state: LoginUiState,
+    form: LoginFormState,
+    onEvent: (LoginUiEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
+    ) {
         if (state.sessionExpired) {
             StatusMessage(stringResource(R.string.login_session_expired), tone = NoticeTone.Warning)
         }
