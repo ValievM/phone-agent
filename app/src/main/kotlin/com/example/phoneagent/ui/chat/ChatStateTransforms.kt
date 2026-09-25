@@ -2,6 +2,8 @@ package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.toolOutcomeFromOutputText
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 
@@ -44,17 +46,20 @@ private fun List<ChatMessage>.mapToolCall(
  * messages go before anything already typed; a later empty history means it was cleared elsewhere
  * (Settings). A history that ends with a user message on start-up means the app was closed before
  * the answer arrived: that is shown as an interrupted turn that can be retried.
+ *
+ * Tool cards are part of the saved history, so they are drawn again from it ([describe] gives the card
+ * its text) and a change from outside never leaves a live card next to its restored twin.
  */
 internal fun ChatUiState.withLoadedHistory(
     loaded: List<HistoryItem>,
     isInitial: Boolean,
-    dropToolCards: Boolean,
+    describe: (HistoryItem.ToolCallItem) -> CallDescription,
 ): ChatUiState {
     val restored =
         when {
-            isInitial -> loaded.toChatMessages() + messages
+            isInitial -> loaded.toChatMessages(describe) + messages
             loaded.isEmpty() -> emptyList()
-            else -> loaded.toChatMessages() + if (dropToolCards) emptyList() else messages.filter { it.role == ChatRole.TOOL }
+            else -> loaded.toChatMessages(describe)
         }
     val unanswered = isInitial && !isRunning && loaded.lastOrNull() is HistoryItem.UserMessage
     return when {
@@ -64,11 +69,32 @@ internal fun ChatUiState.withLoadedHistory(
     }
 }
 
-internal fun List<HistoryItem>.toChatMessages(): List<ChatMessage> =
-    mapNotNull { item ->
+/**
+ * Draws the saved history: texts as messages, and every tool call as a card where the call happened, with
+ * the status read from its saved result (found by call id). A call without a result was cut short.
+ */
+internal fun List<HistoryItem>.toChatMessages(describe: (HistoryItem.ToolCallItem) -> CallDescription): List<ChatMessage> {
+    val outputs = filterIsInstance<HistoryItem.ToolOutput>().associateBy(HistoryItem.ToolOutput::callId)
+    return mapNotNull { item ->
         when (item) {
             is HistoryItem.UserMessage -> ChatMessage(item.id, ChatRole.USER, item.text)
             is HistoryItem.AssistantMessage -> ChatMessage(item.id, ChatRole.ASSISTANT, item.text)
-            is HistoryItem.ToolCallItem, is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
+            is HistoryItem.ToolCallItem -> ChatMessage(item.id, ChatRole.TOOL, "", item.toCard(outputs[item.callId], describe))
+            is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
         }
     }
+}
+
+private fun HistoryItem.ToolCallItem.toCard(
+    output: HistoryItem.ToolOutput?,
+    describe: (HistoryItem.ToolCallItem) -> CallDescription,
+): ToolCallMessage {
+    val outcome = output?.let { toolOutcomeFromOutputText(it.output) }
+    val fileHits = outcome?.toFileHits(name).orEmpty()
+    return ToolCallMessage(
+        status = outcome?.toCardStatus(name, fileHits.size) ?: ToolCallStatus.Cancelled,
+        description = describe(this),
+        arguments = arguments,
+        fileHits = fileHits,
+    )
+}

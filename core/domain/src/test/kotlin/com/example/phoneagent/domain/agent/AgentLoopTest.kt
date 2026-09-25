@@ -242,6 +242,21 @@ class AgentLoopTest {
             logger = FakeAppLogger(),
         )
 
+    @Test
+    fun `describing a call uses the description of the registered tool`() {
+        val registry = ToolRegistry(setOf(fakeTool("get_time") { ToolResult.Success("noon") }))
+        val call = ToolCall("call-1", "get_time", buildJsonObject {})
+
+        assertEquals(CallDescription("get_time", "calling get_time"), loop(registry).describe(call))
+    }
+
+    @Test
+    fun `describing a call to an unknown tool falls back to its name`() {
+        val call = ToolCall("call-1", "vanished_tool", buildJsonObject {})
+
+        assertEquals(CallDescription(title = "vanished_tool", summary = "Unknown tool"), loop().describe(call))
+    }
+
     private fun fakeTool(
         name: String,
         risk: Risk = Risk.SAFE,

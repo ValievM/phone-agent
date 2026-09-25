@@ -14,18 +14,17 @@ import kotlinx.serialization.json.longOrNull
 
 /** Maps only the direct structured output from search_files; assistant text is never inspected. */
 internal fun AgentEvent.toFileHits(): List<FileHit> =
-    successfulSearchOutputOrNull()
+    (this as? AgentEvent.ToolCallFinished)?.let { it.outcome.toFileHits(it.call.name) }.orEmpty()
+
+/** The same mapping for a result read back from the saved history. */
+internal fun ToolOutcome.toFileHits(toolName: String): List<FileHit> =
+    (this as? ToolOutcome.Success)
+        ?.takeIf { toolName == SEARCH_FILES_TOOL_NAME }
+        ?.text
         ?.let { output -> runCatching { Json.parseToJsonElement(output) as? JsonObject }.getOrNull() }
         ?.let { result -> result[ITEMS_KEY] as? JsonArray }
         ?.mapNotNull { (it as? JsonObject)?.toFileHit() }
         .orEmpty()
-
-private fun AgentEvent.successfulSearchOutputOrNull(): String? =
-    (this as? AgentEvent.ToolCallFinished)
-        ?.takeIf { it.call.name == SEARCH_FILES_TOOL_NAME }
-        ?.outcome
-        .let { it as? ToolOutcome.Success }
-        ?.text
 
 private fun JsonObject.toFileHit(): FileHit? {
     val name = this[NAME_KEY].stringOrNull()

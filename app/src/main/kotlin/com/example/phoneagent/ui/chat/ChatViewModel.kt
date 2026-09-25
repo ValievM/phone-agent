@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.storage.ConversationRepository
@@ -82,12 +83,15 @@ class ChatViewModel
                             runningJob = null
                         }
                         history = loadedHistory
-                        // The screen already shows our own turn exactly as it happened (text and
-                        // tool cards in order), so rebuilding it from the saved history would only
-                        // regroup the cards after the texts.
+                        // The screen already shows our own turn exactly as it happened, so only history
+                        // that came from elsewhere (first load, Settings, another writer) is redrawn.
                         if (!isOwnHistoryEmission) {
                             mutableState.update {
-                                it.withLoadedHistory(loadedHistory, isInitialEmission, dropToolCards = interruptedActiveTurn)
+                                it.withLoadedHistory(loadedHistory, isInitialEmission) { call ->
+                                    agentLoop.describe(
+                                        ToolCall(id = call.callId, name = call.name, arguments = call.arguments, itemId = call.id),
+                                    )
+                                }
                             }
                         }
                         initialHistoryLoaded.complete(Unit)
@@ -308,7 +312,7 @@ class ChatViewModel
         private fun nextId(): String = (++nextMessageId).toString()
     }
 
-private fun ToolOutcome.toCardStatus(
+internal fun ToolOutcome.toCardStatus(
     toolName: String,
     fileHitCount: Int,
 ): ToolCallStatus =

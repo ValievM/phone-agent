@@ -13,6 +13,7 @@ import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.domain.tools.ToolPipeline
+import com.example.phoneagent.domain.tools.toOutputText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -99,7 +100,7 @@ public class AgentLoop(
     private suspend fun FlowCollector<AgentEvent>.confirmGroups(calls: List<ToolCall>): Map<String, Approval> {
         val decisions = mutableMapOf<String, Approval>()
         for (group in toolPipeline.batchGroups(calls)) {
-            group.forEach { emit(AgentEvent.ToolCallStarted(it, describeCall(it))) }
+            group.forEach { emit(AgentEvent.ToolCallStarted(it, describe(it))) }
             emit(AgentEvent.BatchApprovalRequested(group.map { it.id }))
             val decision = if (toolPipeline.confirmBatch(group)) Approval.GRANTED else Approval.DECLINED
             group.forEach { decisions[it.id] = decision }
@@ -107,7 +108,8 @@ public class AgentLoop(
         return decisions
     }
 
-    private fun describeCall(call: ToolCall): CallDescription =
+    /** What the card and the confirmation of [call] say; a tool that no longer exists is shown under its name. */
+    public fun describe(call: ToolCall): CallDescription =
         toolPipeline.describe(call.name, call.arguments) ?: unknownToolDescription(call.name)
 
     /** [sharedDecision] is null when the call was not part of a shared question and is asked on its own. */
@@ -116,7 +118,7 @@ public class AgentLoop(
         sharedDecision: Approval?,
     ): HistoryItem.ToolOutput {
         if (sharedDecision == null) {
-            val description = describeCall(call)
+            val description = describe(call)
             emit(AgentEvent.ToolCallStarted(call, description))
             toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE }?.let { risk ->
                 emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
@@ -128,13 +130,6 @@ public class AgentLoop(
     }
 
     private fun unknownToolDescription(name: String): CallDescription = CallDescription(title = name, summary = "Unknown tool")
-
-    private fun ToolOutcome.toOutputText(): String =
-        when (this) {
-            is ToolOutcome.Success -> text
-            is ToolOutcome.Rejected -> "Rejected: $reason"
-            is ToolOutcome.Failed -> "Failed: $reason"
-        }
 
     private data class ModelTurn(
         val text: String,
