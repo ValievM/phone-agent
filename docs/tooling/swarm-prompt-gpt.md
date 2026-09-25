@@ -39,8 +39,8 @@
 
 ## 4. Замок Gradle (один запуск на всю машину)
 Одновременно на этой машине работает ровно один Gradle (GPT, GLM и Claude), иначе сборки конфликтуют. Проверки перед коммитом:
-  bash -c 'until mkdir /tmp/phone-agent-gradle.lock 2>/dev/null; do find /tmp/phone-agent-gradle.lock -maxdepth 0 -mmin +30 -exec rmdir {} \; 2>/dev/null; sleep 20; done; trap "rmdir /tmp/phone-agent-gradle.lock" EXIT; ./gradlew :app:kspReleaseKotlin :tools:kspReleaseKotlin && ./gradlew spotlessApply && ./gradlew check && python3 scripts/check_docs.py'
-Любой другой запуск ./gradlew (сборка манифеста, один тест) оборачивай тем же замком. Замок старше 30 минут считается брошенным: команда выше сама его снимает.
+  bash -c 'L=/tmp/phone-agent-gradle.lock; until mkdir "$L" 2>/dev/null; do if [ -e "$L" ] && [ ! -d "$L" ]; then rm -f "$L"; else find "$L" -maxdepth 0 -type d -mmin +45 -exec rm -rf {} \; 2>/dev/null; fi; sleep 20; done; echo "$$ $(pwd) $(date +%H:%M)" > "$L/owner"; trap "rm -rf $L" EXIT; ./gradlew :app:kspReleaseKotlin :tools:kspReleaseKotlin && ./gradlew spotlessApply && ./gradlew check && python3 scripts/check_docs.py'
+Любой другой запуск ./gradlew (сборка манифеста, один тест) оборачивай тем же замком. Замок (папка) старше 45 минут или обычный файл на месте замка считается брошенным: команда сама его снимает; файл owner внутри показывает, кто держит замок (pid, worktree, время). Запуск Gradle или теста, который идёт дольше 25 минут без вывода, считай зависшим: не жди бесконечно и не убивай чужие процессы сам, напиши владельцу PID (ps -axo pid,etime,command | grep -i gradle) и что запускал. В тестах нельзя реальные сокеты, sleep и ожидания без таймаута (Thread.sleep, CountDownLatch.await(), runBlocking без withTimeout): такой тест может зависнуть навсегда и держать замок.
 
 ## 5. Сдача своей задачи (с независимой проверкой)
 1. Исполнитель закончил: коммиты в ветке, check зелёный, отчёт по шаблону из раздела 9.
