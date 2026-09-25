@@ -3,6 +3,8 @@ package com.example.phoneagent.tools.files
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
@@ -10,7 +12,6 @@ import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -26,6 +27,7 @@ internal class SearchFilesTool
     constructor(
         private val userInteraction: UserInteraction,
         private val mediaStoreSearch: MediaStoreSearch,
+        private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
     ) : Tool {
         override val spec: ToolSpec =
             ToolSpec(
@@ -93,7 +95,7 @@ internal class SearchFilesTool
             }
 
             return try {
-                val searched = withContext(Dispatchers.IO) { mediaStoreSearch.search(query, ::shouldContinue) }
+                val searched = withContext(dispatchers.io) { mediaStoreSearch.search(query, ::shouldContinue) }
                 if (!shouldContinue()) budgetReached = true
                 val result =
                     SearchFilesPolicy.process(

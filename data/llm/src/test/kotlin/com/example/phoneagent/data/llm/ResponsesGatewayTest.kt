@@ -6,6 +6,7 @@ import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.fakes.FakeAppLogger
+import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
 import com.example.phoneagent.domain.fakes.FakeSettingsRepository
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelRequest
@@ -13,7 +14,9 @@ import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -29,6 +32,7 @@ import okhttp3.Request
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class ResponsesGatewayTest {
@@ -349,6 +353,44 @@ class ResponsesGatewayTest {
             .Builder()
             .readTimeout(10, TimeUnit.SECONDS)
             .build()
+
+    @Test
+    fun `the request runs on the dispatcher provided by the port`() =
+        runTest {
+            val seenThreads = mutableListOf<String>()
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        seenThreads += Thread.currentThread().name
+                        chain.proceed(chain.request())
+                    }.build()
+            val io =
+                Executors.newSingleThreadExecutor { r -> Thread(r, "gateway-test-io") }.asCoroutineDispatcher()
+            try {
+                withServer { server ->
+                    server.enqueue(sseResponse(sampleSse()))
+                    val gateway =
+                        ResponsesGateway(
+                            profile = profile(server),
+                            credentialsProvider = FakeCredentialsProvider(),
+                            settingsRepository = FakeSettingsRepository(),
+                            logger = FakeAppLogger(),
+                            client = client,
+                            dispatchers = FakeDispatcherProvider(main = io, io = io, default = io),
+                            newSessionId = { "session-1" },
+                        )
+
+                    gateway.stream(request()).first()
+                }
+            } finally {
+                io.close()
+            }
+            assertTrue(
+                "expected the request on the provided io dispatcher, saw $seenThreads",
+                seenThreads.isNotEmpty() && seenThreads.all { it.startsWith("gateway-test-io") },
+            )
+        }
 
     private fun gateway(
         server: MockWebServer,

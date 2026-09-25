@@ -2,7 +2,8 @@ package com.example.phoneagent.data.llm
 
 import com.example.phoneagent.domain.auth.ApiKeyValidationGateway
 import com.example.phoneagent.domain.auth.ApiKeyValidationResult
-import kotlinx.coroutines.Dispatchers
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -12,9 +13,10 @@ import java.io.IOException
 public class OkHttpApiKeyValidationGateway(
     private val profile: BackendProfile,
     private val client: OkHttpClient = OkHttpClient(),
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : ApiKeyValidationGateway {
     override suspend fun validate(key: String): ApiKeyValidationResult =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             try {
                 val url =
                     profile.baseUrl

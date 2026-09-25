@@ -29,6 +29,7 @@ import com.example.phoneagent.domain.auth.ApiKeyValidationGateway
 import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.RedactingAppLogger
 import com.example.phoneagent.logging.AndroidLogcatLogger
 import dagger.Binds
@@ -80,7 +81,8 @@ internal object AuthNetworkModule {
     fun provideApiKeyValidationGateway(
         profile: BackendProfile,
         client: OkHttpClient,
-    ): ApiKeyValidationGateway = OkHttpApiKeyValidationGateway(profile, client)
+        dispatchers: DispatcherProvider,
+    ): ApiKeyValidationGateway = OkHttpApiKeyValidationGateway(profile, client, dispatchers)
 
     @Provides
     @Singleton

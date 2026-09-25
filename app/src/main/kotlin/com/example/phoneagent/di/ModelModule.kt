@@ -10,6 +10,7 @@ import com.example.phoneagent.domain.conversation.LastNMessagesPolicy
 import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.storage.SettingsRepository
 import dagger.Module
 import dagger.Provides
@@ -36,6 +37,7 @@ internal object ModelModule {
     fun provideModelCatalog(
         profile: BackendProfile,
         credentialsProvider: CredentialsProvider,
+        dispatchers: DispatcherProvider,
         @ApplicationContext context: Context,
     ): ModelCatalog =
         OkHttpModelCatalog(
@@ -46,6 +48,7 @@ internal object ModelModule {
                     .getPackageInfo(context.packageName, 0)
                     .versionName
                     .orEmpty(),
+            dispatchers = dispatchers,
         )
 
     @Provides
@@ -55,9 +58,10 @@ internal object ModelModule {
         credentialsProvider: CredentialsProvider,
         settingsRepository: SettingsRepository,
         logger: AppLogger,
+        dispatchers: DispatcherProvider,
     ): ModelGateway {
         val client = OkHttpClient.Builder().readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS).build()
-        return ResponsesGateway(profile, credentialsProvider, settingsRepository, logger, client)
+        return ResponsesGateway(profile, credentialsProvider, settingsRepository, logger, client, dispatchers)
     }
 
     @Provides
