@@ -11,10 +11,11 @@ import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +66,7 @@ public class ResponsesGateway(
     private val settingsRepository: SettingsRepository,
     private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
     // Test seam: lets a test capture the Call OkHttp created, to assert it gets cancelled when
     // the collecting coroutine is (see docs/stages/3-model-client.md item 3.5).
     private val callFactory: Call.Factory = client,
@@ -130,7 +132,7 @@ public class ResponsesGateway(
     ): AttemptOutcome {
         val call = callFactory.newCall(httpRequest(body, credentials))
         activeCall.set(call)
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatchers.io) {
             try {
                 val response = call.execute()
                 try {

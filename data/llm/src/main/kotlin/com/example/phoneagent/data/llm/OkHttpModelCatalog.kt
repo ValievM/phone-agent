@@ -4,8 +4,9 @@ import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelCatalogResult
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +23,7 @@ public class OkHttpModelCatalog(
     private val credentialsProvider: CredentialsProvider,
     private val clientVersion: String,
     private val client: OkHttpClient = OkHttpClient(),
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : ModelCatalog {
     override suspend fun load(): ModelCatalogResult =
         try {
@@ -29,7 +31,7 @@ public class OkHttpModelCatalog(
             if (credentials !is CredentialsResult.Ready) {
                 ModelCatalogResult.Unavailable
             } else {
-                withContext(Dispatchers.IO) {
+                withContext(dispatchers.io) {
                     val url =
                         profile.baseUrl
                             .toHttpUrl()

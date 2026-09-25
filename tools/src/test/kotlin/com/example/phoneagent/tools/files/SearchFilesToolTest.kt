@@ -2,12 +2,15 @@ package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -19,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.Executors
 
 class SearchFilesToolTest {
     @Test
@@ -144,6 +148,37 @@ class SearchFilesToolTest {
         assertEquals("Поиск файлов", tool.describe(args("план")).title)
         assertTrue(tool.describe(args("план")).summary.contains("план"))
     }
+
+    @Test
+    fun `the media query runs on the dispatcher provided by the port`() =
+        runTest {
+            val seenThreads = mutableListOf<String>()
+            val search =
+                object : MediaStoreSearch {
+                    override fun search(
+                        query: String,
+                        shouldContinue: () -> Boolean,
+                    ): MediaStoreQueryResult {
+                        seenThreads += Thread.currentThread().name
+                        return MediaStoreQueryResult(emptyList(), truncated = false)
+                    }
+                }
+            val io =
+                Executors.newSingleThreadExecutor { r -> Thread(r, "search-test-io") }.asCoroutineDispatcher()
+            try {
+                val result =
+                    SearchFilesTool(FakeUserInteraction(), search, FakeDispatcherProvider(main = io, io = io, default = io))
+                        .execute(args("report"), context())
+
+                assertTrue(result is ToolResult.Success)
+            } finally {
+                io.close()
+            }
+            assertTrue(
+                "expected the query on the provided io dispatcher, saw $seenThreads",
+                seenThreads.isNotEmpty() && seenThreads.all { it.startsWith("search-test-io") },
+            )
+        }
 
     private fun tool(
         interaction: FakeUserInteraction,
