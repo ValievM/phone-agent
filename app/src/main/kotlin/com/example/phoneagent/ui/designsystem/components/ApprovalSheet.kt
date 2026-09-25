@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
@@ -44,17 +45,21 @@ fun ApprovalSheet(
     modifier: Modifier = Modifier,
     initialDetailsExpanded: Boolean = false,
 ) {
-    ConfirmationSheet(
-        onDismissRequest = onReject,
-        modifier = modifier,
-    ) {
-        SheetContent(
-            request = request,
-            arguments = arguments,
-            onApprove = onApprove,
-            onReject = onReject,
-            initialDetailsExpanded = initialDetailsExpanded,
-        )
+    if (request.risk == Risk.SENSITIVE) {
+        SensitiveApprovalSheet(request = request, onApprove = onApprove, onReject = onReject, modifier = modifier)
+    } else {
+        ConfirmationSheet(
+            onDismissRequest = onReject,
+            modifier = modifier,
+        ) {
+            SheetContent(
+                request = request,
+                arguments = arguments,
+                onApprove = onApprove,
+                onReject = onReject,
+                initialDetailsExpanded = initialDetailsExpanded,
+            )
+        }
     }
 }
 

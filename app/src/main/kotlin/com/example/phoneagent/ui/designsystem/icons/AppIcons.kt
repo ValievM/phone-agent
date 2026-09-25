@@ -30,6 +30,9 @@ object AppIcons {
     val error: Int = R.drawable.ic_error
 
     @get:DrawableRes
+    val warning: Int = R.drawable.ic_warning
+
+    @get:DrawableRes
     val block: Int = R.drawable.ic_block
 
     @get:DrawableRes
