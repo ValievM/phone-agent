@@ -26,5 +26,5 @@ class LastNMessagesPolicyTest {
         assertThrows(IllegalArgumentException::class.java) { LastNMessagesPolicy(maxItems = 0) }
     }
 
-    private fun userMessage(text: String): HistoryItem = HistoryItem.UserMessage(text, text)
+    private fun userMessage(text: String): HistoryItem = HistoryItem.UserMessage(ItemId(text), text)
 }

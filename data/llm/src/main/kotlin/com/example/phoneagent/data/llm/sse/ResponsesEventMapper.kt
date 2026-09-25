@@ -6,6 +6,8 @@ import com.example.phoneagent.data.llm.dto.OutputItemDto
 import com.example.phoneagent.data.llm.dto.OutputTextDeltaDto
 import com.example.phoneagent.data.llm.dto.ResponseCompletedDto
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.CallId
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.Usage
@@ -49,10 +51,10 @@ private fun OutputItemDto.toToolCallOrNull(): ToolCall? {
     if (listOf(id, callId, name, arguments).any { it == null }) return null
     val parsedArguments = relaxedJson.parseToJsonElement(requireNotNull(arguments)).jsonObject
     return ToolCall(
-        id = requireNotNull(callId),
+        callId = CallId(requireNotNull(callId)),
         name = requireNotNull(name),
         arguments = parsedArguments,
-        itemId = requireNotNull(id),
+        itemId = ItemId(requireNotNull(id)),
     )
 }
 

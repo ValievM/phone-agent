@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentEvent
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
@@ -13,7 +14,7 @@ class FileHitMapperTest {
     fun `search files tool result maps structured content uris`() {
         val event =
             AgentEvent.ToolCallFinished(
-                call = ToolCall("call-1", "search_files", buildJsonObject {}),
+                call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {}),
                 outcome =
                     ToolOutcome.Success(
                         """{"items":[{"name":"report.pdf","uri":"content://media/external/downloads/42",
@@ -42,7 +43,7 @@ class FileHitMapperTest {
     fun `malformed search files result has no hits`() {
         val event =
             AgentEvent.ToolCallFinished(
-                call = ToolCall("call-1", "search_files", buildJsonObject {}),
+                call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {}),
                 outcome = ToolOutcome.Success("not JSON"),
             )
 
@@ -53,7 +54,7 @@ class FileHitMapperTest {
     fun `other tool result is not treated as search files output`() {
         val event =
             AgentEvent.ToolCallFinished(
-                call = ToolCall("call-1", "find_files", buildJsonObject {}),
+                call = ToolCall(CallId("call-1"), "find_files", buildJsonObject {}),
                 outcome =
                     ToolOutcome.Success(
                         """{"items":[{"name":"local.txt","uri":"content://media/external/files/7","size":1,"mimeType":"text/plain"}]}""",
@@ -67,7 +68,7 @@ class FileHitMapperTest {
     fun `non content uri is discarded`() {
         val event =
             AgentEvent.ToolCallFinished(
-                call = ToolCall("call-1", "search_files", buildJsonObject {}),
+                call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {}),
                 outcome =
                     ToolOutcome.Success(
                         """{"items":[{"name":"private.txt","uri":"file:///private/private.txt","size":1,"mimeType":"text/plain"}]}""",

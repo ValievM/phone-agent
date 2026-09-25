@@ -77,9 +77,9 @@ internal fun List<HistoryItem>.toChatMessages(describe: (HistoryItem.ToolCallIte
     val outputs = filterIsInstance<HistoryItem.ToolOutput>().associateBy(HistoryItem.ToolOutput::callId)
     return mapNotNull { item ->
         when (item) {
-            is HistoryItem.UserMessage -> ChatMessage(item.id, ChatRole.USER, item.text)
-            is HistoryItem.AssistantMessage -> ChatMessage(item.id, ChatRole.ASSISTANT, item.text)
-            is HistoryItem.ToolCallItem -> ChatMessage(item.id, ChatRole.TOOL, "", item.toCard(outputs[item.callId], describe))
+            is HistoryItem.UserMessage -> ChatMessage(item.itemId.value, ChatRole.USER, item.text)
+            is HistoryItem.AssistantMessage -> ChatMessage(item.itemId.value, ChatRole.ASSISTANT, item.text)
+            is HistoryItem.ToolCallItem -> ChatMessage(item.itemId.value, ChatRole.TOOL, "", item.toCard(outputs[item.callId], describe))
             is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
         }
     }

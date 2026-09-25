@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
@@ -60,7 +62,7 @@ class ChatViewModel
         // twice (the question, then the finished turn), so one slot could mistake the first echo for
         // an outside change and rebuild the feed from a stale list.
         private val pendingOwnEmissions = ArrayDeque<List<HistoryItem>>()
-        private val toolMessageIdByCallId = mutableMapOf<String, String>()
+        private val toolMessageIdByCallId = mutableMapOf<CallId, String>()
 
         // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
         // the one an ApprovalRequested (which carries no call id of its own) belongs to.
@@ -89,7 +91,7 @@ class ChatViewModel
                             mutableState.update {
                                 it.withLoadedHistory(loadedHistory, isInitialEmission) { call ->
                                     agentLoop.describe(
-                                        ToolCall(id = call.callId, name = call.name, arguments = call.arguments, itemId = call.id),
+                                        ToolCall(callId = call.callId, name = call.name, arguments = call.arguments, itemId = call.itemId),
                                     )
                                 }
                             }
@@ -152,7 +154,7 @@ class ChatViewModel
             // so a Stop before the echo cannot lose it, and the next submit cannot overwrite it.
             historyBeforeTurn = history
             // The id must be unique: a stopped question stays in history, and the feed keys on it.
-            history = history + HistoryItem.UserMessage("pending-${idGenerator.newId()}", trimmed)
+            history = history + HistoryItem.UserMessage(ItemId("pending-${idGenerator.newItemId().value}"), trimmed)
             // Saved in its own job: stopping the turn must not cancel the save of the question.
             val questionSnapshot = history
             viewModelScope.launch {
@@ -250,7 +252,7 @@ class ChatViewModel
 
                 is AgentEvent.ToolCallStarted -> {
                     val id = nextId()
-                    toolMessageIdByCallId[event.call.id] = id
+                    toolMessageIdByCallId[event.call.callId] = id
                     lastToolMessageId = id
                     val toolCall =
                         ToolCallMessage(
@@ -303,7 +305,7 @@ class ChatViewModel
             }
 
         private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
-            val id = toolMessageIdByCallId.remove(event.call.id) ?: return
+            val id = toolMessageIdByCallId.remove(event.call.callId) ?: return
             val fileHits = event.toFileHits()
             val status = event.outcome.toCardStatus(event.call.name, fileHits.size)
             mutableState.update { it.withToolCallStatus(id, status, fileHits) }

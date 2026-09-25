@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.agent
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.interaction.ApprovalRequest
@@ -27,7 +28,7 @@ public sealed interface AgentEvent {
 
     /** The tool cards of [callIds] wait for one shared answer (see [com.example.phoneagent.domain.tools.ToolPipeline.confirmBatch]). */
     public data class BatchApprovalRequested(
-        public val callIds: List<String>,
+        public val callIds: List<CallId>,
     ) : AgentEvent
 
     public data class ToolCallFinished(

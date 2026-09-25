@@ -4,6 +4,7 @@ import com.example.phoneagent.domain.auth.Credentials
 import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
@@ -103,7 +104,7 @@ public class FakeClock(
 public class FakeIdGenerator : IdGenerator {
     private var counter = 0
 
-    override fun newId(): String = "id-${++counter}"
+    override fun newItemId(): ItemId = ItemId("id-${++counter}")
 }
 
 public class FakeDispatcherProvider(

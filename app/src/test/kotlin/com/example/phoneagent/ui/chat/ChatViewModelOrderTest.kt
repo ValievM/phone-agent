@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
@@ -52,7 +53,7 @@ class ChatViewModelOrderTest {
     @Test
     fun `a tool card stays between the texts around it after the turn is saved`() =
         runTest(dispatcher.scheduler) {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     responseQueue.addLast(

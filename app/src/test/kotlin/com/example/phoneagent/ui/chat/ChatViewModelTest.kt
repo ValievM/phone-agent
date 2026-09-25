@@ -2,8 +2,10 @@ package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -130,8 +132,8 @@ class ChatViewModelTest {
             val repository =
                 FakeConversationRepository(
                     listOf(
-                        HistoryItem.UserMessage("saved-user", "Earlier question"),
-                        HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                        HistoryItem.UserMessage(ItemId("saved-user"), "Earlier question"),
+                        HistoryItem.AssistantMessage(ItemId("saved-assistant"), "Earlier answer"),
                     ),
                 )
             val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
@@ -149,8 +151,8 @@ class ChatViewModelTest {
         runTest(dispatcher.scheduler) {
             val initialHistory =
                 listOf(
-                    HistoryItem.UserMessage("saved-user", "Earlier question"),
-                    HistoryItem.AssistantMessage("saved-assistant", "Earlier answer"),
+                    HistoryItem.UserMessage(ItemId("saved-user"), "Earlier question"),
+                    HistoryItem.AssistantMessage(ItemId("saved-assistant"), "Earlier answer"),
                 )
             val repository = FakeConversationRepository(initialHistory)
             val gateway = HangingModelGateway()
@@ -178,7 +180,7 @@ class ChatViewModelTest {
     @Test
     fun `initial history emission does not cancel submit waiting for startup load`() =
         runTest(dispatcher.scheduler) {
-            val initialHistory = listOf(HistoryItem.UserMessage("saved-user", "Earlier question"))
+            val initialHistory = listOf(HistoryItem.UserMessage(ItemId("saved-user"), "Earlier question"))
             val allowInitialEmission = CompletableDeferred<Unit>()
             val updates = MutableSharedFlow<List<HistoryItem>>(extraBufferCapacity = 1)
             val repository =
@@ -225,7 +227,7 @@ class ChatViewModelTest {
         runTest(dispatcher.scheduler) {
             val repository =
                 FakeConversationRepository(
-                    listOf(HistoryItem.UserMessage("saved-user", "Earlier question")),
+                    listOf(HistoryItem.UserMessage(ItemId("saved-user"), "Earlier question")),
                 )
             val finishTurn = CompletableDeferred<Unit>()
             var wasCancelled = false
@@ -269,7 +271,7 @@ class ChatViewModelTest {
         runTest(dispatcher.scheduler) {
             val repository =
                 FakeConversationRepository(
-                    listOf(HistoryItem.UserMessage("saved-user", "Earlier question")),
+                    listOf(HistoryItem.UserMessage(ItemId("saved-user"), "Earlier question")),
                 )
             val finishTurn = CompletableDeferred<Unit>()
             var wasCancelled = false
@@ -348,7 +350,7 @@ class ChatViewModelTest {
     @Test
     fun `a SAFE tool call renders as a card that goes from running to done`() =
         runTest(dispatcher.scheduler) {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
@@ -372,7 +374,7 @@ class ChatViewModelTest {
                 """{"items":[{"name":"report.pdf",
                     "uri":"content://media/external/downloads/42","size":1024,"mimeType":"application/pdf"}],
                     "truncated":false}"""
-            val call = ToolCall("call-1", "search_files", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
@@ -397,7 +399,7 @@ class ChatViewModelTest {
     fun `a CONFIRM tool call shows awaiting approval before the user decides`() =
         runTest(dispatcher.scheduler) {
             interaction.approvalResult = false
-            val call = ToolCall("call-1", "set_alarm", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "set_alarm", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
@@ -417,7 +419,7 @@ class ChatViewModelTest {
     @Test
     fun `toggling a tool call flips its expanded state`() =
         runTest(dispatcher.scheduler) {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
@@ -444,7 +446,7 @@ class ChatViewModelTest {
     @Test
     fun `stopping while a tool call is pending marks its card cancelled`() =
         runTest(dispatcher.scheduler) {
-            val call = ToolCall("call-1", "get_time", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})
             val gateway = HangingAfterToolCallGateway(call)
             val registry = ToolRegistry(setOf(fakeTool("get_time") { awaitCancellation() }))
             val viewModel = createChatViewModel(agentLoop(gateway, registry))
