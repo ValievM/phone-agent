@@ -1,9 +1,10 @@
 package com.example.phoneagent.data.auth
 
 import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -30,6 +31,7 @@ public class OkHttpTokenRefreshGateway(
     // request goes out. A DNS/connection failure there is often transient, not "no internet".
     private val retryDelaysMillis: List<Long> = listOf(FIRST_RETRY_DELAY_MILLIS, SECOND_RETRY_DELAY_MILLIS),
     private val retryDelay: suspend (Long) -> Unit = { millis -> delay(millis) },
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : TokenRefreshGateway {
     override suspend fun exchangeAuthorizationCode(exchange: AuthorizationCodeExchange): AuthResult =
         request(
@@ -52,7 +54,7 @@ public class OkHttpTokenRefreshGateway(
         ).toRefreshResult()
 
     private suspend fun request(fields: Map<String, String>): GatewayResult =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             val maxAttempts = retryDelaysMillis.size + 1
             for (attempt in 1..maxAttempts) {
                 try {

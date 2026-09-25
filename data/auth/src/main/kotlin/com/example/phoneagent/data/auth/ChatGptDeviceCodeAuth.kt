@@ -1,7 +1,8 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -117,6 +118,7 @@ public class ChatGptDeviceCodeAuth(
 public class OkHttpDeviceCodeGateway(
     private val config: AuthConfig,
     private val client: OkHttpClient = OkHttpClient(),
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : DeviceCodeGateway {
     override suspend fun requestCode(): DeviceCodeRequestResult =
         execute(
@@ -180,7 +182,7 @@ public class OkHttpDeviceCodeGateway(
         onIoException: () -> T,
         map: (Int, String) -> T,
     ): T =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             try {
                 val request =
                     Request

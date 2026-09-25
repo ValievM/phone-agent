@@ -4,7 +4,11 @@ import com.example.phoneagent.domain.fakes.FakeAppLogger
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -192,6 +196,44 @@ class OkHttpTokenRefreshGatewayTest {
             assertFalse(result.toString().contains("secret-refresh"))
         }
 
+    @Test
+    fun `the token request dispatches through the port and the response comes without network`() =
+        runTest {
+            val dispatchers = RecordingDispatcherProvider()
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("ok")
+                            .body(
+                                (
+                                    """{"access_token":"access","id_token":"id","refresh_token":"new-refresh",""" +
+                                        """"expires_in":100,"earliest_refresh_at":50}"""
+                                ).toResponseBody(jsonMediaType),
+                            ).build()
+                    }.build()
+            val gateway =
+                OkHttpTokenRefreshGateway(
+                    tokenConfig,
+                    FakeAppLogger(),
+                    client,
+                    nowEpochSeconds = { NOW_SECONDS },
+                    retryDelay = {},
+                    dispatchers = dispatchers,
+                )
+
+            assertEquals(AuthResult.Success(tokens()), gateway.exchangeAuthorizationCode(EXCHANGE))
+            assertTrue(
+                "the blocking section must go through dispatchers.io",
+                dispatchers.ioDispatcher.dispatchCount.get() >= 1,
+            )
+        }
+
     private fun gateway(
         server: MockWebServer,
         logger: FakeAppLogger = FakeAppLogger(),
@@ -203,6 +245,11 @@ class OkHttpTokenRefreshGatewayTest {
         AuthConfig("issuer", "authorize", server.url("/oauth/token").toString(), "client", "redirect", "scope", emptyMap())
 
     private fun tokens(): AuthTokens = AuthTokens("access", "id", "new-refresh", NOW_SECONDS + 100L, 50L, AuthMethod.CHATGPT_BROWSER)
+
+    private val jsonMediaType = "application/json".toMediaType()
+
+    private val tokenConfig =
+        AuthConfig("http://token.test", "authorize", "http://token.test/oauth/token", "client", "redirect", "scope", emptyMap())
 
     private fun tokensResponse(): MockResponse =
         MockResponse

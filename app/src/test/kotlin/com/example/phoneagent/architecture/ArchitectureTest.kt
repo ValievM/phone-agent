@@ -216,9 +216,6 @@ class ArchitectureTest {
         val baseline =
             setOf(
                 "/app/src/main/kotlin/com/example/phoneagent/di/AuthBindingsModule.kt", // Dispatchers.Main.immediate для scope приложения
-                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/OkHttpTokenRefreshGateway.kt",
-                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/ChatGptBrowserAuth.kt",
-                "/data/auth/src/main/kotlin/com/example/phoneagent/data/auth/ChatGptDeviceCodeAuth.kt",
             )
         val violations =
             productionFiles

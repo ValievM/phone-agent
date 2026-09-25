@@ -7,10 +7,11 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.error
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -75,6 +76,7 @@ public interface CallbackReceiver {
 public class LoopbackCallbackReceiver(
     private val logger: AppLogger,
     private val port: Int = LOOPBACK_PORT,
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : CallbackReceiver {
     private var serverSocket: ServerSocket? = null
 
@@ -98,7 +100,7 @@ public class LoopbackCallbackReceiver(
         }
 
     override suspend fun awaitCallback(timeoutMillis: Long): CallbackResult =
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             val socket = serverSocket ?: return@withContext CallbackResult.Failure(AuthFailure.Network(null))
             try {
                 socket.soTimeout = timeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
