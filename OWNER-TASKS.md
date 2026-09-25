@@ -8,7 +8,7 @@
 - **«вливай»**: слить проверенную ветку в `main`.
 - **«пушь»**: отправить `main` на GitHub (перед этим проверю коммиты на секреты).
 - **«ставь»**: собрать release из `main` и поставить на телефон поверх, вход сохранится ([#11](https://github.com/ValievM/phone-agent/issues/11)).
-- **«промпты»**: выдать свежие промпты GPT и GLM.
+- **«промпты»**: выдать свежие промпты. Готовые универсальные лежат в [swarm.md](docs/tooling/swarm.md): рой для GPT (сам берёт задачи из issues) и очередь для GLM.
 - **«нравится»** или **«не нравится»** про вид «Стыка»: при «нравится» запишу эталоны скриншотов ([#17](https://github.com/ValievM/phone-agent/issues/17)).
 
 ## Решения (ответь одним словом в issue или мне в чате)
@@ -28,8 +28,8 @@
 ## Кто чем занят
 | Кто | В работе | Готово к выдаче |
 |---|---|---|
-| GPT | [#1](https://github.com/ValievM/phone-agent/issues/1) T13, [#2](https://github.com/ValievM/phone-agent/issues/2) отказ пачки | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении» |
-| GLM | [#3](https://github.com/ValievM/phone-agent/issues/3) G2b, [#4](https://github.com/ValievM/phone-agent/issues/4) защита `confirmBatch`, [#5](https://github.com/ValievM/phone-agent/issues/5) контракт `UserInteraction` | [#6](https://github.com/ValievM/phone-agent/issues/6) контекст целыми ходами, [#14](https://github.com/ValievM/phone-agent/issues/14) `INSTALL.md` |
+| GPT (рой) | [#1](https://github.com/ValievM/phone-agent/issues/1) T13, [#2](https://github.com/ValievM/phone-agent/issues/2) отказ пачки | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении», записки [#35](https://github.com/ValievM/phone-agent/issues/35) (безопасный «Повторить») и [#36](https://github.com/ValievM/phone-agent/issues/36) (статус «передано»); проверяет сдачи GLM |
+| GLM (очередь) | [#3](https://github.com/ValievM/phone-agent/issues/3) G2b, [#4](https://github.com/ValievM/phone-agent/issues/4) защита `confirmBatch`, [#5](https://github.com/ValievM/phone-agent/issues/5) контракт `UserInteraction` | [#6](https://github.com/ValievM/phone-agent/issues/6) контекст целыми ходами, [#14](https://github.com/ValievM/phone-agent/issues/14) `INSTALL.md`, [#34](https://github.com/ValievM/phone-agent/issues/34) проверка «нет фона» |
 | Claude | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры, [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток |
 
 `[x]` в `docs/manual-verification*.md` ставишь только ты.
