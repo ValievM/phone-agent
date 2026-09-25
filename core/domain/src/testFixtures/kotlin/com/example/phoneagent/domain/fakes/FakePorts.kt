@@ -69,18 +69,29 @@ public class FakeSettingsRepository : SettingsRepository {
     }
 }
 
+/**
+ * Behaves like the real session manager (see CredentialsProviderContract): a forced refresh of a session that is
+ * temporarily unavailable stays unavailable, and a refresh that succeeds (or ends the session) is what
+ * [current] returns afterwards.
+ */
 public class FakeCredentialsProvider(
     public var currentResult: CredentialsResult,
 ) : CredentialsProvider {
     public var refreshedCredentials: Credentials? = null
 
-    /** Overrides [refreshedCredentials] when a test needs the refresh itself to be temporarily unavailable. */
+    /** Overrides [refreshedCredentials] when a test needs the refresh itself to have a specific outcome. */
     public var refreshResult: CredentialsResult? = null
 
     override suspend fun current(): CredentialsResult = currentResult
 
-    override suspend fun refreshAfterUnauthorized(): CredentialsResult =
-        refreshResult ?: refreshedCredentials?.let(CredentialsResult::Ready) ?: CredentialsResult.SignedOut
+    override suspend fun refreshAfterUnauthorized(): CredentialsResult {
+        val result =
+            refreshResult
+                ?: refreshedCredentials?.let(CredentialsResult::Ready)
+                ?: if (currentResult == CredentialsResult.Unavailable) CredentialsResult.Unavailable else CredentialsResult.SignedOut
+        if (result != CredentialsResult.Unavailable) currentResult = result
+        return result
+    }
 }
 
 public class FakeClock(
