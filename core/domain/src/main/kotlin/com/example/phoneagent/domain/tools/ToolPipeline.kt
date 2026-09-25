@@ -81,13 +81,16 @@ public class ToolPipeline(
     public suspend fun confirmBatch(group: List<ToolCall>): Boolean {
         val requests =
             group.map { call ->
-                val tool = checkNotNull(registry.find(call.name)) { "unknown tool in a batch: ${call.name}" }
-                val description =
-                    describeSafely(tool, call.arguments)
-                        ?: // Never show a sheet with a broken description: decline the whole group,
-                        // the broken call itself fails in runKnownTool's risk guard.
-                        return false
-                ApprovalRequest(description, tool.spec.risk, call.arguments)
+                // A shared question is only for known plain-CONFIRM calls (as batchGroups promises);
+                // anything else in the group declines it without showing a sheet.
+                batchRequestFor(registry, call) ?: run {
+                    logger.warn(
+                        TAG,
+                        "batch rejected: not a describable plain-CONFIRM group",
+                        fields = mapOf("size" to group.size.toString()),
+                    )
+                    return false
+                }
             }
         val approved = userInteraction.confirmBatch(requests)
         logger.info(TAG, "batch confirmation answered", fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()))
@@ -234,3 +237,17 @@ private fun describeSafely(
     } catch (expected: Exception) {
         null
     }
+
+/** Sheet content for one grouped call; null = decline the group (unknown tool, non-CONFIRM risk, broken describe). */
+private fun batchRequestFor(
+    registry: ToolRegistry,
+    call: ToolCall,
+): ApprovalRequest? =
+    registry
+        .find(call.name)
+        ?.takeIf { it.spec.risk == Risk.CONFIRM }
+        ?.let { tool ->
+            describeSafely(tool, call.arguments)?.let { description ->
+                ApprovalRequest(description, tool.spec.risk, call.arguments)
+            }
+        }
