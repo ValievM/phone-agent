@@ -1,5 +1,7 @@
 # Карта архитектуры: обзор
 
+> Снимок 2026-09-24: `файл:строка` устарели (T8, T9, «Стык»). Верить коду и [overview](overview.md).
+
 > Карта: **обзор** · [ядро](map-core-data.md) · [вход](map-auth.md) · [tools и UI](map-tools-app.md) · [app](map-app-infra.md) · [потоки](map-flows.md). Раньше: [overview](overview.md), [core](core.md), [adapters](adapters.md).
 
 Карта для ревью по схеме, без чтения всего кода. Снята с `src/main` на коммите `31415f3` (в `main` дальше только два CI-коммита), тесты не описаны. Факт = подтверждён кодом (импорты, конструкторы, `@Binds`/`@Provides`); `[проверить]` = чтением не подтверждено. Расхождения со старыми docs: в конце [map-core-data](map-core-data.md).

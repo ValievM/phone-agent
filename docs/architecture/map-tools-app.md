@@ -1,5 +1,7 @@
 # Карта архитектуры: инструменты и UI чата
 
+> Снимок 2026-09-24: `файл:строка` устарели (T8, T9, «Стык»). Верить коду и [overview](overview.md).
+
 > Карта: [обзор](map-overview.md) · [ядро](map-core-data.md) · [вход](map-auth.md) · **tools и UI** · [app](map-app-infra.md) · [потоки](map-flows.md). Раньше: [adapters](adapters.md), [ui](ui.md), [design/components](../design/components.md).
 
 ## `:tools`

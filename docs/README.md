@@ -29,7 +29,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Добавить инструмент, способ входа, экран | [architecture/recipes.md](architecture/recipes.md) |
 | Почему так решили, риски архитектуры | [architecture/decisions.md](architecture/decisions.md) |
 | Домен разговора: решение и план T8 → T9 → T7 | [ADR 0005](adr/0005-conversation-domain.md) · [детальный дизайн](architecture/conversation-domain-design.md) |
-| Карта фактической архитектуры для ревью: граф модулей, DI, диаграммы классов, потоки, наблюдения | [architecture/map-overview.md](architecture/map-overview.md) → [ядро](architecture/map-core-data.md), [вход](architecture/map-auth.md), [tools и UI](architecture/map-tools-app.md), [app](architecture/map-app-infra.md), [потоки](architecture/map-flows.md) |
+| Карта фактической архитектуры для ревью (снимок 24.09, строки устарели): граф модулей, DI, диаграммы классов, потоки, наблюдения | [architecture/map-overview.md](architecture/map-overview.md) → [ядро](architecture/map-core-data.md), [вход](architecture/map-auth.md), [tools и UI](architecture/map-tools-app.md), [app](architecture/map-app-infra.md), [потоки](architecture/map-flows.md) |
 | Обзор дизайна | [design/overview.md](design/overview.md) |
 | Цвет, шрифты, формы | [design/style.md](design/style.md) |
 | Иконки, анимации, тексты интерфейса | [design/icons-motion-copy.md](design/icons-motion-copy.md) |

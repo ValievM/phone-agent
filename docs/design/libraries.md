@@ -15,8 +15,8 @@
 | Compose UI tooling (debug) | превью, Layout Inspector | |
 | Roborazzi + Robolectric | скриншот-тесты ключевых компонентов | популярен, но версию и настройку **[проверить, этап 5]** |
 | LeakCanary (debug) | поиск утечек памяти | предложение **[проверить]** |
-| Material Theme Builder | палитры и custom colors | инструмент, не библиотека |
-| Шрифты: Roboto Flex или Inter + JetBrains Mono | типографика | вшитые, OFL |
+| Палитра «Стык» | цвета и статусные роли из [brand/joint-tokens.json](brand/joint-tokens.json) | без библиотеки; тест сверяет код с JSON |
+| Шрифты: Inter + JetBrains Mono | типографика | вшитые variable, OFL |
 | Material Symbols Rounded | иконки | ~20 vector drawable, Apache 2.0 |
 
 **Не берём (и почему)**
@@ -27,7 +27,7 @@
 | Coil и загрузка картинок | внешних картинок нет и не должно быть (см. [a11y-security.md](a11y-security.md)) |
 | Lottie | декор, лишний вес и энергия |
 | Accompanist, Timber | устарели или заменены (`AppLogger`, штатные API) |
-| MaterialKolor | нужен для генерации палитр «на лету»; нам хватает статической палитры из Theme Builder |
+| MaterialKolor | нужен для генерации палитр «на лету»; нам хватает фиксированной палитры «Стык» |
 | `kotlinx-collections-immutable` | пока не нужен (см. strong skipping) |
 | Material 3 Expressive | альфа-версия |
 | `material3-adaptive` | планшетная раскладка не в MVP, хватает ограничения ширины |

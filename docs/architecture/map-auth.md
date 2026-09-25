@@ -1,5 +1,7 @@
 # Карта архитектуры: вход и токены (`:data:auth`)
 
+> Снимок 2026-09-24: `файл:строка` устарели (T8, T9, «Стык»). Верить коду и [overview](overview.md).
+
 > Карта: [обзор](map-overview.md) · [ядро](map-core-data.md) · **вход `:data:auth`** · [tools и UI](map-tools-app.md) · [app](map-app-infra.md) · [потоки](map-flows.md). Раньше: [adapters](adapters.md).
 
 Модуль Android library: DataStore, Keystore, Custom Tabs, `ProcessLifecycleOwner`. Зависит только от `:core:domain`. Наружу отдаёт `CredentialsProvider` (реализует `SessionManager`), остальные типы читает `:app`.

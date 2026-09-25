@@ -1,5 +1,7 @@
 # Карта архитектуры: `:app`, мост диалогов, вход, хранилище, логи
 
+> Снимок 2026-09-24: `файл:строка` устарели (T8, T9, «Стык»). Верить коду и [overview](overview.md).
+
 > Карта: [обзор](map-overview.md) · [ядро](map-core-data.md) · [вход](map-auth.md) · [tools и UI](map-tools-app.md) · **app: мост, вход, хранилище** · [потоки](map-flows.md). Раньше: [adapters](adapters.md). DI-модули: в [обзоре](map-overview.md).
 
 ## Пакеты `:app`
