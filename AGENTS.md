@@ -7,8 +7,7 @@ Android-приложение (Kotlin + Compose): чат с Codex + узкие и
 - MVP и приёмка: `docs/product/overview.md`; требования: `docs/product/requirements.md`.
 - Код (`docs/architecture/`): `overview.md` модули; `core.md` порты, AgentLoop, инструменты; `adapters.md` модель, вход, хранилище; `recipes.md` как добавить инструмент, экран, вход; `testing.md` тесты.
 - UI (`docs/design/`): `layout-rules.md` вёрстка; `components.md` компоненты; `style.md` стиль; `icons-motion-copy.md` иконки и тексты; `a11y-security.md` безопасность UI.
-- Константы входа и бэкенда: `docs/backend-notes.md` (после этапа 0), раньше `docs/research/backend-facts.md`.
-- Serena, Context7 (только в этом проекте): `docs/tooling/serena-context7.md`.
+- Константы входа и бэкенда: `docs/backend-notes.md`.
 
 Документ важнее твоих знаний. Документация только в `docs/` (кроме `OWNER-TASKS.md` в корне), новый файл добавляй в `docs/README.md`. Решение изменилось: обнови документ в том же коммите и запусти `python3 scripts/check_docs.py`.
 
@@ -20,9 +19,9 @@ Android-приложение (Kotlin + Compose): чат с Codex + узкие и
 Спрашивай перед: новой зависимостью, модулем или паттерном, отступлением от архитектуры, новым разрешением, изменением констант входа/бэкенда или `TokenStore`, выходом за границы MVP.
 
 ## TDD (обязательно для логики)
-Тест-кейсы (5-10, с границами и ошибками) согласуй с пользователем. Затем цикл: **Red** (один тест, запусти, покажи, что он упал по нужной причине) → **Green** (минимальный код, покажи зелёный вывод) → **Refactor**. Баг: сначала падающий тест.
+Тест-кейсы (5-10, с границами и ошибками): по перечню из задачи пиши сразу, покажи в отчёте; заранее согласуй лишь отступления (новое поведение, смысл существующего теста, зависимость, модуль, паттерн, разрешение). Цикл: **Red** (один тест, запусти, покажи, что он упал по нужной причине) → **Green** (минимальный код, покажи зелёный вывод) → **Refactor**. Баг: сначала падающий тест.
 Запрещено: код до красного теста; править, ослаблять, удалять или `@Ignore` тест ради прохождения (тест неверен: объясни и спроси); проверять внутренности вместо поведения; реальное время, сеть, случайность в тестах (`Clock`, тестовые диспетчеры, `MockWebServer`, фейки вместо моков).
-Исключение: Compose-вёрстка и тонкие Android-обёртки: проверь на телефоне, добавь строку в `docs/manual-verification.md` (`[x]` ставит только пользователь). Этапы A и 0 без TDD.
+Исключение: Compose-вёрстка и тонкие Android-обёртки: проверь на телефоне, добавь строку в `docs/manual-verification.md` (`[x]` ставит только пользователь).
 
 ## Команды
 ```
@@ -37,7 +36,7 @@ python3 scripts/check_docs.py
 - Константы бэкенда и входа только в `BackendProfile` и `AuthConfig`.
 - Ожидаемые ошибки: sealed-типы, не исключения. `CancellationException` не глотать.
 - Подтверждения, лимиты, логи инструментов: в `ToolPipeline`, не в самих инструментах.
-Сомневаешься или нужен новый паттерн/модуль: спроси, решение запиши в `docs/adr/`.
+Сомневаешься: спроси, решение запиши в `docs/adr/`.
 
 ## UI
 Только токены и роли темы (цвета `MaterialTheme.colorScheme`/`AppTheme.extendedColors`, отступы `AppTheme.spacing`, тексты `strings.xml`, иконки `AppIcons`). Без `Color(0x…)` вне `ui/designsystem/theme` и литералов в `Text("…")`. Экран = `Route` + stateless `Screen`, превью на каждое состояние. У кнопки-иконки есть `contentDescription`.
@@ -50,8 +49,8 @@ python3 scripts/check_docs.py
 - Токены и ключи только в `TokenStore` (DataStore + Keystore): не в логах, репозитории, `SharedPreferences`, тестах. `allowBackup="false"`. `auth.json` с компьютера не копировать. Секреты (`*.jks`, `local.properties`, `spike/auth*.json`) в `.gitignore`, перед коммитом `git diff --staged`.
 - В MVP нет `MANAGE_EXTERNAL_STORAGE`, AccessibilityService, SMS и звонков.
 
-## Serena и Context7
-Оба включены только тут (`.codex/config.toml`), в остальных проектах выключены. Serena — symbol-навигация, не работает — `rg`/`grep`. Context7: API библиотек (`resolve-library-id` → `query-docs`), без токенов/ключей в запросе. Контракт OpenAI: `docs/backend-notes.md`.
+## Serena и Context7 (`docs/tooling/serena-context7.md`)
+Оба включены только тут (`.codex/config.toml`). Serena — symbol-навигация, не работает — `rg`/`grep`. Context7: API библиотек (`resolve-library-id` → `query-docs`), без токенов/ключей в запросе.
 
 ## Результат
 Комментарии и имена в коде на английском, тексты для пользователя русские.
