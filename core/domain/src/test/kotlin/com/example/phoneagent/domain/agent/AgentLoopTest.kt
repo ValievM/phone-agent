@@ -165,6 +165,20 @@ class AgentLoopTest {
         }
 
     @Test
+    fun `a single approval resolution reports its exact call id`() =
+        runTest {
+            val call = ToolCall(CallId("call-1"), "set_alarm", buildJsonObject {})
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry = ToolRegistry(setOf(fakeTool("set_alarm", risk = Risk.CONFIRM) { ToolResult.Success("set") }))
+            val resolvedCallIds = mutableListOf<List<CallId>>()
+
+            loop(registry).run(emptyList(), "set an alarm") { callIds -> resolvedCallIds += callIds }.toList()
+
+            assertEquals(listOf(listOf(call.callId)), resolvedCallIds)
+        }
+
+    @Test
     fun `a model that keeps requesting tools forever is stopped at the step limit`() =
         runTest {
             val call = ToolCall(CallId("call-1"), "get_time", buildJsonObject {})

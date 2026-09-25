@@ -36,6 +36,7 @@ public class AgentLoop(
     public fun run(
         history: List<HistoryItem>,
         input: String,
+        onApprovalResolved: suspend (List<CallId>) -> Unit = {},
     ): Flow<AgentEvent> =
         flow {
             val newItems = mutableListOf<HistoryItem>(HistoryItem.UserMessage(idGenerator.newItemId(), input))
@@ -58,10 +59,10 @@ public class AgentLoop(
                     emit(AgentEvent.TurnCompleted(newItems.toList()))
                     return@flow
                 }
-                val sharedDecisions = confirmGroups(turn.toolCalls)
+                val sharedDecisions = confirmGroups(turn.toolCalls, onApprovalResolved)
                 for (call in turn.toolCalls) {
                     newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, call.arguments)
-                    newItems += runToolCall(call, sharedDecisions[call.callId])
+                    newItems += runToolCall(call, sharedDecisions[call.callId], onApprovalResolved)
                 }
             }
         }
@@ -98,12 +99,16 @@ public class AgentLoop(
      * Asks one shared question per group of confirm-level calls (before anything runs), so the user
      * answers once for a batch instead of once per call. Returns the answer for each grouped call.
      */
-    private suspend fun FlowCollector<AgentEvent>.confirmGroups(calls: List<ToolCall>): Map<CallId, Approval> {
+    private suspend fun FlowCollector<AgentEvent>.confirmGroups(
+        calls: List<ToolCall>,
+        onApprovalResolved: suspend (List<CallId>) -> Unit,
+    ): Map<CallId, Approval> {
         val decisions = mutableMapOf<CallId, Approval>()
         for (group in toolPipeline.batchGroups(calls)) {
             group.forEach { emit(AgentEvent.ToolCallStarted(it, describe(it))) }
             emit(AgentEvent.BatchApprovalRequested(group.map { it.callId }))
             val decision = if (toolPipeline.confirmBatch(group)) Approval.GRANTED else Approval.DECLINED
+            onApprovalResolved(group.map { it.callId })
             group.forEach { decisions[it.callId] = decision }
         }
         return decisions
@@ -117,6 +122,7 @@ public class AgentLoop(
     private suspend fun FlowCollector<AgentEvent>.runToolCall(
         call: ToolCall,
         sharedDecision: Approval?,
+        onApprovalResolved: suspend (List<CallId>) -> Unit,
     ): HistoryItem.ToolOutput {
         if (sharedDecision == null) {
             val description = describe(call)
@@ -125,7 +131,10 @@ public class AgentLoop(
                 emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
             }
         }
-        val outcome = toolPipeline.run(call.name, call.arguments, sharedDecision ?: Approval.ASK)
+        val outcome =
+            toolPipeline.run(call.name, call.arguments, sharedDecision ?: Approval.ASK) {
+                onApprovalResolved(listOf(call.callId))
+            }
         emit(AgentEvent.ToolCallFinished(call, outcome))
         return HistoryItem.ToolOutput(idGenerator.newItemId(), call.callId, outcome.toOutputText())
     }

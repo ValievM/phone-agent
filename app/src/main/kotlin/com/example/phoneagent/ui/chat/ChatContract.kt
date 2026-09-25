@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
@@ -8,11 +9,29 @@ import kotlinx.serialization.json.JsonObject
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
-    val isRunning: Boolean = false,
-    val error: AgentError? = null,
-    /** The last turn failed in a way a retry can fix; the UI offers "Повторить" only then. */
-    val canRetry: Boolean = false,
+    val turn: TurnState = TurnState.Idle,
+    val historySync: HistorySyncState = HistorySyncState.Loading,
 )
+
+sealed interface HistorySyncState {
+    data object Loading : HistorySyncState
+
+    data object Ready : HistorySyncState
+
+    data class Failed(
+        val operation: StorageOperation,
+        val error: AgentError =
+            when (operation) {
+                StorageOperation.LOAD -> AgentError.Unexpected("Failed to load conversation history")
+                StorageOperation.SAVE -> AgentError.Unexpected("Failed to save conversation history")
+            },
+    ) : HistorySyncState
+}
+
+enum class StorageOperation {
+    LOAD,
+    SAVE,
+}
 
 data class ChatMessage(
     val id: String,

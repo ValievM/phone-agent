@@ -4,6 +4,7 @@ import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
@@ -59,8 +60,16 @@ class ChatViewModelRetryTest {
             forbidden.first.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
 
-            assertTrue(offline.first.state.value.canRetry)
-            assertFalse(forbidden.first.state.value.canRetry)
+            assertTrue(offline.first.state.value.turn is TurnState.FailedRetryable)
+            assertTrue(
+                offline.first.state.value.turn
+                    .hasRetryAction(),
+            )
+            assertTrue(forbidden.first.state.value.turn is TurnState.FailedTerminal)
+            assertFalse(
+                forbidden.first.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -90,8 +99,12 @@ class ChatViewModelRetryTest {
                 viewModel.state.value.messages
                     .map { it.role to it.text },
             )
-            assertNull(viewModel.state.value.error)
-            assertFalse(viewModel.state.value.canRetry)
+            assertNull(viewModel.state.value.errorForDisplay())
+            assertEquals(TurnState.Idle, viewModel.state.value.turn)
+            assertFalse(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
             assertEquals(
                 listOf("Привет", "Full answer"),
                 repository.load().map { (it as? HistoryItem.UserMessage)?.text ?: (it as HistoryItem.AssistantMessage).text },
@@ -156,7 +169,10 @@ class ChatViewModelRetryTest {
             advanceUntilIdle()
 
             assertEquals(1, gateway.requests.size)
-            assertFalse(viewModel.state.value.canRetry)
+            assertFalse(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -167,8 +183,15 @@ class ChatViewModelRetryTest {
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
 
-            assertNull(viewModel.state.value.error)
-            assertFalse(viewModel.state.value.canRetry)
+            assertNull(
+                viewModel.state.value
+                    .errorForDisplay()
+                    ?.toPresentation(),
+            )
+            assertFalse(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -185,7 +208,10 @@ class ChatViewModelRetryTest {
             runCurrent()
 
             try {
-                assertTrue(viewModel.state.value.isRunning)
+                assertTrue(
+                    viewModel.state.value.turn
+                        .isInProgress(),
+                )
                 assertEquals(
                     listOf("Привет"),
                     repository.load().map { (it as HistoryItem.UserMessage).text },

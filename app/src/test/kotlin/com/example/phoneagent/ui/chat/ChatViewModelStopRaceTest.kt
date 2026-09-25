@@ -66,8 +66,9 @@ class ChatViewModelStopRaceTest {
 
             // The second turn is still waiting on the hanging gateway: the composer must stay locked.
             assertTrue(
-                "the second turn must keep isRunning, was ${viewModel.state.value.isRunning}",
-                viewModel.state.value.isRunning,
+                "the second turn must stay active, was ${viewModel.state.value.turn}",
+                viewModel.state.value.turn
+                    .isInProgress(),
             )
 
             // With the flag wrongly cleared, this third submit would start a parallel turn.

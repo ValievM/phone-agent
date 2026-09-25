@@ -71,6 +71,17 @@ class AgentLoopBatchApprovalTest {
         }
 
     @Test
+    fun `a batch approval resolution reports the exact ordered call ids`() =
+        runTest {
+            respondWith(alarm(1), alarm(2), alarm(3))
+            val resolvedCallIds = mutableListOf<List<CallId>>()
+
+            loop(tools(alarmTool())).run(emptyList(), "три будильника") { callIds -> resolvedCallIds += callIds }.toList()
+
+            assertEquals(listOf(listOf(CallId("call-1"), CallId("call-2"), CallId("call-3"))), resolvedCallIds)
+        }
+
+    @Test
     fun `declining the shared question rejects every call and the turn continues`() =
         runTest {
             interaction.batchApprovalResult = false

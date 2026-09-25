@@ -5,13 +5,20 @@ import androidx.lifecycle.viewModelScope
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentEvent
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.ApprovedCall
 import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.PendingApproval
 import com.example.phoneagent.domain.conversation.ToolCall
+import com.example.phoneagent.domain.conversation.TurnEvent
+import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.domain.conversation.transitionTurn
+import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.storage.ConversationRepository
+import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
@@ -40,8 +47,7 @@ class ChatViewModel
         private var nextMessageId = 0L
         private var runningJob: Job? = null
 
-        // Identity of the newest submitted turn: a cancelled turn's finally runs later and must
-        // not touch the state of a turn submitted after it (Stop clears isRunning right away).
+        // Identity of the newest submitted turn: a cancelled turn's finally must not touch a newer one.
         private var currentTurn: Any? = null
 
         // Persisted snapshots are authoritative for history; ChatMessage remains a UI-only rendering
@@ -53,19 +59,19 @@ class ChatViewModel
         private var historyBeforeTurn: List<HistoryItem> = emptyList()
         private val initialHistoryLoaded = CompletableDeferred<Unit>()
 
-        // Set while the last persist() failed, so the next successful save knows to clear the
-        // (now stale) save error - and only that error, never a newer turn error.
+        // A successful later save clears only a stale save failure, never a load or turn failure.
         private var saveFailed = false
-        private val saveError = AgentError.Unexpected("Failed to save conversation history")
 
         // Every history we wrote and have not yet seen come back through observe(); a turn now saves
         // twice (the question, then the finished turn), so one slot could mistake the first echo for
         // an outside change and rebuild the feed from a stale list.
         private val pendingOwnEmissions = ArrayDeque<List<HistoryItem>>()
         private val toolMessageIdByCallId = mutableMapOf<CallId, String>()
+        private val approvalRequestByCallId = mutableMapOf<CallId, ApprovalRequest>()
+        private val agentEventHandler = AgentEventHandler()
 
-        // AgentLoop runs tool calls strictly one at a time, so "the last one started" is always
-        // the one an ApprovalRequested (which carries no call id of its own) belongs to.
+        // Single approval events do not carry a call id; AgentLoop runs tool calls sequentially.
+        private var lastToolCallId: CallId? = null
         private var lastToolMessageId: String? = null
 
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
@@ -102,7 +108,13 @@ class ChatViewModel
                     throw exception
                 } catch (exception: Exception) {
                     mutableState.update {
-                        it.copy(error = AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"))
+                        it.copy(
+                            historySync =
+                                HistorySyncState.Failed(
+                                    StorageOperation.LOAD,
+                                    AgentError.Unexpected("Failed to load conversation history (${exception::class.simpleName})"),
+                                ),
+                        )
                     }
                 } finally {
                     initialHistoryLoaded.complete(Unit)
@@ -117,10 +129,9 @@ class ChatViewModel
                 }
 
                 ChatUiEvent.Stop -> {
+                    mutableState.update { state -> state.copy(turn = transitionTurn(state.turn, TurnEvent.Stop)) }
+                    cancelPendingToolCards()
                     runningJob?.cancel()
-                    // A cancel racing the very first step of the turn never runs collectTurn's
-                    // finally, so the flag is cleared here; the finally just repeats it harmlessly.
-                    mutableState.update { it.copy(isRunning = false) }
                 }
 
                 is ChatUiEvent.ToggleToolCallDetails -> {
@@ -132,21 +143,35 @@ class ChatViewModel
                 }
 
                 ChatUiEvent.DismissError -> {
-                    mutableState.update { it.copy(error = null, canRetry = false) }
+                    saveFailed = false
+                    mutableState.update { state ->
+                        val clearTurnFailure = state.turn.hasRetryAction() || state.turn is TurnState.FailedTerminal
+                        state.copy(
+                            turn = if (clearTurnFailure) transitionTurn(state.turn, TurnEvent.DismissFailure) else state.turn,
+                            historySync = if (state.historySync is HistorySyncState.Failed) HistorySyncState.Ready else state.historySync,
+                        )
+                    }
                 }
             }
         }
 
-        private fun submit(text: String) {
-            if (text.isBlank() || mutableState.value.isRunning) return
+        private fun submit(
+            text: String,
+            retry: Boolean = false,
+        ) {
+            if (text.isBlank()) return
             val trimmed = text.trim()
+            val questionId = ItemId("pending-${idGenerator.newItemId().value}")
+            val stateBeforeSubmit = mutableState.value
+            val startEvent = if (retry) TurnEvent.Retry(questionId) else TurnEvent.Submitted(questionId)
+            val nextTurn = transitionTurn(stateBeforeSubmit.turn, startEvent)
+            if (nextTurn == stateBeforeSubmit.turn) return
 
             mutableState.update {
                 it.copy(
                     messages = it.messages + ChatMessage(nextId(), ChatRole.USER, trimmed),
-                    isRunning = true,
-                    error = null,
-                    canRetry = false,
+                    turn = nextTurn,
+                    historySync = if (it.historySync is HistorySyncState.Failed) HistorySyncState.Ready else it.historySync,
                 )
             }
 
@@ -154,7 +179,7 @@ class ChatViewModel
             // so a Stop before the echo cannot lose it, and the next submit cannot overwrite it.
             historyBeforeTurn = history
             // The id must be unique: a stopped question stays in history, and the feed keys on it.
-            history = history + HistoryItem.UserMessage(ItemId("pending-${idGenerator.newItemId().value}"), trimmed)
+            history = history + HistoryItem.UserMessage(questionId, trimmed)
             // Saved in its own job: stopping the turn must not cancel the save of the question.
             val questionSnapshot = history
             viewModelScope.launch {
@@ -180,15 +205,15 @@ class ChatViewModel
          */
         private fun retry() {
             val current = mutableState.value
-            if (!current.canRetry || current.isRunning) return
+            if (!current.turn.hasRetryAction()) return
             val failedUserIndex = history.indexOfLast { it is HistoryItem.UserMessage }
             val failedUser = history.getOrNull(failedUserIndex) as? HistoryItem.UserMessage ?: return
             val keptHistory = history.take(failedUserIndex)
             val keptMessages = current.messages.take(current.messages.indexOfLast { it.role == ChatRole.USER }.coerceAtLeast(0))
 
             history = keptHistory
-            mutableState.update { it.copy(messages = keptMessages, error = null, canRetry = false) }
-            submit(failedUser.text)
+            mutableState.update { it.copy(messages = keptMessages) }
+            submit(failedUser.text, retry = true)
         }
 
         private suspend fun persist(items: List<HistoryItem>) {
@@ -196,10 +221,14 @@ class ChatViewModel
             try {
                 conversationRepository.replace(items)
                 if (saveFailed) {
-                    // A later successful save clears the stale save error - but only it, never a
-                    // newer error that arrived in between.
                     saveFailed = false
-                    mutableState.update { state -> if (state.error == saveError) state.copy(error = null) else state }
+                    mutableState.update { state ->
+                        if (state.historySync == HistorySyncState.Failed(StorageOperation.SAVE)) {
+                            state.copy(historySync = HistorySyncState.Ready)
+                        } else {
+                            state
+                        }
+                    }
                 }
             } catch (exception: CancellationException) {
                 pendingOwnEmissions.remove(items)
@@ -207,7 +236,7 @@ class ChatViewModel
             } catch (_: Exception) {
                 pendingOwnEmissions.remove(items)
                 saveFailed = true
-                mutableState.update { it.copy(error = saveError) }
+                mutableState.update { it.copy(historySync = HistorySyncState.Failed(StorageOperation.SAVE)) }
             }
         }
 
@@ -217,95 +246,164 @@ class ChatViewModel
         ) {
             try {
                 var assistantMessageId: String? = null
-                agentLoop.run(historyBeforeTurn, text).collect { event ->
-                    assistantMessageId = handleAgentEvent(event, assistantMessageId)
-                    if (event is AgentEvent.TurnCompleted || event is AgentEvent.TurnFailed) persist(history)
-                }
+                agentLoop
+                    .run(historyBeforeTurn, text) { callIds ->
+                        updateTurn(TurnEvent.ApprovalResolved(callIds))
+                    }.collect { event ->
+                        assistantMessageId = agentEventHandler.handle(event, assistantMessageId)
+                        when (event) {
+                            is AgentEvent.TurnCompleted -> {
+                                persist(history)
+                                updateTurn(TurnEvent.Completed)
+                            }
+
+                            is AgentEvent.TurnFailed -> {
+                                clearPriorSaveFailure()
+                                updateTurn(TurnEvent.Failed(event.error, event.error.toPresentation()?.retryable == true))
+                                persist(history)
+                            }
+
+                            else -> {
+                                Unit
+                            }
+                        }
+                    }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 // A bug in the loop, a gateway or a tool must not take the app down: keep the
                 // question in history and offer a retry of the whole turn.
-                mutableState.update {
-                    it.copy(error = AgentError.Unexpected("turn failed (${exception::class.simpleName})"), canRetry = true)
+                if (currentTurn === turnToken) {
+                    clearPriorSaveFailure()
+                    updateTurn(TurnEvent.Failed(AgentError.Unexpected("turn failed (${exception::class.simpleName})"), retryable = true))
                 }
             } finally {
-                val pendingIds = toolMessageIdByCallId.values.toList()
-                toolMessageIdByCallId.clear()
-                mutableState.update { state -> pendingIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.Cancelled) } }
-                // A submit right after Stop starts a new turn before this cancelled turn's finally
-                // runs; only the newest turn may clear the running flag.
-                mutableState.update { state -> if (currentTurn === turnToken) state.copy(isRunning = false) else state }
+                if (currentTurn === turnToken) {
+                    cancelPendingToolCards()
+                    mutableState.update { state ->
+                        if (state.turn.isInProgress()) state.copy(turn = transitionTurn(state.turn, TurnEvent.Stop)) else state
+                    }
+                }
             }
         }
 
-        private fun handleAgentEvent(
-            event: AgentEvent,
-            assistantMessageId: String?,
-        ): String? =
-            when (event) {
-                is AgentEvent.TextDelta -> {
-                    val id = assistantMessageId ?: nextId()
-                    mutableState.update { it.withAssistantDelta(id, event.text) }
-                    id
+        private inner class AgentEventHandler {
+            fun handle(
+                event: AgentEvent,
+                assistantMessageId: String?,
+            ): String? =
+                when (event) {
+                    is AgentEvent.TextDelta -> {
+                        appendAssistantDelta(event, assistantMessageId)
+                    }
+
+                    is AgentEvent.ToolCallStarted -> {
+                        addToolCallCard(event)
+                    }
+
+                    is AgentEvent.BatchApprovalRequested -> {
+                        requestBatchApproval(event)
+                        assistantMessageId
+                    }
+
+                    is AgentEvent.ApprovalRequested -> {
+                        requestSingleApproval(event)
+                        assistantMessageId
+                    }
+
+                    is AgentEvent.ToolCallFinished -> {
+                        finishToolCall(event)
+                        assistantMessageId
+                    }
+
+                    is AgentEvent.TurnCompleted -> {
+                        updateHistory(event.newItems, assistantMessageId)
+                    }
+
+                    is AgentEvent.TurnFailed -> {
+                        updateHistory(event.newItems, assistantMessageId)
+                    }
                 }
 
-                is AgentEvent.ToolCallStarted -> {
-                    val id = nextId()
-                    toolMessageIdByCallId[event.call.callId] = id
-                    lastToolMessageId = id
-                    val toolCall =
-                        ToolCallMessage(
-                            status = ToolCallStatus.Running,
-                            description = event.description,
-                            arguments = event.call.arguments,
+            private fun appendAssistantDelta(
+                event: AgentEvent.TextDelta,
+                assistantMessageId: String?,
+            ): String {
+                val id = assistantMessageId ?: nextId()
+                mutableState.update { it.withAssistantDelta(id, event.text) }
+                return id
+            }
+
+            private fun addToolCallCard(event: AgentEvent.ToolCallStarted): String? {
+                val id = nextId()
+                toolMessageIdByCallId[event.call.callId] = id
+                approvalRequestByCallId[event.call.callId] = ApprovalRequest(event.description, Risk.CONFIRM, event.call.arguments)
+                lastToolCallId = event.call.callId
+                lastToolMessageId = id
+                val card = ToolCallMessage(ToolCallStatus.Running, event.description, event.call.arguments)
+                mutableState.update { it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, "", toolCall = card)) }
+                return null
+            }
+
+            private fun requestBatchApproval(event: AgentEvent.BatchApprovalRequested) {
+                val cardIds = event.callIds.mapNotNull { toolMessageIdByCallId[it] }
+                val approvedCalls = event.callIds.mapNotNull { callId -> approvalRequestByCallId[callId]?.let { ApprovedCall(callId, it) } }
+                mutableState.update { state ->
+                    val withCards = cardIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) }
+                    if (approvedCalls.size == event.callIds.size) {
+                        withCards.copy(
+                            turn = transitionTurn(withCards.turn, TurnEvent.ApprovalRequired(PendingApproval.Batch(approvedCalls))),
                         )
-                    mutableState.update {
-                        it.copy(messages = it.messages + ChatMessage(id, ChatRole.TOOL, "", toolCall = toolCall))
+                    } else {
+                        withCards
                     }
-                    null
-                }
-
-                is AgentEvent.BatchApprovalRequested -> {
-                    val cardIds = event.callIds.mapNotNull { toolMessageIdByCallId[it] }
-                    mutableState.update { state ->
-                        cardIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) }
-                    }
-                    assistantMessageId
-                }
-
-                is AgentEvent.ApprovalRequested -> {
-                    lastToolMessageId?.let { id -> mutableState.update { it.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) } }
-                    assistantMessageId
-                }
-
-                is AgentEvent.ToolCallFinished -> {
-                    finishToolCall(event)
-                    assistantMessageId
-                }
-
-                is AgentEvent.TurnCompleted -> {
-                    // Rebuild from before the turn: newItems carries the real user message, which
-                    // replaces the provisional one saved on submit.
-                    history = historyBeforeTurn + event.newItems
-                    assistantMessageId
-                }
-
-                is AgentEvent.TurnFailed -> {
-                    history = historyBeforeTurn + event.newItems
-                    val presentation = event.error.toPresentation()
-                    mutableState.update {
-                        it.copy(
-                            error = event.error.takeIf { presentation != null },
-                            canRetry = presentation?.retryable == true,
-                        )
-                    }
-                    assistantMessageId
                 }
             }
 
+            private fun requestSingleApproval(event: AgentEvent.ApprovalRequested) {
+                lastToolMessageId?.let { id -> mutableState.update { it.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) } }
+                lastToolCallId?.let { callId -> updateTurn(TurnEvent.ApprovalRequired(PendingApproval.Single(callId, event.request))) }
+            }
+
+            private fun updateHistory(
+                newItems: List<HistoryItem>,
+                assistantMessageId: String?,
+            ): String? {
+                // newItems carries the real user message, replacing the provisional one.
+                history = historyBeforeTurn + newItems
+                return assistantMessageId
+            }
+        }
+
+        private fun updateTurn(event: TurnEvent) {
+            mutableState.update { state -> state.copy(turn = transitionTurn(state.turn, event)) }
+        }
+
+        private fun clearPriorSaveFailure() {
+            val sync = mutableState.value.historySync as? HistorySyncState.Failed ?: return
+            if (sync.operation != StorageOperation.SAVE) return
+            saveFailed = false
+            mutableState.update { state ->
+                if (state.historySync is HistorySyncState.Failed && state.historySync.operation == StorageOperation.SAVE) {
+                    state.copy(historySync = HistorySyncState.Ready)
+                } else {
+                    state
+                }
+            }
+        }
+
+        private fun cancelPendingToolCards() {
+            val pendingIds = toolMessageIdByCallId.values.toList()
+            toolMessageIdByCallId.clear()
+            approvalRequestByCallId.clear()
+            lastToolCallId = null
+            lastToolMessageId = null
+            mutableState.update { state -> pendingIds.fold(state) { acc, id -> acc.withToolCallStatus(id, ToolCallStatus.Cancelled) } }
+        }
+
         private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
             val id = toolMessageIdByCallId.remove(event.call.callId) ?: return
+            approvalRequestByCallId.remove(event.call.callId)
             val fileHits = event.toFileHits()
             val status = event.outcome.toCardStatus(event.call.name, fileHits.size)
             mutableState.update { it.withToolCallStatus(id, status, fileHits) }

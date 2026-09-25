@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -24,7 +26,7 @@ class ChatScreenLiveRegionUiTest {
     fun `the running status is a polite live region so TalkBack announces it once`() {
         composeRule.setContent {
             AppTheme(useDynamicColor = false) {
-                ChatScreen(state = ChatUiState(isRunning = true), onEvent = {}, onOpenSettings = {})
+                ChatScreen(state = ChatUiState(turn = TurnState.Running(ItemId("question-1"))), onEvent = {}, onOpenSettings = {})
             }
         }
 

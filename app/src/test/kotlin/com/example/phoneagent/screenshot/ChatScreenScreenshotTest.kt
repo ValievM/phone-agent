@@ -3,6 +3,8 @@ package com.example.phoneagent.screenshot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.ui.chat.ChatMessage
 import com.example.phoneagent.ui.chat.ChatRole
 import com.example.phoneagent.ui.chat.ChatScreen
@@ -21,6 +23,20 @@ import org.robolectric.annotation.GraphicsMode
 class ChatScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private fun failed(
+        error: AgentError,
+        retryable: Boolean,
+        messages: List<ChatMessage> = asked,
+    ) = ChatUiState(
+        messages = messages,
+        turn =
+            if (retryable) {
+                TurnState.FailedRetryable(ItemId("question-1"), error)
+            } else {
+                TurnState.FailedTerminal(error)
+            },
+    )
 
     private fun screen(
         name: String,
@@ -81,30 +97,29 @@ class ChatScreenScreenshotTest {
             "running",
             ChatUiState(
                 messages = listOf(ChatMessage("1", ChatRole.USER, "Найди договор аренды")),
-                isRunning = true,
+                turn = TurnState.Running(ItemId("question-1")),
             ),
         )
 
     private val asked = listOf(ChatMessage("1", ChatRole.USER, "Найди договор аренды"))
 
     @Test
-    fun offlineBanner() = screen("offline", ChatUiState(messages = asked, error = AgentError.Offline, canRetry = true))
+    fun offlineBanner() = screen("offline", failed(AgentError.Offline, retryable = true))
 
     @Test
-    fun sessionExpiredBanner() = screen("session_expired", ChatUiState(messages = asked, error = AgentError.SessionExpired))
+    fun sessionExpiredBanner() = screen("session_expired", failed(AgentError.SessionExpired, retryable = false))
 
     @Test
     fun timeoutInline() =
         screen(
             "timeout_inline",
-            ChatUiState(messages = asked, error = AgentError.Timeout, canRetry = true),
+            failed(AgentError.Timeout, retryable = true),
             listOf(Variant.Light, Variant.Dark, Variant.LargeFont),
         )
 
     @Test
-    fun rateLimitedInline() =
-        screen("rate_limited_inline", ChatUiState(messages = asked, error = AgentError.RateLimited(30), canRetry = true))
+    fun rateLimitedInline() = screen("rate_limited_inline", failed(AgentError.RateLimited(30), retryable = true))
 
     @Test
-    fun forbiddenInlineWithoutRetry() = screen("forbidden_inline", ChatUiState(messages = asked, error = AgentError.Forbidden))
+    fun forbiddenInlineWithoutRetry() = screen("forbidden_inline", failed(AgentError.Forbidden, retryable = false))
 }

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.ui.designsystem.components.Composer
 import com.example.phoneagent.ui.designsystem.components.ComposerMode
 import com.example.phoneagent.ui.designsystem.components.FileHit
@@ -117,8 +118,8 @@ private fun ChatBody(
     modifier: Modifier = Modifier,
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
-    val error = state.error?.toPresentation()
-    val retry = if (state.canRetry) ({ onEvent(ChatUiEvent.Retry) }) else null
+    val error = state.errorForDisplay()?.toPresentation()
+    val retry = if (state.turn.hasRetryAction()) ({ onEvent(ChatUiEvent.Retry) }) else null
     Column(modifier = modifier.fillMaxSize()) {
         MessageList(
             messages = state.messages,
@@ -150,7 +151,7 @@ private fun ChatBody(
         Composer(
             draft = draft,
             onDraftChange = { draft = it },
-            mode = if (state.isRunning) ComposerMode.Running else ComposerMode.Ready,
+            mode = if (state.turn.isInProgress()) ComposerMode.Running else ComposerMode.Ready,
             onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
             onStop = { onEvent(ChatUiEvent.Stop) },
         )
@@ -163,5 +164,5 @@ private fun ChatBody(
  */
 private fun ChatUiState.isPreparingAnswer(): Boolean {
     val lastToolStatus = messages.lastOrNull()?.toolCall?.status
-    return isRunning && lastToolStatus != ToolCallStatus.AwaitingApproval && lastToolStatus != ToolCallStatus.Running
+    return turn is TurnState.Running && lastToolStatus != ToolCallStatus.AwaitingApproval && lastToolStatus != ToolCallStatus.Running
 }

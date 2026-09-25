@@ -5,6 +5,7 @@ import com.example.phoneagent.domain.agent.AgentLoop
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
@@ -62,7 +63,10 @@ class ChatViewModelProcessDeathTest {
             runCurrent()
 
             try {
-                assertTrue(viewModel.state.value.isRunning)
+                assertTrue(
+                    viewModel.state.value.turn
+                        .isInProgress(),
+                )
                 assertEquals(
                     listOf("Поставь будильник"),
                     repository.load().filterIsInstance<HistoryItem.UserMessage>().map(HistoryItem.UserMessage::text),
@@ -108,7 +112,7 @@ class ChatViewModelProcessDeathTest {
 
             assertEquals(1, gateway.requests.size)
             assertEquals(listOf("Привет", "Готово"), repository.load().map(::textOf))
-            assertNull(viewModel.state.value.error)
+            assertNull(viewModel.state.value.errorForDisplay())
         }
 
     @Test
@@ -131,8 +135,12 @@ class ChatViewModelProcessDeathTest {
                 viewModel.state.value.messages
                     .map(ChatMessage::text),
             )
-            assertEquals(AgentError.Interrupted, viewModel.state.value.error)
-            assertTrue(viewModel.state.value.canRetry)
+            assertTrue(viewModel.state.value.turn is TurnState.Interrupted)
+            assertEquals(ItemId("u2"), (viewModel.state.value.turn as TurnState.Interrupted).questionId)
+            assertTrue(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -144,8 +152,12 @@ class ChatViewModelProcessDeathTest {
             val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
             advanceUntilIdle()
 
-            assertNull(viewModel.state.value.error)
-            assertFalse(viewModel.state.value.canRetry)
+            assertNull(viewModel.state.value.errorForDisplay())
+            assertEquals(TurnState.Idle, viewModel.state.value.turn)
+            assertFalse(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -178,7 +190,7 @@ class ChatViewModelProcessDeathTest {
                 listOf("Первый вопрос", "Первый ответ", "Второй вопрос", "Второй ответ"),
                 repository.load().map(::textOf),
             )
-            assertNull(viewModel.state.value.error)
+            assertNull(viewModel.state.value.errorForDisplay())
         }
 
     @Test
@@ -187,13 +199,17 @@ class ChatViewModelProcessDeathTest {
             val repository = Repository(listOf(HistoryItem.UserMessage(ItemId("u1"), "Вопрос")))
             val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
             advanceUntilIdle()
-            assertEquals(AgentError.Interrupted, viewModel.state.value.error)
+            assertEquals(AgentError.Interrupted, viewModel.state.value.errorForDisplay())
 
             repository.replace(emptyList())
             advanceUntilIdle()
 
-            assertNull(viewModel.state.value.error)
-            assertFalse(viewModel.state.value.canRetry)
+            assertNull(viewModel.state.value.errorForDisplay())
+            assertEquals(TurnState.Idle, viewModel.state.value.turn)
+            assertFalse(
+                viewModel.state.value.turn
+                    .hasRetryAction(),
+            )
         }
 
     @Test
@@ -232,7 +248,10 @@ class ChatViewModelProcessDeathTest {
             viewModel.onEvent(ChatUiEvent.Submit("Первый"))
             viewModel.onEvent(ChatUiEvent.Stop)
             advanceUntilIdle()
-            assertFalse(viewModel.state.value.isRunning)
+            assertFalse(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
             assertEquals(0, gateway.requests.size)
 
             viewModel.onEvent(ChatUiEvent.Submit("Второй"))
@@ -279,14 +298,15 @@ class ChatViewModelProcessDeathTest {
             advanceUntilIdle()
 
             val state = viewModel.state.value
-            assertFalse(state.isRunning)
-            assertNotNull(state.error)
-            assertTrue(state.canRetry)
+            assertFalse(state.turn.isInProgress())
+            assertTrue(state.turn is TurnState.FailedRetryable)
+            assertNotNull(state.errorForDisplay())
+            assertTrue(state.turn.hasRetryAction())
 
             viewModel.onEvent(ChatUiEvent.Retry)
             advanceUntilIdle()
 
-            assertNull(viewModel.state.value.error)
+            assertNull(viewModel.state.value.errorForDisplay())
             assertEquals(listOf("Привет", "Ответ"), repository.load().map(::textOf))
         }
 
@@ -301,7 +321,8 @@ class ChatViewModelProcessDeathTest {
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
 
-            assertNull(viewModel.state.value.error)
+            assertNull(viewModel.state.value.errorForDisplay())
+            assertEquals(HistorySyncState.Ready, viewModel.state.value.historySync)
             assertEquals(listOf("Привет", "Ответ"), repository.load().map(::textOf))
         }
 
@@ -316,8 +337,53 @@ class ChatViewModelProcessDeathTest {
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
 
-            assertNotNull(viewModel.state.value.error)
+            assertEquals(HistorySyncState.Failed(StorageOperation.SAVE), viewModel.state.value.historySync)
+            assertNotNull(viewModel.state.value.errorForDisplay())
             assertEquals(listOf("Привет"), repository.load().map(::textOf))
+        }
+
+    @Test
+    fun `a final save error remains visible when the model turn also fails`() =
+        runTest(dispatcher.scheduler) {
+            val repository = FailLastSaveRepository()
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(AgentError.Timeout)) }
+            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            advanceUntilIdle()
+
+            assertEquals(HistorySyncState.Failed(StorageOperation.SAVE), viewModel.state.value.historySync)
+            assertEquals(
+                AgentError.Unexpected("Failed to save conversation history"),
+                viewModel.state.value.errorForDisplay(),
+            )
+            assertTrue(viewModel.state.value.turn is TurnState.FailedRetryable)
+
+            viewModel.onEvent(ChatUiEvent.DismissError)
+
+            assertNull(viewModel.state.value.errorForDisplay())
+            assertEquals(TurnState.Idle, viewModel.state.value.turn)
+            assertEquals(HistorySyncState.Ready, viewModel.state.value.historySync)
+        }
+
+    @Test
+    fun `a history save failure is separate from an active turn`() =
+        runTest(dispatcher.scheduler) {
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), AlwaysFailingSaveRepository())
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("Привет"))
+            runCurrent()
+
+            assertTrue(viewModel.state.value.turn is TurnState.Running)
+            assertEquals(
+                HistorySyncState.Failed(StorageOperation.SAVE),
+                viewModel.state.value.historySync,
+            )
+
+            viewModel.onEvent(ChatUiEvent.Stop)
+            runCurrent()
         }
 
     private fun textOf(item: HistoryItem): String =
@@ -421,6 +487,16 @@ class ChatViewModelProcessDeathTest {
             this.items = items
             mutableItems.value = items
         }
+    }
+
+    private class AlwaysFailingSaveRepository : ConversationRepository {
+        private val mutableItems = MutableStateFlow<List<HistoryItem>>(emptyList())
+
+        override suspend fun load(): List<HistoryItem> = mutableItems.value
+
+        override fun observe(): Flow<List<HistoryItem>> = mutableItems
+
+        override suspend fun replace(items: List<HistoryItem>): Unit = throw java.io.IOException("disk is full")
     }
 
     /** The first turn explodes mid-stream; the retry answers normally. */
