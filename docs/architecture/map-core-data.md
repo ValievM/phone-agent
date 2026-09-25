@@ -113,7 +113,7 @@ class UserInteraction {
 class CredentialsProvider {
   <<interface>>
   +current() CredentialsResult
-  +refreshAfterUnauthorized() Credentials
+  +refreshAfterUnauthorized() CredentialsResult
 }
 class HistoryItem {
   <<sealed>>

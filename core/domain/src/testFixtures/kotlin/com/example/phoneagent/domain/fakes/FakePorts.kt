@@ -74,9 +74,13 @@ public class FakeCredentialsProvider(
 ) : CredentialsProvider {
     public var refreshedCredentials: Credentials? = null
 
+    /** Overrides [refreshedCredentials] when a test needs the refresh itself to be temporarily unavailable. */
+    public var refreshResult: CredentialsResult? = null
+
     override suspend fun current(): CredentialsResult = currentResult
 
-    override suspend fun refreshAfterUnauthorized(): Credentials? = refreshedCredentials
+    override suspend fun refreshAfterUnauthorized(): CredentialsResult =
+        refreshResult ?: refreshedCredentials?.let(CredentialsResult::Ready) ?: CredentialsResult.SignedOut
 }
 
 public class FakeClock(

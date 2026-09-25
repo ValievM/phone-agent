@@ -1,5 +1,6 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.auth.Credentials
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -69,7 +70,7 @@ class SessionManagerTest {
                 )
             manager.signIn(AuthMethod.CHATGPT_BROWSER)
 
-            assertEquals(null, manager.refreshAfterUnauthorized())
+            assertEquals(CredentialsResult.SignedOut, manager.refreshAfterUnauthorized())
             assertEquals(AuthState.SignedOut, manager.state.value)
             assertEquals(null, store.stored)
         }
@@ -168,7 +169,7 @@ class SessionManagerTest {
             manager.signOut()
             gate.complete(RefreshResult.Success(tokens(accountId = "late")))
 
-            assertEquals(null, refresh.await())
+            assertEquals(CredentialsResult.SignedOut, refresh.await())
             assertEquals(null, store.stored)
             assertEquals(AuthState.SignedOut, manager.state.value)
             assertEquals(CredentialsResult.SignedOut, manager.current())
@@ -211,6 +212,40 @@ class SessionManagerTest {
 
             assertEquals(CredentialsResult.Unavailable, manager.current())
             assertEquals(stored, store.stored)
+        }
+
+    @Test
+    fun `a network failure during the forced refresh keeps the session and says the credentials are unavailable`() =
+        runTest {
+            val stored = tokens(accountId = "a")
+            val store = InMemoryTokenStore()
+            val manager =
+                sessionManager(
+                    provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER, AuthResult.Success(stored)),
+                    store = store,
+                    refreshResult = RefreshResult.Failure(AuthFailure.Network("offline")),
+                )
+            manager.signIn(AuthMethod.CHATGPT_BROWSER)
+
+            assertEquals(CredentialsResult.Unavailable, manager.refreshAfterUnauthorized())
+            assertEquals(stored, store.stored)
+            assertEquals(AuthState.Error(AuthMethod.CHATGPT_BROWSER, AuthFailure.Network("offline")), manager.state.value)
+        }
+
+    @Test
+    fun `a successful forced refresh returns the fresh credentials`() =
+        runTest {
+            val fresh = tokens(accountId = "fresh-account")
+            val manager =
+                sessionManager(
+                    provider = FakeAuthProvider(AuthMethod.CHATGPT_BROWSER, AuthResult.Success(tokens(accountId = "old"))),
+                    refreshResult = RefreshResult.Success(fresh),
+                )
+            manager.signIn(AuthMethod.CHATGPT_BROWSER)
+
+            val result = manager.refreshAfterUnauthorized()
+
+            assertEquals(CredentialsResult.Ready(Credentials(fresh.accessToken, "fresh-account")), result)
         }
 
     private fun sessionManager(

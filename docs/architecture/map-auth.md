@@ -14,7 +14,7 @@ class SessionManager {
   +signIn(method) AuthResult
   +signOut()
   +current() CredentialsResult
-  +refreshAfterUnauthorized() Credentials
+  +refreshAfterUnauthorized() CredentialsResult
 }
 class TokenRefresher {
   +current(forceRefresh) TokenRefreshOutcome

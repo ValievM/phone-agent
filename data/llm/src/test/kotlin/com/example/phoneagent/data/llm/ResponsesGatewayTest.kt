@@ -200,6 +200,41 @@ class ResponsesGatewayTest {
         }
 
     @Test
+    fun `a 401 followed by a temporary refresh failure fails with Offline so the user can retry, not with SessionExpired`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(MockResponse.Builder().code(401).build())
+                val credentialsProvider =
+                    FakeCredentialsProvider(
+                        current = CredentialsResult.Ready(Credentials("stale", null)),
+                        refreshOutcome = CredentialsResult.Unavailable,
+                    )
+
+                val events = gateway(server, credentials = credentialsProvider).stream(request()).toList()
+
+                assertEquals(1, credentialsProvider.refreshCalls)
+                assertEquals(listOf(ModelEvent.Failed(AgentError.Offline)), events)
+            }
+        }
+
+    @Test
+    fun `a 401 followed by a lost session fails with SessionExpired`() =
+        runTest {
+            withServer { server ->
+                server.enqueue(MockResponse.Builder().code(401).build())
+                val credentialsProvider =
+                    FakeCredentialsProvider(
+                        current = CredentialsResult.Ready(Credentials("stale", null)),
+                        refreshOutcome = CredentialsResult.SignedOut,
+                    )
+
+                val events = gateway(server, credentials = credentialsProvider).stream(request()).toList()
+
+                assertEquals(listOf(ModelEvent.Failed(AgentError.SessionExpired)), events)
+            }
+        }
+
+    @Test
     fun `a rejected request logs the error identifiers but never the response body`() =
         runTest {
             withServer { server ->
@@ -351,14 +386,15 @@ class ResponsesGatewayTest {
     private class FakeCredentialsProvider(
         private val current: CredentialsResult = CredentialsResult.Ready(Credentials("token", null)),
         private val refreshed: Credentials? = null,
+        private val refreshOutcome: CredentialsResult? = null,
     ) : CredentialsProvider {
         var refreshCalls: Int = 0
 
         override suspend fun current(): CredentialsResult = current
 
-        override suspend fun refreshAfterUnauthorized(): Credentials? {
+        override suspend fun refreshAfterUnauthorized(): CredentialsResult {
             refreshCalls += 1
-            return refreshed
+            return refreshOutcome ?: refreshed?.let(CredentialsResult::Ready) ?: CredentialsResult.SignedOut
         }
     }
 

@@ -86,11 +86,7 @@ public class SessionManager(
 
     override suspend fun current(): CredentialsResult = credentials(forceRefresh = false)
 
-    override suspend fun refreshAfterUnauthorized(): Credentials? =
-        when (val result = credentials(forceRefresh = true)) {
-            is CredentialsResult.Ready -> result.credentials
-            CredentialsResult.SignedOut, CredentialsResult.Unavailable -> null
-        }
+    override suspend fun refreshAfterUnauthorized(): CredentialsResult = credentials(forceRefresh = true)
 
     private suspend fun credentials(forceRefresh: Boolean): CredentialsResult =
         when (val result = tokenRefresher.current(forceRefresh)) {

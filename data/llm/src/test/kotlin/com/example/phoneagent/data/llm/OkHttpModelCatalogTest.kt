@@ -90,7 +90,7 @@ class OkHttpModelCatalogTest {
         object : CredentialsProvider {
             override suspend fun current(): CredentialsResult = CredentialsResult.Ready(Credentials("test-token", accountId = null))
 
-            override suspend fun refreshAfterUnauthorized(): Credentials? = null
+            override suspend fun refreshAfterUnauthorized(): CredentialsResult = CredentialsResult.SignedOut
         }
 
     private fun catalog(server: MockWebServer): OkHttpModelCatalog =

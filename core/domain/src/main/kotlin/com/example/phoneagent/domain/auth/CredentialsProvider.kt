@@ -19,5 +19,10 @@ public sealed interface CredentialsResult {
 public interface CredentialsProvider {
     public suspend fun current(): CredentialsResult
 
-    public suspend fun refreshAfterUnauthorized(): Credentials?
+    /**
+     * Forces a token refresh after the backend answered 401. [CredentialsResult.SignedOut] means the session is
+     * gone (the user must sign in again); [CredentialsResult.Unavailable] means the refresh could not be done right
+     * now (no network) and the session is kept, so the caller reports a temporary failure, not an expired session.
+     */
+    public suspend fun refreshAfterUnauthorized(): CredentialsResult
 }

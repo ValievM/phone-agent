@@ -104,17 +104,23 @@ public class ResponsesGateway(
         val model = settingsRepository.load().model ?: DEFAULT_MODEL
         val body = buildResponsesRequestBody(request, profile, model, newSessionId())
         var credentials = initialCredentials
-        var sessionExpired = false
+        var failure: AgentError? = null
         for (attempt in 1..MAX_ATTEMPTS) {
             if (attempt(body, credentials, activeCall) != AttemptOutcome.Unauthorized) return
-            val refreshed = if (attempt < MAX_ATTEMPTS) credentialsProvider.refreshAfterUnauthorized() else null
-            if (refreshed == null) {
-                sessionExpired = true
-                break
+            // The last attempt still got a 401: the credentials are not the problem any more.
+            val refreshed = if (attempt < MAX_ATTEMPTS) credentialsProvider.refreshAfterUnauthorized() else CredentialsResult.SignedOut
+            when (refreshed) {
+                is CredentialsResult.Ready -> credentials = refreshed.credentials
+
+                // The token could not be refreshed right now (no network): the session is intact, so this is a
+                // temporary failure the user can retry, not an expired session.
+                CredentialsResult.Unavailable -> failure = AgentError.Offline
+
+                CredentialsResult.SignedOut -> failure = AgentError.SessionExpired
             }
-            credentials = refreshed
+            if (failure != null) break
         }
-        if (sessionExpired) send(ModelEvent.Failed(AgentError.SessionExpired))
+        failure?.let { send(ModelEvent.Failed(it)) }
     }
 
     private suspend fun SendChannel<ModelEvent>.attempt(
