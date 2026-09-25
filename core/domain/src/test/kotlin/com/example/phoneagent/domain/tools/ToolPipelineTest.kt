@@ -1,5 +1,6 @@
 package com.example.phoneagent.domain.tools
 
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -195,7 +196,7 @@ class ToolPipelineTest {
         assertTrue(outcome.exceptionOrNull() is CancellationException)
     }
 
-    private fun call(name: String) = ToolCall(name, name, buildJsonObject { })
+    private fun call(name: String) = ToolCall(CallId(name), name, buildJsonObject { })
 
     private fun describingTool(
         name: String,
