@@ -23,9 +23,17 @@ jobs:
           distribution: temurin
           java-version: "17"
       # The runner image already ships the Android SDK; only the licenses need accepting so
-      # Gradle can download the platform and build-tools it is missing.
+      # Gradle can download the platform and build-tools it is missing. The sdkmanager folder
+      # is "latest" on some images and a version number ("16.0") on others, so look it up.
       - name: Accept Android SDK licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::warning::sdkmanager not found under $ANDROID_HOME/cmdline-tools; skipping license acceptance"
+          else
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+          fi
       - uses: gradle/actions/setup-gradle@v4
       - name: Build, detekt, lint, unit tests
         run: ./gradlew check
