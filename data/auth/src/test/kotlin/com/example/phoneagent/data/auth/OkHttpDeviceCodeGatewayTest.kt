@@ -1,15 +1,16 @@
 package com.example.phoneagent.data.auth
 
-import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.concurrent.Executors
 
 class OkHttpDeviceCodeGatewayTest {
     @Test
@@ -97,20 +98,33 @@ class OkHttpDeviceCodeGatewayTest {
         }
 
     @Test
-    fun `the device code request dispatches through the port and fails without a server`() =
+    fun `the device code request dispatches through the port and the response comes without network`() =
         runTest {
             val dispatchers = RecordingDispatcherProvider()
-            // Port 1 refuses the connection instantly; the mapping of that failure is covered by
-            // the other tests. This test only proves the blocking section goes through the port.
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("ok")
+                            .body(USER_CODE_JSON.toResponseBody(JSON_MEDIA_TYPE))
+                            .build()
+                    }.build()
             val gateway =
                 OkHttpDeviceCodeGateway(
-                    AuthConfig("http://127.0.0.1:1", "authorize", "token", "client", "redirect", "scope", emptyMap()),
-                    client = OkHttpClient(),
+                    DEVICE_CODE_CONFIG,
+                    client,
                     dispatchers = dispatchers,
                 )
 
-            gateway.requestCode()
-
+            assertEquals(
+                DeviceCodeRequestResult.Ready("auth-id", "CODE-1", "http://device.test/device", 5L),
+                gateway.requestCode(),
+            )
             assertTrue(
                 "the blocking section must go through dispatchers.io",
                 dispatchers.ioDispatcher.dispatchCount.get() >= 1,
@@ -135,6 +149,10 @@ class OkHttpDeviceCodeGatewayTest {
 
     private companion object {
         private const val USER_CODE_JSON = """{"device_auth_id":"auth-id","user_code":"CODE-1","interval":"5"}"""
+        private const val DEVICE_CODE_CONFIG_BODY = "http://device.test"
+        private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+        private val DEVICE_CODE_CONFIG =
+            AuthConfig(DEVICE_CODE_CONFIG_BODY, "authorize", "token", "client", "redirect", "scope", emptyMap())
         private const val AUTHORIZED_JSON = """{"authorization_code":"authorization-code","code_verifier":"verifier"}"""
     }
 }

@@ -1,19 +1,20 @@
 package com.example.phoneagent.data.auth
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
-import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.URLDecoder
 import java.net.UnknownHostException
-import java.util.concurrent.Executors
 
 class OkHttpTokenRefreshGatewayTest {
     @Test
@@ -196,24 +197,37 @@ class OkHttpTokenRefreshGatewayTest {
         }
 
     @Test
-    fun `the token request dispatches through the port and fails without a server`() =
+    fun `the token request dispatches through the port and the response comes without network`() =
         runTest {
             val dispatchers = RecordingDispatcherProvider()
-            // Port 1 refuses the connection instantly; the mapping of that failure is covered by
-            // the other tests. This test only proves the blocking section goes through the port.
-            val config =
-                AuthConfig("http://127.0.0.1:1", "authorize", "http://127.0.0.1:1/oauth/token", "client", "redirect", "scope", emptyMap())
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("ok")
+                            .body(
+                                (
+                                    """{"access_token":"access","id_token":"id","refresh_token":"new-refresh",""" +
+                                        """"expires_in":100,"earliest_refresh_at":50}"""
+                                ).toResponseBody(jsonMediaType),
+                            ).build()
+                    }.build()
             val gateway =
                 OkHttpTokenRefreshGateway(
-                    config,
+                    tokenConfig,
                     FakeAppLogger(),
+                    client,
                     nowEpochSeconds = { NOW_SECONDS },
                     retryDelay = {},
                     dispatchers = dispatchers,
                 )
 
-            gateway.exchangeAuthorizationCode(EXCHANGE)
-
+            assertEquals(AuthResult.Success(tokens()), gateway.exchangeAuthorizationCode(EXCHANGE))
             assertTrue(
                 "the blocking section must go through dispatchers.io",
                 dispatchers.ioDispatcher.dispatchCount.get() >= 1,
@@ -231,6 +245,11 @@ class OkHttpTokenRefreshGatewayTest {
         AuthConfig("issuer", "authorize", server.url("/oauth/token").toString(), "client", "redirect", "scope", emptyMap())
 
     private fun tokens(): AuthTokens = AuthTokens("access", "id", "new-refresh", NOW_SECONDS + 100L, 50L, AuthMethod.CHATGPT_BROWSER)
+
+    private val jsonMediaType = "application/json".toMediaType()
+
+    private val tokenConfig =
+        AuthConfig("http://token.test", "authorize", "http://token.test/oauth/token", "client", "redirect", "scope", emptyMap())
 
     private fun tokensResponse(): MockResponse =
         MockResponse
