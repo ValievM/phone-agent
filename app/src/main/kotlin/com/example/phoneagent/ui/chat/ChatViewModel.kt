@@ -95,11 +95,21 @@ class ChatViewModel
                         // that came from elsewhere (first load, Settings, another writer) is redrawn.
                         if (!isOwnHistoryEmission) {
                             mutableState.update {
-                                it.withLoadedHistory(loadedHistory, isInitialEmission) { call ->
-                                    agentLoop.describe(
-                                        ToolCall(callId = call.callId, name = call.name, arguments = call.arguments, itemId = call.itemId),
-                                    )
-                                }
+                                it.withLoadedHistory(
+                                    loadedHistory,
+                                    isInitialEmission,
+                                    describe = { call ->
+                                        agentLoop.describe(
+                                            ToolCall(
+                                                callId = call.callId,
+                                                name = call.name,
+                                                arguments = call.arguments,
+                                                itemId = call.itemId,
+                                            ),
+                                        )
+                                    },
+                                    restoreContent = agentLoop::restoreToolContent,
+                                )
                             }
                         }
                         initialHistoryLoaded.complete(Unit)
@@ -404,34 +414,10 @@ class ChatViewModel
         private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
             val id = toolMessageIdByCallId.remove(event.call.callId) ?: return
             approvalRequestByCallId.remove(event.call.callId)
-            val fileHits = event.toFileHits()
-            val status = event.outcome.toCardStatus(event.call.name, fileHits.size)
+            val fileHits = event.outcome.toFileHits()
+            val status = event.outcome.toCardStatus(fileHits.size)
             mutableState.update { it.withToolCallStatus(id, status, fileHits) }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
     }
-
-internal fun ToolOutcome.toCardStatus(
-    toolName: String,
-    fileHitCount: Int,
-): ToolCallStatus =
-    when (this) {
-        is ToolOutcome.Success -> {
-            if (toolName == SEARCH_FILES_TOOL_NAME) {
-                ToolCallStatus.FilesFound(fileHitCount)
-            } else {
-                ToolCallStatus.Done(text)
-            }
-        }
-
-        is ToolOutcome.Rejected -> {
-            ToolCallStatus.Rejected
-        }
-
-        is ToolOutcome.Failed -> {
-            ToolCallStatus.Failed(reason)
-        }
-    }
-
-private const val SEARCH_FILES_TOOL_NAME = "search_files"

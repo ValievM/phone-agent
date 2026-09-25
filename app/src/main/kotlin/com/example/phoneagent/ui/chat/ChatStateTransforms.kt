@@ -6,6 +6,8 @@ import com.example.phoneagent.domain.conversation.TurnEvent
 import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.conversation.transitionTurn
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.ToolContent
+import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.domain.tools.toolOutcomeFromOutputText
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
@@ -57,12 +59,13 @@ internal fun ChatUiState.withLoadedHistory(
     loaded: List<HistoryItem>,
     isInitial: Boolean,
     describe: (HistoryItem.ToolCallItem) -> CallDescription,
+    restoreContent: (String, String) -> ToolContent? = { _, _ -> null },
 ): ChatUiState {
     val restored =
         when {
-            isInitial -> loaded.toChatMessages(describe) + messages
+            isInitial -> loaded.toChatMessages(describe, restoreContent) + messages
             loaded.isEmpty() -> emptyList()
-            else -> loaded.toChatMessages(describe)
+            else -> loaded.toChatMessages(describe, restoreContent)
         }
     val unanswered = loaded.lastOrNull() as? HistoryItem.UserMessage
     val nextTurn =
@@ -100,14 +103,28 @@ internal fun ChatUiState.errorForDisplay(): AgentError? {
  * Draws the saved history: texts as messages, and every tool call as a card where the call happened, with
  * the status read from its saved result (found by call id). A call without a result was cut short.
  */
-internal fun List<HistoryItem>.toChatMessages(describe: (HistoryItem.ToolCallItem) -> CallDescription): List<ChatMessage> {
+internal fun List<HistoryItem>.toChatMessages(
+    describe: (HistoryItem.ToolCallItem) -> CallDescription,
+    restoreContent: (String, String) -> ToolContent? = { _, _ -> null },
+): List<ChatMessage> {
     val outputs = filterIsInstance<HistoryItem.ToolOutput>().associateBy(HistoryItem.ToolOutput::callId)
     return mapNotNull { item ->
         when (item) {
-            is HistoryItem.UserMessage -> ChatMessage(item.itemId.value, ChatRole.USER, item.text)
-            is HistoryItem.AssistantMessage -> ChatMessage(item.itemId.value, ChatRole.ASSISTANT, item.text)
-            is HistoryItem.ToolCallItem -> ChatMessage(item.itemId.value, ChatRole.TOOL, "", item.toCard(outputs[item.callId], describe))
-            is HistoryItem.ToolOutput, is HistoryItem.Opaque -> null
+            is HistoryItem.UserMessage -> {
+                ChatMessage(item.itemId.value, ChatRole.USER, item.text)
+            }
+
+            is HistoryItem.AssistantMessage -> {
+                ChatMessage(item.itemId.value, ChatRole.ASSISTANT, item.text)
+            }
+
+            is HistoryItem.ToolCallItem -> {
+                ChatMessage(item.itemId.value, ChatRole.TOOL, "", item.toCard(outputs[item.callId], describe, restoreContent))
+            }
+
+            is HistoryItem.ToolOutput, is HistoryItem.Opaque -> {
+                null
+            }
         }
     }
 }
@@ -115,11 +132,21 @@ internal fun List<HistoryItem>.toChatMessages(describe: (HistoryItem.ToolCallIte
 private fun HistoryItem.ToolCallItem.toCard(
     output: HistoryItem.ToolOutput?,
     describe: (HistoryItem.ToolCallItem) -> CallDescription,
+    restoreContent: (String, String) -> ToolContent?,
 ): ToolCallMessage {
-    val outcome = output?.let { toolOutcomeFromOutputText(it.output) }
-    val fileHits = outcome?.toFileHits(name).orEmpty()
+    val outcome =
+        output?.let { toolOutcomeFromOutputText(it.output) }?.let { restoredOutcome ->
+            if (restoredOutcome is ToolOutcome.Success) {
+                restoredOutcome.copy(
+                    content = restoreContent(name, restoredOutcome.text),
+                )
+            } else {
+                restoredOutcome
+            }
+        }
+    val fileHits = outcome?.toFileHits().orEmpty()
     return ToolCallMessage(
-        status = outcome?.toCardStatus(name, fileHits.size) ?: ToolCallStatus.Cancelled,
+        status = outcome?.toCardStatus(fileHits.size) ?: ToolCallStatus.Cancelled,
         description = describe(this),
         arguments = arguments,
         fileHits = fileHits,

@@ -19,7 +19,9 @@ import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolFile
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
@@ -393,18 +395,26 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun `search files result is attached as structured file hits`() =
+    fun `structured file content renders without knowing the tool name`() =
         runTest(dispatcher.scheduler) {
-            val result =
-                """{"items":[{"name":"report.pdf",
-                    "uri":"content://media/external/downloads/42","size":1024,"mimeType":"application/pdf"}],
-                    "truncated":false}"""
-            val call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "files_plugin", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
-            val registry = ToolRegistry(setOf(fakeTool("search_files") { ToolResult.Success(result) }))
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("files_plugin") {
+                            ToolResult.Success(
+                                "model-facing output",
+                                ToolContent.FilesFound(
+                                    listOf(ToolFile("report.pdf", "content://media/external/downloads/42", 1024L, "application/pdf")),
+                                ),
+                            )
+                        },
+                    ),
+                )
             val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("найди отчет"))

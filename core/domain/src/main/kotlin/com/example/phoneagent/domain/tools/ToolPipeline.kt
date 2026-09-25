@@ -63,6 +63,26 @@ public class ToolPipeline(
     /** Null for an unregistered name; SAFE tools never trigger [UserInteraction.confirm]. */
     public fun riskOf(name: String): Risk? = registry.find(name)?.spec?.risk
 
+    /** Restores optional typed content through the tool that owns the saved output format. */
+    public fun restoreContent(
+        name: String,
+        outputText: String,
+    ): ToolContent? {
+        val tool = registry.find(name) ?: return null
+        return try {
+            tool.restoreContent(outputText)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (exception: Exception) {
+            logger.warn(
+                TAG,
+                "tool content restore failed",
+                fields = mapOf("name" to name, "error" to exception::class.simpleName.orEmpty()),
+            )
+            null
+        }
+    }
+
     /**
      * Calls of one model response that deserve a single shared question: plain-[Risk.CONFIRM] calls
      * with valid arguments, in groups of at most [maxBatchSize]. A group of one is not a batch (it
@@ -177,7 +197,7 @@ public class ToolPipeline(
         try {
             withTimeout(timeoutMillis) {
                 when (val result = tool.execute(args, ToolContext(clock, logger))) {
-                    is ToolResult.Success -> ToolOutcome.Success(truncate(result.text))
+                    is ToolResult.Success -> ToolOutcome.Success(truncateOutput(result.text, maxOutputBytes), result.content)
                     is ToolResult.Failed -> ToolOutcome.Failed(result.reason)
                 }
             }
@@ -191,14 +211,6 @@ public class ToolPipeline(
             logger.warn(TAG, "tool threw", fields = mapOf("name" to tool.spec.name), throwable = exception)
             ToolOutcome.Failed("tool failed: ${exception::class.simpleName}")
         }
-
-    private fun truncate(text: String): String {
-        val bytes = text.toByteArray(Charsets.UTF_8)
-        if (bytes.size <= maxOutputBytes) return text
-        var end = maxOutputBytes
-        while (end > 0 && bytes[end].isUtf8ContinuationByte()) end--
-        return String(bytes, 0, end, Charsets.UTF_8)
-    }
 
     private companion object {
         private fun Byte.isUtf8ContinuationByte(): Boolean = (toInt() and UTF8_CONTINUATION_BYTE_MASK) == UTF8_CONTINUATION_BYTE_PATTERN
@@ -221,6 +233,19 @@ public class ToolPipeline(
             }
     }
 }
+
+private fun truncateOutput(
+    text: String,
+    maxOutputBytes: Int,
+): String {
+    val bytes = text.toByteArray(Charsets.UTF_8)
+    if (bytes.size <= maxOutputBytes) return text
+    var end = maxOutputBytes
+    while (end > 0 && bytes[end].isUtf8ContinuationByte()) end--
+    return String(bytes, 0, end, Charsets.UTF_8)
+}
+
+private fun Byte.isUtf8ContinuationByte(): Boolean = (toInt() and UTF8_CONTINUATION_BYTE_MASK) == UTF8_CONTINUATION_BYTE_PATTERN
 
 /** Null when the tool's own describe blew up; [CancellationException] always propagates. */
 private fun describeSafely(
