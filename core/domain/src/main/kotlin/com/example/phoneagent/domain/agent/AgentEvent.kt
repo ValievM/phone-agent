@@ -9,6 +9,8 @@ import com.example.phoneagent.domain.tools.ToolOutcome
 
 public data class AgentConfig(
     public val maxSteps: Int = 5,
+    /** Tool executions allowed per turn; a step requesting more is rejected whole, nothing in it runs. */
+    public val maxToolCallsPerTurn: Int = 30,
 )
 
 /** What the UI feed renders as [AgentLoop] runs a turn; the actual approval prompt is a separate concern (UserInteractionBridge). */

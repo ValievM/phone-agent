@@ -40,6 +40,7 @@ public class AgentLoop(
         flow {
             val newItems = mutableListOf<HistoryItem>(HistoryItem.UserMessage(idGenerator.newItemId(), input))
             var step = 0
+            var toolCallsMade = 0
             while (true) {
                 step++
                 if (step > config.maxSteps) {
@@ -58,6 +59,13 @@ public class AgentLoop(
                     emit(AgentEvent.TurnCompleted(newItems.toList()))
                     return@flow
                 }
+                if (toolCallsMade + turn.toolCalls.size > config.maxToolCallsPerTurn) {
+                    // The step does not fit into the per-turn tool budget: reject it whole - no
+                    // call in it runs, everything already done stays in history.
+                    emit(AgentEvent.TurnFailed(AgentError.StepLimit, newItems.toList()))
+                    return@flow
+                }
+                toolCallsMade += turn.toolCalls.size
                 val sharedDecisions = confirmGroups(turn.toolCalls)
                 for (call in turn.toolCalls) {
                     newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, call.arguments)
