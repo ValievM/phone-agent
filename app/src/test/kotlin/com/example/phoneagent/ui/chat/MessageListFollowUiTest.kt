@@ -1,10 +1,12 @@
 package com.example.phoneagent.ui.chat
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
@@ -26,6 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 
 private const val HISTORY_SIZE = 40
 private const val FAR_FROM_BOTTOM_INDEX = 30
+private const val AWAIT_DISPLAYED_MILLIS = 5_000L
 
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -39,14 +42,19 @@ class MessageListFollowUiTest {
     @Before
     fun showList() {
         composeRule.setContent {
-            AppTheme(useDynamicColor = false) {
-                MessageList(
-                    messages = messages,
-                    onEvent = {},
-                    onOpenFile = {},
-                    onSuggestionClick = {},
-                    modifier = Modifier.fillMaxSize(),
-                )
+            // Replies are parsed as markdown in the background, on a clock the test does not control: on a slow
+            // machine the new text is not on screen yet when waitForIdle() returns. Inspection mode makes the
+            // parse synchronous (the same switch the screenshot tests use), so the test stops depending on speed.
+            CompositionLocalProvider(LocalInspectionMode provides true) {
+                AppTheme(useDynamicColor = false) {
+                    MessageList(
+                        messages = messages,
+                        onEvent = {},
+                        onOpenFile = {},
+                        onSuggestionClick = {},
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
@@ -57,7 +65,7 @@ class MessageListFollowUiTest {
 
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("New reply").assertIsDisplayed()
+        awaitDisplayed("New reply")
         composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP).assertDoesNotExist()
     }
 
@@ -70,7 +78,7 @@ class MessageListFollowUiTest {
 
         composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP).assertIsDisplayed()
         composeRule.onNodeWithText("New reply").assertDoesNotExist()
-        composeRule.onNodeWithText("Message 10").assertIsDisplayed()
+        awaitDisplayed("Message 10")
     }
 
     @Test
@@ -82,7 +90,7 @@ class MessageListFollowUiTest {
         composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP).performClick()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("New reply").assertIsDisplayed()
+        awaitDisplayed("New reply")
         composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP).assertDoesNotExist()
     }
 
@@ -114,7 +122,7 @@ class MessageListFollowUiTest {
         messages = messages.dropLast(1) + messages.last().copy(text = "Message 40 keeps streaming in")
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Message 40 keeps streaming in").assertIsDisplayed()
+        awaitDisplayed("Message 40 keeps streaming in")
         composeRule.onNodeWithTag(ChatTestTags.SCROLL_TO_BOTTOM_CHIP).assertDoesNotExist()
     }
 
@@ -164,6 +172,17 @@ class MessageListFollowUiTest {
     private fun scrollFarFromBottom() {
         composeRule.onNodeWithTag(ChatTestTags.MESSAGE_LIST).performScrollToIndex(FAR_FROM_BOTTOM_INDEX)
         composeRule.waitForIdle()
+    }
+
+    /**
+     * A model reply is laid out and parsed by machinery that runs outside the test clock, so on a slow machine
+     * waitForIdle() can return before it is on screen. Wait (bounded) until it is displayed, then assert as usual.
+     */
+    private fun awaitDisplayed(text: String) {
+        composeRule.waitUntil(timeoutMillis = AWAIT_DISPLAYED_MILLIS) {
+            runCatching { composeRule.onNodeWithText(text).assertIsDisplayed() }.isSuccess
+        }
+        composeRule.onNodeWithText(text).assertIsDisplayed()
     }
 
     private fun append(
