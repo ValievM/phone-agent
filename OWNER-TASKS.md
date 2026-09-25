@@ -1,33 +1,35 @@
 # ЗАДАЧИ ВЛАДЕЛЬЦА
 
-Обновляет Claude, по одному экрану. Что проверить на телефоне: [docs/manual-verification.md](docs/manual-verification.md), [tools-build](docs/manual-verification-tools-build.md), [brand](docs/manual-verification-brand.md); `[x]` там ставишь только ты. Обновлено: 2026-09-25 (после T9 и T6).
+Все задачи проекта на GitHub: [issues](https://github.com/ValievM/phone-agent/issues), устройство и метки в [tracker.md](docs/tooling/tracker.md). Здесь только то, что нужно от тебя. Обновляет Claude. Обновлено: 2026-09-25.
+
+**Твой список одним фильтром:** [всё, что ждёт тебя](https://github.com/ValievM/phone-agent/issues?q=is%3Aopen+label%3A%22who%3Aowner%22).
 
 ## Команды мне (одним словом)
-- **«пушь»**: запушу `main` на GitHub, и заработает CI (сейчас там красный старый запуск, у меня уже исправлено).
-- **«ставь»**: соберу release из `main` и поставлю на телефон поверх (вход сохранится).
-- **«промпты»**: дам свежие промпты GPT и GLM.
-- **«нравится»** или **«не нравится»** про вид «Стыка»: при «нравится» запишу эталоны скриншотов.
+- **«вливай»**: слить проверенную ветку в `main`.
+- **«пушь»**: отправить `main` на GitHub (перед этим проверю коммиты на секреты).
+- **«ставь»**: собрать release из `main` и поставить на телефон поверх, вход сохранится ([#11](https://github.com/ValievM/phone-agent/issues/11)).
+- **«промпты»**: выдать свежие промпты GPT и GLM.
+- **«нравится»** или **«не нравится»** про вид «Стыка»: при «нравится» запишу эталоны скриншотов ([#17](https://github.com/ValievM/phone-agent/issues/17)).
 
-## Твои решения (жду)
-- [ ] Нужны ли скоро несколько чатов или фоновый агент? (T7, Room-миграция v1→v2; я за «нет», тогда её не делаем)
-- [ ] Журнал будильников: `show_alarms` и `cancel_alarm`, приложение помнит свои будильники (я за «да»)
-- [ ] Чистить ли историю и папку поиска при выходе из аккаунта? (сейчас только токены)
-- [ ] Режим «искать по всей памяти» (`MANAGE_EXTERNAL_STORAGE`, переключатель): ты сказал «позже»
+## Решения (ответь одним словом в issue или мне в чате)
+- [#7](https://github.com/ValievM/phone-agent/issues/7) «Повторить» не должен выполнять действия заново. Я за «да»
+- [#8](https://github.com/ValievM/phone-agent/issues/8) Честный статус «передано другому приложению» вместо зелёной галочки. Я за «да»
+- [#20](https://github.com/ValievM/phone-agent/issues/20) Чистить ли историю и папку поиска при выходе. Я за «спрашивать»
+- [#22](https://github.com/ValievM/phone-agent/issues/22) Зачем нужен `notify`. Я за «уникальный id и открытие приложения по нажатию»
+- [#21](https://github.com/ValievM/phone-agent/issues/21) Название приложения и `applicationId`: проверить Tenon?
+- [#18](https://github.com/ValievM/phone-agent/issues/18) Несколько чатов или фоновый агент (T7). Я за «нет»
+- [#19](https://github.com/ValievM/phone-agent/issues/19) Журнал будильников. Я за «да, после MVP»
 
-## Проверить на телефоне (по важности)
-1. Карточка после перезахода: поставь будильник, смахни приложение, открой снова (нужно моё «ставь»)
-2. «Поставь 4 будильника: 12:00, 12:15, 12:30, 12:45», «Разрешить все (4)», в «Часах» все четыре
-3. Разрешение уведомлений (T4/T5): отзови, попроси уведомление, подожди больше 5 секунд, разреши
-4. Вид «Стыка»: обе темы, переключатель темы, шрифт 200%, ландшафт
-5. «Стоп» (в том числе два раза) и убийство приложения посреди ответа
-6. Режим полёта: баннер и «Повторить»
-7. `notify`, поиск файла и его открытие, выбор папки
-8. Ссылка из ответа идёт через подтверждение с настоящим доменом
+## Телефон и релиз
+- [#10](https://github.com/ValievM/phone-agent/issues/10) Проверка на телефоне: 8 главных сценариев (после «ставь»)
+- [#9](https://github.com/ValievM/phone-agent/issues/9) Проверка протокола на живом бэкенде (T15): нужно, чтобы ты был рядом при входе
+- [#13](https://github.com/ValievM/phone-agent/issues/13) Релизная подпись и APK 0.1.0: keystore создаёшь ты, пароли только у тебя
 
 ## Кто чем занят
-| Кто | Сделано (всё в `main`) | Дальше |
+| Кто | В работе | Готово к выдаче |
 |---|---|---|
-| GPT | T8 типизированные id, T9 состояние хода, T6 подтверждение `SENSITIVE` | T13 (UI не знает `search_files`), точный ответ модели при отказе пачки из-за битого `describe()` |
-| GLM | T11 тексты ошибок, безопасный `describe()`, G2 потоки, T16 лимит вызовов | G2b (3 файла входа из baseline), защита `confirmBatch`, контрактный тест `UserInteraction` |
-| Claude | токен без сети после 401, карточки после перезахода, контрактные тесты фейков, CI зелёный, ревью и слияния, чистка доки | T15 проверка протокола, журнал будильников (после решения), эталоны скриншотов (после «нравится») |
-| Позже | T7 (после решения выше), SMS и звонки, голос | |
+| GPT | [#1](https://github.com/ValievM/phone-agent/issues/1) T13, [#2](https://github.com/ValievM/phone-agent/issues/2) отказ пачки | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении» |
+| GLM | [#3](https://github.com/ValievM/phone-agent/issues/3) G2b, [#4](https://github.com/ValievM/phone-agent/issues/4) защита `confirmBatch`, [#5](https://github.com/ValievM/phone-agent/issues/5) контракт `UserInteraction` | [#6](https://github.com/ValievM/phone-agent/issues/6) контекст целыми ходами, [#14](https://github.com/ValievM/phone-agent/issues/14) `INSTALL.md` |
+| Claude | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры, [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток |
+
+`[x]` в `docs/manual-verification*.md` ставишь только ты.
