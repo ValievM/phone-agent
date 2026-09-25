@@ -2,6 +2,7 @@ package com.example.phoneagent.ui.chat
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -12,7 +13,16 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.CallId
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.PendingApproval
+import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -44,9 +54,23 @@ class ChatScreenStatesUiTest {
 
     private fun userMessage() = listOf(ChatMessage("1", ChatRole.USER, "Привет"))
 
+    private fun errorState(
+        error: AgentError,
+        retryable: Boolean,
+        messages: List<ChatMessage> = userMessage(),
+    ) = ChatUiState(
+        messages = messages,
+        turn =
+            if (retryable) {
+                TurnState.FailedRetryable(ItemId("question-1"), error)
+            } else {
+                TurnState.FailedTerminal(error)
+            },
+    )
+
     @Test
     fun `offline is a status banner with retry and dismiss`() {
-        show(ChatUiState(messages = userMessage(), error = AgentError.Offline, canRetry = true))
+        show(errorState(AgentError.Offline, retryable = true))
 
         composeRule.onNodeWithText(string(R.string.error_offline)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
@@ -57,7 +81,7 @@ class ChatScreenStatesUiTest {
 
     @Test
     fun `an expired session banner has no retry`() {
-        show(ChatUiState(messages = userMessage(), error = AgentError.SessionExpired, canRetry = false))
+        show(errorState(AgentError.SessionExpired, retryable = false))
 
         composeRule.onNodeWithText(string(R.string.error_session_expired)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).assertDoesNotExist()
@@ -65,7 +89,7 @@ class ChatScreenStatesUiTest {
 
     @Test
     fun `a timeout is shown inside the feed with a retry action`() {
-        show(ChatUiState(messages = userMessage(), error = AgentError.Timeout, canRetry = true))
+        show(errorState(AgentError.Timeout, retryable = true))
 
         composeRule.onNodeWithText(string(R.string.error_timeout)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
@@ -75,7 +99,7 @@ class ChatScreenStatesUiTest {
 
     @Test
     fun `an inline error is visible in an empty chat and can be dismissed`() {
-        show(ChatUiState(messages = emptyList(), error = AgentError.Timeout, canRetry = true))
+        show(errorState(AgentError.Timeout, retryable = true, messages = emptyList()))
 
         composeRule.onNodeWithText(string(R.string.error_timeout)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).performClick()
@@ -86,17 +110,44 @@ class ChatScreenStatesUiTest {
 
     @Test
     fun `a rate limit tells the seconds to wait`() {
-        show(ChatUiState(messages = userMessage(), error = AgentError.RateLimited(30), canRetry = true))
+        show(errorState(AgentError.RateLimited(30), retryable = true))
 
         composeRule.onNodeWithText(string(R.string.error_rate_limited_after, 30L)).assertIsDisplayed()
     }
 
     @Test
     fun `no retry button when the failure cannot be retried`() {
-        show(ChatUiState(messages = userMessage(), error = AgentError.Forbidden, canRetry = false))
+        show(errorState(AgentError.Forbidden, retryable = false))
 
         composeRule.onNodeWithText(string(R.string.error_forbidden)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.error_retry)).assertDoesNotExist()
+    }
+
+    @Test
+    fun `awaiting approval keeps stop controls and hides preparing status`() {
+        val request = ApprovalRequest(CallDescription("Set alarm", "At 20:00"), Risk.CONFIRM, buildJsonObject {})
+        val card = ToolCallMessage(ToolCallStatus.AwaitingApproval, request.description, request.arguments)
+        show(
+            ChatUiState(
+                messages = listOf(ChatMessage("card-1", ChatRole.TOOL, "", card)),
+                turn = TurnState.AwaitingApproval(ItemId("question-1"), PendingApproval.Single(CallId("call-1"), request)),
+            ),
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.stop_generation)).assertIsDisplayed()
+        composeRule.onNodeWithText("Готовлю ответ").assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.message_hint)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun `running turn keeps stop controls and preparing status`() {
+        show(ChatUiState(turn = TurnState.Running(ItemId("question-1"))))
+
+        composeRule.onNodeWithContentDescription(string(R.string.stop_generation)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Готовлю ответ").assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.message_hint)).assertIsNotEnabled()
+
+        assertEquals(listOf(ChatUiEvent.Stop), events)
     }
 
     @Test

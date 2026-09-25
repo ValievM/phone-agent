@@ -2,6 +2,9 @@ package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.TurnEvent
+import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.domain.conversation.transitionTurn
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.toolOutcomeFromOutputText
 import com.example.phoneagent.ui.designsystem.components.FileHit
@@ -61,11 +64,35 @@ internal fun ChatUiState.withLoadedHistory(
             loaded.isEmpty() -> emptyList()
             else -> loaded.toChatMessages(describe)
         }
-    val unanswered = isInitial && !isRunning && loaded.lastOrNull() is HistoryItem.UserMessage
-    return when {
-        unanswered -> copy(messages = restored, error = AgentError.Interrupted, canRetry = true)
-        !isInitial && loaded.isEmpty() -> copy(messages = restored, error = null, canRetry = false)
-        else -> copy(messages = restored)
+    val unanswered = loaded.lastOrNull() as? HistoryItem.UserMessage
+    val nextTurn =
+        if (isInitial) {
+            if (!turn.isInProgress() && unanswered != null) {
+                transitionTurn(turn, TurnEvent.RestoredUnanswered(unanswered.itemId))
+            } else {
+                turn
+            }
+        } else {
+            transitionTurn(turn, TurnEvent.ExternalHistoryChanged(unanswered?.itemId))
+        }
+    return copy(
+        messages = restored,
+        turn = nextTurn,
+        historySync = if (isInitial || loaded.isEmpty()) HistorySyncState.Ready else historySync,
+    )
+}
+
+internal fun TurnState.isInProgress(): Boolean = this is TurnState.Running || this is TurnState.AwaitingApproval
+
+internal fun TurnState.hasRetryAction(): Boolean = this is TurnState.FailedRetryable || this is TurnState.Interrupted
+
+internal fun ChatUiState.errorForDisplay(): AgentError? {
+    val syncError = (historySync as? HistorySyncState.Failed)?.error
+    return syncError ?: when (val currentTurn = turn) {
+        is TurnState.FailedRetryable -> currentTurn.error
+        is TurnState.FailedTerminal -> currentTurn.error
+        is TurnState.Interrupted -> AgentError.Interrupted
+        is TurnState.Idle, is TurnState.Running, is TurnState.AwaitingApproval, is TurnState.Stopped -> null
     }
 }
 

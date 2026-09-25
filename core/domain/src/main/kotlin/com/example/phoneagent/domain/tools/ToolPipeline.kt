@@ -98,9 +98,15 @@ public class ToolPipeline(
         name: String,
         args: JsonObject,
         approval: Approval = Approval.ASK,
+        onApprovalResolved: suspend () -> Unit = {},
     ): ToolOutcome {
         val tool = registry.find(name)
-        val outcome = if (tool == null) ToolOutcome.Failed("unknown tool: $name") else runKnownTool(tool, args, approval)
+        val outcome =
+            if (tool == null) {
+                ToolOutcome.Failed("unknown tool: $name")
+            } else {
+                runKnownTool(tool, args, approval, onApprovalResolved)
+            }
         logger.info(TAG, "tool call finished", fields = mapOf("name" to name, "outcome" to outcome.kind()))
         return outcome
     }
@@ -109,6 +115,7 @@ public class ToolPipeline(
         tool: Tool,
         args: JsonObject,
         approval: Approval,
+        onApprovalResolved: suspend () -> Unit,
     ): ToolOutcome {
         val missing = missingRequiredFields(tool.spec.inputSchema, args)
         // CONFIRM/SENSITIVE with a broken describe refuse to run: no execution, no confirmation
@@ -122,7 +129,7 @@ public class ToolPipeline(
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
         } else if (refusedByDescribe) {
             ToolOutcome.Failed("the tool could not describe its action, so it was not run")
-        } else if (!approve(tool, args, approval, description)) {
+        } else if (!approve(tool, args, approval, description, onApprovalResolved)) {
             ToolOutcome.Rejected("user declined")
         } else {
             deniedCapability(tool)?.let { ToolOutcome.Failed(tool.deniedMessage(it)) } ?: execute(tool, args)
@@ -141,12 +148,26 @@ public class ToolPipeline(
         args: JsonObject,
         approval: Approval,
         description: CallDescription?,
+        onApprovalResolved: suspend () -> Unit,
     ): Boolean =
         when {
-            approval == Approval.GRANTED -> true
-            approval == Approval.DECLINED -> false
-            tool.spec.risk == Risk.SAFE -> true
-            else -> userInteraction.confirm(ApprovalRequest(checkNotNull(description), tool.spec.risk, args))
+            approval == Approval.GRANTED -> {
+                true
+            }
+
+            approval == Approval.DECLINED -> {
+                false
+            }
+
+            tool.spec.risk == Risk.SAFE -> {
+                true
+            }
+
+            else -> {
+                val approved = userInteraction.confirm(ApprovalRequest(checkNotNull(description), tool.spec.risk, args))
+                onApprovalResolved()
+                approved
+            }
         }
 
     private suspend fun execute(

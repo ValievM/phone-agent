@@ -6,6 +6,8 @@ import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.agent.AgentError
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 @PreviewLightDark
@@ -40,7 +42,7 @@ private fun ConversationChatPreview() {
 @Composable
 private fun RunningComposerPreview() {
     AppTheme(useDynamicColor = false) {
-        ChatScreen(ChatUiState(isRunning = true), {}, {})
+        ChatScreen(ChatUiState(turn = TurnState.Running(ItemId("preview-question"))), {}, {})
     }
 }
 
@@ -48,6 +50,6 @@ private fun RunningComposerPreview() {
 @Composable
 private fun ErrorChatPreview() {
     AppTheme(useDynamicColor = false) {
-        ChatScreen(ChatUiState(error = AgentError.Offline), {}, {})
+        ChatScreen(ChatUiState(turn = TurnState.FailedRetryable(ItemId("preview-question"), AgentError.Offline)), {}, {})
     }
 }

@@ -2,6 +2,8 @@ package com.example.phoneagent.screenshot
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
@@ -36,7 +38,7 @@ private val conversation =
                     ToolCallMessage(ToolCallStatus.Done("Запрос на будильник отправлен"), alarmDescription, alarmArguments),
                 ),
             ),
-        isRunning = true,
+        turn = TurnState.Running(ItemId("question-1")),
     )
 
 private fun batch(count: Int) =

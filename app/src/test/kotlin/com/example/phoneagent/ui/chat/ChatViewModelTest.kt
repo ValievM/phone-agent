@@ -86,7 +86,7 @@ class ChatViewModelTest {
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
 
-            assertTrue(states.any(ChatUiState::isRunning))
+            assertTrue(states.any { it.turn.isInProgress() })
             assertEquals(
                 listOf(ChatRole.USER, ChatRole.ASSISTANT),
                 viewModel.state.value.messages
@@ -98,7 +98,10 @@ class ChatViewModelTest {
                     .last()
                     .text,
             )
-            assertFalse(viewModel.state.value.isRunning)
+            assertFalse(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
         }
 
     @Test
@@ -161,14 +164,20 @@ class ChatViewModelTest {
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
-            assertTrue(viewModel.state.value.isRunning)
+            assertTrue(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
 
             try {
                 repository.replace(emptyList())
                 runCurrent()
 
                 assertTrue(gateway.wasCancelled)
-                assertFalse(viewModel.state.value.isRunning)
+                assertFalse(
+                    viewModel.state.value.turn
+                        .isInProgress(),
+                )
                 assertEquals(emptyList<ChatMessage>(), viewModel.state.value.messages)
                 assertEquals(emptyList<HistoryItem>(), repository.load())
             } finally {
@@ -207,14 +216,20 @@ class ChatViewModelTest {
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
-            assertTrue(viewModel.state.value.isRunning)
+            assertTrue(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
             assertTrue(gateway.requests.isEmpty())
 
             allowInitialEmission.complete(Unit)
             advanceUntilIdle()
 
             assertEquals(1, gateway.requests.size)
-            assertFalse(viewModel.state.value.isRunning)
+            assertFalse(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
             assertEquals(
                 listOf("Earlier question", "New question", "Answer"),
                 viewModel.state.value.messages
@@ -320,8 +335,12 @@ class ChatViewModelTest {
             viewModel.onEvent(ChatUiEvent.Submit("Проверка"))
             advanceUntilIdle()
 
-            assertEquals(expectedError, viewModel.state.value.error)
-            assertFalse(viewModel.state.value.isRunning)
+            assertEquals(expectedError, viewModel.state.value.errorForDisplay())
+            assertTrue(viewModel.state.value.turn is com.example.phoneagent.domain.conversation.TurnState.FailedRetryable)
+            assertFalse(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
         }
 
     @Test
@@ -332,13 +351,19 @@ class ChatViewModelTest {
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
-            assertTrue(viewModel.state.value.isRunning)
+            assertTrue(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
 
             viewModel.onEvent(ChatUiEvent.Stop)
             advanceUntilIdle()
 
             assertTrue(gateway.wasCancelled)
-            assertFalse(viewModel.state.value.isRunning)
+            assertFalse(
+                viewModel.state.value.turn
+                    .isInProgress(),
+            )
             assertEquals(
                 "partial",
                 viewModel.state.value.messages
