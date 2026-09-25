@@ -1,6 +1,6 @@
 # ЗАДАЧИ ВЛАДЕЛЬЦА
 
-Обновляет Claude, по одному экрану. Что проверить на телефоне: [docs/manual-verification.md](docs/manual-verification.md), [tools-build](docs/manual-verification-tools-build.md), [brand](docs/manual-verification-brand.md); `[x]` там ставишь только ты. Обновлено: 2026-09-25.
+Обновляет Claude, по одному экрану. Что проверить на телефоне: [docs/manual-verification.md](docs/manual-verification.md), [tools-build](docs/manual-verification-tools-build.md), [brand](docs/manual-verification-brand.md); `[x]` там ставишь только ты. Обновлено: 2026-09-25 (после T8).
 
 ## Команды мне (одним словом)
 - **«пушь»**: запушу `main` на GitHub, и заработает CI (сейчас там красный старый запуск, у меня уже исправлено).
@@ -27,7 +27,7 @@
 ## Кто чем занят
 | Кто | Задачи |
 |---|---|
-| GPT | T8 типизированные id, T9 состояние хода, T6 `SENSITIVE` строже, флак теста ленты |
+| GPT | T8 ✅ в `main`. Дальше: T9 состояние хода (в работе), T6 `SENSITIVE` строже, флак теста ленты |
 | GLM | T11 не отдавать модели `exception.message`, `describe()` упал, G2 baseline `Dispatchers`, T16 лимит вызовов за ход |
-| Claude | CI после пуша, ревью и вливание веток, токен без сети (`refreshAfterUnauthorized`), T15 проверка протокола, журнал будильников (после решения), уборка |
+| Claude | Сделано: токен без сети после 401, карточки после перезахода, контрактный тест фейка `CredentialsProvider`, уборка папок. Дальше: CI после пуша, контрактный тест `ModelGateway`, ревью и вливание веток, T15 проверка протокола, журнал будильников (после решения) |
 | Позже | T7 (после решения выше), T13, SMS и звонки (после T6), голос |
