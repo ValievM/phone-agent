@@ -39,6 +39,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Библиотеки и инструменты UI | [design/libraries.md](design/libraries.md) |
 | Скриншот-тесты, Design QA | [design/qa.md](design/qa.md) |
 | Задачи и решения владельца одним экраном | [OWNER-TASKS.md](../OWNER-TASKS.md) (корень репозитория) |
+| Установка и первый вход для пользователя | [INSTALL.md](INSTALL.md) |
 | Что из сделанного пользователь ещё не проверил на своём телефоне | [manual-verification.md](manual-verification.md) (чат и ход агента), [manual-verification-tools-build.md](manual-verification-tools-build.md) (инструменты, вход, сборка, CI, логи), [manual-verification-brand.md](manual-verification-brand.md) (вид, размеры, движение «Стыка») |
 | Что пишется в логи и как это проверять | [log-audit.md](log-audit.md) |
 | Serena и Context7 | [tooling/serena-context7.md](tooling/serena-context7.md) |
@@ -48,6 +49,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 
 ## Карта документов
 - `product/`: что строим. [overview](product/overview.md), [requirements](product/requirements.md).
+- [INSTALL.md](INSTALL.md): как поставить приложение и войти (для пользователя).
 - `research/`: исходные гипотезы. [backend-facts](research/backend-facts.md). Проверенные значения: [backend-notes](backend-notes.md).
 - `architecture/`: как устроено. [overview](architecture/overview.md), [core](architecture/core.md), [adapters](architecture/adapters.md), [ui](architecture/ui.md), [patterns](architecture/patterns.md), [testing](architecture/testing.md), [recipes](architecture/recipes.md), [decisions](architecture/decisions.md). Карта по коду (снята с `main`, для ревью): [map-overview](architecture/map-overview.md), [map-core-data](architecture/map-core-data.md), [map-auth](architecture/map-auth.md), [map-tools-app](architecture/map-tools-app.md), [map-app-infra](architecture/map-app-infra.md), [map-flows](architecture/map-flows.md).
 - `design/`: как выглядит. [overview](design/overview.md), [style](design/style.md), [icons-motion-copy](design/icons-motion-copy.md), [components](design/components.md), [layout-rules](design/layout-rules.md), [a11y-security](design/a11y-security.md), [libraries](design/libraries.md), [qa](design/qa.md).
@@ -61,7 +63,6 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Документ | Когда | Что внутри |
 |---|---|---|
 | `measurements.md` | этап 6 | замеры памяти и батареи |
-| `INSTALL.md` | этап 6 | инструкция для пользователя: скачать, установить, войти, что умеет |
 
 ## Правила ведения
 - Новый документ создаём в `docs/`, не в корне и не рядом с кодом. Язык русский, имена файлов латиницей.
