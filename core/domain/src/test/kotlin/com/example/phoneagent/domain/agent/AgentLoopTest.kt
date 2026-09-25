@@ -146,6 +146,65 @@ class AgentLoopTest {
         }
 
     @Test
+    fun `a step within the tool call limit runs exactly as before`() =
+        runTest {
+            val callA = ToolCall(CallId("call-a"), "tool_a", buildJsonObject {})
+            val callB = ToolCall(CallId("call-b"), "tool_b", buildJsonObject {})
+            gateway.responseQueue.addLast(
+                listOf(ModelEvent.ToolCallRequested(callA), ModelEvent.ToolCallRequested(callB), ModelEvent.Completed()),
+            )
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("tool_a") { ToolResult.Success("a-done") },
+                        fakeTool("tool_b") { ToolResult.Success("b-done") },
+                    ),
+                )
+            val config = AgentConfig(maxToolCallsPerTurn = 2)
+
+            val events = loop(registry, config).run(emptyList(), "do both").toList()
+
+            assertEquals(listOf("tool_a", "tool_b"), executedCalls)
+            assertTrue(events.last() is AgentEvent.TurnCompleted)
+        }
+
+    @Test
+    fun `a step requesting more calls than the limit allows runs none and fails with StepLimit`() =
+        runTest {
+            val callA = ToolCall(CallId("call-a"), "tool_a", buildJsonObject {})
+            val callB = ToolCall(CallId("call-b"), "tool_b", buildJsonObject {})
+            val callC = ToolCall(CallId("call-c"), "tool_c", buildJsonObject {})
+            gateway.responseQueue.addLast(
+                listOf(
+                    ModelEvent.ToolCallRequested(callA),
+                    ModelEvent.ToolCallRequested(callB),
+                    ModelEvent.ToolCallRequested(callC),
+                    ModelEvent.Completed(),
+                ),
+            )
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("tool_a") { ToolResult.Success("a-done") },
+                        fakeTool("tool_b") { ToolResult.Success("b-done") },
+                        fakeTool("tool_c") { ToolResult.Success("c-done") },
+                    ),
+                )
+            val config = AgentConfig(maxToolCallsPerTurn = 2)
+
+            val events = loop(registry, config).run(emptyList(), "do three").toList()
+
+            assertTrue("no tool may run: $executedCalls", executedCalls.isEmpty())
+            val failure = events.last() as AgentEvent.TurnFailed
+            assertEquals(AgentError.StepLimit, failure.error)
+            assertTrue(
+                "only the user message may be in history, was ${failure.newItems}",
+                failure.newItems.all { it is HistoryItem.UserMessage },
+            )
+        }
+
+    @Test
     fun `the user declining a CONFIRM tool rejects it without executing, and the turn continues`() =
         runTest {
             interaction.approvalResult = false
