@@ -113,10 +113,24 @@ public class AgentLoop(
     ): Map<CallId, Approval> {
         val decisions = mutableMapOf<CallId, Approval>()
         for (group in toolPipeline.batchGroups(calls)) {
-            group.forEach { emit(AgentEvent.ToolCallStarted(it, describe(it))) }
-            emit(AgentEvent.BatchApprovalRequested(group.map { it.callId }))
-            val decision = if (toolPipeline.confirmBatch(group)) Approval.GRANTED else Approval.DECLINED
-            onApprovalResolved(group.map { it.callId })
+            var approvalWasPresented = false
+            val approved =
+                toolPipeline.confirmBatch(group) { descriptions ->
+                    group.zip(descriptions).forEach { (call, description) ->
+                        emit(AgentEvent.ToolCallStarted(call, description ?: CallDescription(call.name, "")))
+                    }
+                    if (descriptions.all { it != null }) {
+                        emit(AgentEvent.BatchApprovalRequested(group.map { it.callId }))
+                        approvalWasPresented = true
+                    }
+                }
+            val decision =
+                when {
+                    !approvalWasPresented -> Approval.NOT_PRESENTED
+                    approved -> Approval.GRANTED
+                    else -> Approval.DECLINED
+                }
+            if (approvalWasPresented) onApprovalResolved(group.map { it.callId })
             group.forEach { decisions[it.callId] = decision }
         }
         return decisions

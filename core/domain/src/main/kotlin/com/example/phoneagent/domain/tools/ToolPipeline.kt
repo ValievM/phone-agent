@@ -17,13 +17,16 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Who answers the confirmation of one call: the pipeline itself, or an earlier shared question. */
-public enum class Approval { ASK, GRANTED, DECLINED }
+/** Result of confirming a call: the pipeline itself, an earlier shared question, or no question shown. */
+public enum class Approval { ASK, GRANTED, DECLINED, NOT_PRESENTED }
 
 private const val TAG = "ToolPipeline"
 private const val DEFAULT_TIMEOUT_MILLIS = 5_000L
 private const val DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024
 private const val DEFAULT_MAX_BATCH_SIZE = 15
+private const val BATCH_DESCRIPTION_UNAVAILABLE_REASON =
+    "not shown to user: one action description could not be built; " +
+        "no calls in the batch were run"
 private const val UTF8_CONTINUATION_BYTE_MASK = 0xC0
 private const val UTF8_CONTINUATION_BYTE_PATTERN = 0x80
 
@@ -77,24 +80,24 @@ public class ToolPipeline(
             }.chunked(maxBatchSize)
             .filter { it.size > 1 }
 
-    /** Asks once for the whole [group] (from [batchGroups]); `true` approves every call, `false` declines every call. */
-    public suspend fun confirmBatch(group: List<ToolCall>): Boolean {
-        val requests =
-            group.map { call ->
-                // A shared question is only for known plain-CONFIRM calls (as batchGroups promises);
-                // anything else in the group declines it without showing a sheet.
-                batchRequestFor(registry, call) ?: run {
-                    logger.warn(
-                        TAG,
-                        "batch rejected: not a describable plain-CONFIRM group",
-                        fields = mapOf("size" to group.size.toString()),
-                    )
-                    return false
-                }
-            }
-        val approved = userInteraction.confirmBatch(requests)
-        logger.info(TAG, "batch confirmation answered", fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()))
-        return approved
+    /**
+     * Asks once for the whole [group] (from [batchGroups]); `true` approves every call, `false` declines every call.
+     * A shared question is only for known plain-CONFIRM calls, as [batchGroups] promises: anything else in the group
+     * declines it without showing a sheet. Every description is built before [onPrepared] lets the agent publish an
+     * approval event to the UI, and a group with a description that could not be built is never shown.
+     */
+    public suspend fun confirmBatch(
+        group: List<ToolCall>,
+        onPrepared: suspend (List<CallDescription?>) -> Unit = {},
+    ): Boolean {
+        val tools = group.map { call -> registry.find(call.name)?.takeIf { it.spec.risk == Risk.CONFIRM } }
+        if (tools.any { it == null }) {
+            logger.warn(TAG, "batch rejected: not a plain-CONFIRM group", fields = mapOf("size" to group.size.toString()))
+            return false
+        }
+        val descriptions = group.indices.map { index -> describeSafely(checkNotNull(tools[index]), group[index].arguments) }
+        onPrepared(descriptions)
+        return descriptions.none { it == null } && askBatch(userInteraction, logger, group, descriptions)
     }
 
     public suspend fun run(
@@ -126,10 +129,17 @@ public class ToolPipeline(
         // asked for exactly once and that same value is what the user is shown, so a describe that
         // breaks on a later call cannot abort the turn.
         val description =
-            if (tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED) describeSafely(tool, args) else null
-        val refusedByDescribe = tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && description == null
+            if (tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && approval != Approval.NOT_PRESENTED) {
+                describeSafely(tool, args)
+            } else {
+                null
+            }
+        val refusedByDescribe =
+            tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && approval != Approval.NOT_PRESENTED && description == null
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
+        } else if (approval == Approval.NOT_PRESENTED) {
+            ToolOutcome.Rejected(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
         } else if (refusedByDescribe) {
             ToolOutcome.Failed("the tool could not describe its action, so it was not run")
         } else if (!approve(tool, args, approval, description, onApprovalResolved)) {
@@ -158,7 +168,7 @@ public class ToolPipeline(
                 true
             }
 
-            approval == Approval.DECLINED -> {
+            approval == Approval.DECLINED || approval == Approval.NOT_PRESENTED -> {
                 false
             }
 
@@ -225,6 +235,24 @@ public class ToolPipeline(
     }
 }
 
+/** The one shared question of a batch whose every description was built; kept outside the class to keep it small. */
+private suspend fun askBatch(
+    userInteraction: UserInteraction,
+    logger: AppLogger,
+    group: List<ToolCall>,
+    descriptions: List<CallDescription?>,
+): Boolean {
+    val requests =
+        group.indices.map { index -> ApprovalRequest(checkNotNull(descriptions[index]), Risk.CONFIRM, group[index].arguments) }
+    val approved = userInteraction.confirmBatch(requests)
+    logger.info(
+        TAG,
+        "batch confirmation answered",
+        fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()),
+    )
+    return approved
+}
+
 /** Null when the tool's own describe blew up; [CancellationException] always propagates. */
 private fun describeSafely(
     tool: Tool,
@@ -237,17 +265,3 @@ private fun describeSafely(
     } catch (expected: Exception) {
         null
     }
-
-/** Sheet content for one grouped call; null = decline the group (unknown tool, non-CONFIRM risk, broken describe). */
-private fun batchRequestFor(
-    registry: ToolRegistry,
-    call: ToolCall,
-): ApprovalRequest? =
-    registry
-        .find(call.name)
-        ?.takeIf { it.spec.risk == Risk.CONFIRM }
-        ?.let { tool ->
-            describeSafely(tool, call.arguments)?.let { description ->
-                ApprovalRequest(description, tool.spec.risk, call.arguments)
-            }
-        }

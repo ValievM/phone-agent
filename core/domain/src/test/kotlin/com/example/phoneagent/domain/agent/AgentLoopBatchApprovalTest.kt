@@ -96,6 +96,41 @@ class AgentLoopBatchApprovalTest {
         }
 
     @Test
+    fun `a broken batch description is not presented as a user decline or approval request`() =
+        runTest {
+            respondWith(alarm(1), alarm(2))
+
+            val events = loop(tools(brokenDescribeAlarmTool())).run(emptyList(), "два будильника").toList()
+
+            assertTrue(executed.isEmpty())
+            assertTrue(interaction.batchRequests.isEmpty())
+            // These are the only events that move a card into its awaiting-approval state.
+            assertTrue(events.none { it is AgentEvent.BatchApprovalRequested || it is AgentEvent.ApprovalRequested })
+        }
+
+    @Test
+    fun `a broken batch description tells the model the calls were not shown rather than declined`() =
+        runTest {
+            respondWith(alarm(1), alarm(2))
+
+            loop(tools(brokenDescribeAlarmTool())).run(emptyList(), "два будильника").toList()
+
+            val outputs =
+                gateway.requests
+                    .last()
+                    .history
+                    .filterIsInstance<HistoryItem.ToolOutput>()
+            assertEquals(2, outputs.size)
+            assertEquals(
+                listOf(
+                    "Rejected: not shown to user: one action description could not be built; no calls in the batch were run",
+                    "Rejected: not shown to user: one action description could not be built; no calls in the batch were run",
+                ),
+                outputs.map { it.output },
+            )
+        }
+
+    @Test
     fun `a safe call runs without a question and only the confirm calls are asked together`() =
         runTest {
             respondWith(call(1, "find_files"), alarm(2), alarm(3))
@@ -226,6 +261,30 @@ class AgentLoopBatchApprovalTest {
     private fun safeTool() = fakeTool("find_files", Risk.SAFE)
 
     private fun sensitiveTool() = fakeTool("send_sms", Risk.SENSITIVE)
+
+    private fun brokenDescribeAlarmTool(): Tool =
+        object : Tool {
+            override val spec =
+                ToolSpec(
+                    "set_alarm",
+                    "does set_alarm",
+                    buildJsonObject { put("type", "object") },
+                    Risk.CONFIRM,
+                )
+
+            override fun describe(args: JsonObject): CallDescription {
+                if (args.number() == "1") error("broken description")
+                return CallDescription("set_alarm", "set_alarm #${args.number()}")
+            }
+
+            override suspend fun execute(
+                args: JsonObject,
+                context: ToolContext,
+            ): ToolResult {
+                executed += "set_alarm #${args.number()}"
+                return ToolResult.Success("set_alarm done")
+            }
+        }
 
     private fun loop(
         registry: ToolRegistry,
