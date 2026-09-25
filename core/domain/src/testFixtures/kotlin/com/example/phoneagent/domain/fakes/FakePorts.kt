@@ -121,14 +121,22 @@ public class FakeUserInteraction : UserInteraction {
     public var batchApprovalResult: Boolean = true
     public var capabilityResult: CapabilityResult = CapabilityResult.Available
 
+    /**
+     * Per-call answers handed out one at a time, in call order (the UserInteractionContract way to
+     * say "answers arrive at their own calls"). When a queue is empty, the call falls back to the
+     * single [approvalResult]/[batchApprovalResult], which is what every existing test relies on.
+     */
+    public val scriptedApprovals: ArrayDeque<Boolean> = ArrayDeque()
+    public val scriptedBatchApprovals: ArrayDeque<Boolean> = ArrayDeque()
+
     override suspend fun confirm(request: ApprovalRequest): Boolean {
         approvalRequests += request
-        return approvalResult
+        return scriptedApprovals.removeFirstOrNull() ?: approvalResult
     }
 
     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
         batchRequests += requests
-        return batchApprovalResult
+        return scriptedBatchApprovals.removeFirstOrNull() ?: batchApprovalResult
     }
 
     override suspend fun ensure(capability: Capability): CapabilityResult {
