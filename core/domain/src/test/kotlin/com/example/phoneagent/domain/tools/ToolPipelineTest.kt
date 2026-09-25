@@ -1,8 +1,10 @@
 package com.example.phoneagent.domain.tools
 
+import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -126,11 +128,108 @@ class ToolPipelineTest {
             assertEquals(ToolOutcome.Failed("timed out after 10ms"), outcome)
         }
 
+    @Test
+    fun `a SAFE tool with a broken describe shows a neutral card and still runs`() =
+        runTest {
+            var executed = false
+            val tool =
+                describingTool("find_files", Risk.SAFE, describeError = IllegalStateException("boom")) {
+                    executed = true
+                    ToolResult.Success("ok")
+                }
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)))
+
+            val description = pipeline.describe("find_files", buildJsonObject {})
+
+            assertEquals("find_files", description?.title)
+            assertTrue(description?.summary?.isBlank() == true)
+
+            val outcome = pipeline.run("find_files", buildJsonObject {})
+
+            assertEquals(ToolOutcome.Success("ok"), outcome)
+            assertTrue(executed)
+        }
+
+    @Test
+    fun `a CONFIRM tool with a broken describe refuses to run without asking`() =
+        runTest {
+            var executed = false
+            val tool =
+                describingTool("set_alarm", Risk.CONFIRM, describeError = IllegalStateException("boom")) {
+                    executed = true
+                    ToolResult.Success("ok")
+                }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction)
+
+            val outcome = pipeline.run("set_alarm", buildJsonObject {})
+
+            assertTrue(outcome is ToolOutcome.Failed)
+            assertTrue(interaction.approvalRequests.isEmpty())
+            assertTrue(!executed)
+        }
+
+    @Test
+    fun `a batch with a broken describe is declined without asking`() =
+        runTest {
+            val broken =
+                describingTool("set_alarm", Risk.CONFIRM, describeError = IllegalStateException("boom")) { ToolResult.Success("ok") }
+            val healthy = describingTool("send_notice", Risk.CONFIRM, describeError = null) { ToolResult.Success("ok") }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(broken, healthy)), interaction = interaction, maxBatchSize = 4)
+            val calls = listOf(call("set_alarm"), call("send_notice"))
+
+            val approved = pipeline.confirmBatch(calls)
+
+            assertTrue(!approved)
+            assertTrue(interaction.batchRequests.isEmpty())
+        }
+
+    @Test
+    fun `a CancellationException from describe is rethrown, never turned into a card`() {
+        val tool = describingTool("find_files", Risk.SAFE, describeError = CancellationException("stop")) { ToolResult.Success("ok") }
+        val pipeline = pipeline(registry = ToolRegistry(setOf(tool)))
+
+        val outcome = runCatching { pipeline.describe("find_files", buildJsonObject {}) }
+
+        assertTrue(outcome.exceptionOrNull() is CancellationException)
+    }
+
+    private fun call(name: String) = ToolCall(name, name, buildJsonObject { })
+
+    private fun describingTool(
+        name: String,
+        risk: Risk,
+        describeError: Throwable?,
+        execute: suspend () -> ToolResult,
+    ): Tool =
+        object : Tool {
+            override val spec =
+                ToolSpec(
+                    name = name,
+                    description = "test tool",
+                    inputSchema = buildJsonObject { put("type", "object") },
+                    risk = risk,
+                )
+
+            override fun describe(args: JsonObject): CallDescription =
+                describeError?.let(::throwIt) ?: CallDescription(title = name, summary = "summary")
+
+            @Suppress("USELESS_ELVIS")
+            private fun throwIt(error: Throwable): Nothing = throw error
+
+            override suspend fun execute(
+                args: JsonObject,
+                context: ToolContext,
+            ): ToolResult = execute()
+        }
+
     private fun pipeline(
         registry: ToolRegistry,
         interaction: FakeUserInteraction = FakeUserInteraction(),
         timeoutMillis: Long = 1_000,
         maxOutputBytes: Int = 4096,
+        maxBatchSize: Int = 3,
     ): ToolPipeline =
         ToolPipeline(
             registry = registry,
@@ -139,6 +238,7 @@ class ToolPipelineTest {
             logger = FakeAppLogger(),
             timeoutMillis = timeoutMillis,
             maxOutputBytes = maxOutputBytes,
+            maxBatchSize = maxBatchSize,
         )
 
     private fun fakeTool(

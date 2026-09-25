@@ -53,7 +53,12 @@ public class ToolPipeline(
     public fun describe(
         name: String,
         args: JsonObject,
-    ): CallDescription? = registry.find(name)?.describe(args)
+    ): CallDescription? {
+        val tool = registry.find(name) ?: return null
+        // A broken describe must not break the turn: SAFE keeps running under a neutral card,
+        // and a refusing call is handled by the risk guard in [runKnownTool].
+        return describeSafely(tool, args) ?: CallDescription(title = tool.spec.name, summary = "")
+    }
 
     /** Null for an unregistered name; SAFE tools never trigger [UserInteraction.confirm]. */
     public fun riskOf(name: String): Risk? = registry.find(name)?.spec?.risk
@@ -77,7 +82,12 @@ public class ToolPipeline(
         val requests =
             group.map { call ->
                 val tool = checkNotNull(registry.find(call.name)) { "unknown tool in a batch: ${call.name}" }
-                ApprovalRequest(tool.describe(call.arguments), tool.spec.risk, call.arguments)
+                val description =
+                    describeSafely(tool, call.arguments)
+                        ?: // Never show a sheet with a broken description: decline the whole group,
+                        // the broken call itself fails in runKnownTool's risk guard.
+                        return false
+                ApprovalRequest(description, tool.spec.risk, call.arguments)
             }
         val approved = userInteraction.confirmBatch(requests)
         logger.info(TAG, "batch confirmation answered", fields = mapOf("size" to group.size.toString(), "approved" to approved.toString()))
@@ -101,8 +111,14 @@ public class ToolPipeline(
         approval: Approval,
     ): ToolOutcome {
         val missing = missingRequiredFields(tool.spec.inputSchema, args)
+        // CONFIRM/SENSITIVE with a broken describe refuse to run: no execution, no confirmation
+        // sheet (a SAFE tool keeps running under the neutral card from [describe]).
+        val refusedByDescribe =
+            tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && describeSafely(tool, args) == null
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
+        } else if (refusedByDescribe) {
+            ToolOutcome.Failed("the tool could not describe its action, so it was not run")
         } else if (!approve(tool, args, approval)) {
             ToolOutcome.Rejected("user declined")
         } else {
@@ -180,3 +196,16 @@ public class ToolPipeline(
             }
     }
 }
+
+/** Null when the tool's own describe blew up; [CancellationException] always propagates. */
+private fun describeSafely(
+    tool: Tool,
+    args: JsonObject,
+): CallDescription? =
+    try {
+        tool.describe(args)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (expected: Exception) {
+        null
+    }
