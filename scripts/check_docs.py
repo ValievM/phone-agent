@@ -16,7 +16,7 @@ ROOT_ALLOWED = {'AGENTS.md', 'OWNER-TASKS.md'}  # the owner's one-screen task li
 AGENTS_BUDGET = 8 * 1024      # always loaded by Codex, keep it lean (hard limit of Codex is 32 KiB)
 DOC_BUDGET = 14 * 1024        # one topic per file, roughly up to ~5k tokens
 STALE_NAMES = ['TZ_MVP.md', 'ARCHITECTURE.md', 'DESIGN.md', 'DEV_STAGES.md']
-PLANNED = {'docs/backend-notes.md', 'docs/measurements.md'}
+PLANNED = {'docs/backend-notes.md'}
 PLANNED_PREFIXES = ('docs/adr/',)
 SKIP_DIRS = {'.git', 'build', '.gradle', 'node_modules', '.serena', '.idea', '.air'}
 

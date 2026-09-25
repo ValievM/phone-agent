@@ -44,6 +44,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Что пишется в логи и как это проверять | [log-audit.md](log-audit.md) |
 | Serena и Context7 | [tooling/serena-context7.md](tooling/serena-context7.md) |
 | Оптимизация сборки (замечания на будущее) | [tooling/build-performance.md](tooling/build-performance.md) |
+| Замеры: память, батарея, фоновая работа | [measurements.md](measurements.md) |
 | Фирменный стиль «Стык» (цвет, знак, тон) | [design/brand.md](design/brand.md) |
 | CI и JDK для Gradle | [tooling/ci.md](tooling/ci.md) |
 
@@ -56,13 +57,8 @@ Android-приложение: чат с Codex + узкие инструмент�
 - `stages/`: в каком порядке делаем. [README](stages/README.md), [A](stages/a-environment.md), [0](stages/0-spike.md), [1](stages/1-skeleton.md), [2](stages/2-auth.md), [3](stages/3-model-client.md), [4](stages/4-tools.md), [5](stages/5-hardening.md), [6](stages/6-release.md).
 - `tooling/`: инструменты агента. [serena-context7](tooling/serena-context7.md), [build-performance](tooling/build-performance.md), [ci](tooling/ci.md).
 - [manual-verification.md](manual-verification.md): что из сделанного реально потрогал пользователь на своём телефоне, а что нет. [log-audit.md](log-audit.md): аудит логов на токены и данные чата.
+- [measurements.md](measurements.md): замеры этапа 6 и проверка отсутствия фоновой работы.
 - `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md), [0004-batch-approval](adr/0004-batch-approval.md), [0005-conversation-domain](adr/0005-conversation-domain.md; принято), [детали эпика](architecture/conversation-domain-design.md), [0006-brand-joint](adr/0006-brand-joint.md).
-
-**Появятся по ходу работы:**
-
-| Документ | Когда | Что внутри |
-|---|---|---|
-| `measurements.md` | этап 6 | замеры памяти и батареи |
 
 ## Правила ведения
 - Новый документ создаём в `docs/`, не в корне и не рядом с кодом. Язык русский, имена файлов латиницей.
