@@ -117,6 +117,30 @@ class AgentLoopBatchApprovalTest {
 
             assertTrue(interaction.batchRequests.isEmpty())
             assertEquals(2, interaction.approvalRequests.size)
+            assertEquals(listOf(Risk.SENSITIVE, Risk.SENSITIVE), interaction.approvalRequests.map { it.risk })
+        }
+
+    @Test
+    fun `a lone sensitive call uses a single confirmation and never a one-call batch`() =
+        runTest {
+            respondWith(call(1, "send_sms"))
+
+            loop(tools(sensitiveTool())).run(emptyList(), "отправь сообщение").toList()
+
+            assertTrue(interaction.batchRequests.isEmpty())
+            assertEquals(listOf(Risk.SENSITIVE), interaction.approvalRequests.map { it.risk })
+        }
+
+    @Test
+    fun `mixed confirm and sensitive calls execute in model order with sensitive confirmed separately`() =
+        runTest {
+            respondWith(alarm(1), call(2, "send_sms"), alarm(3))
+
+            loop(tools(alarmTool(), sensitiveTool())).run(emptyList(), "выполни три действия").toList()
+
+            assertEquals(listOf("set_alarm #1", "set_alarm #3"), interaction.batchRequests.single().map { it.description.summary })
+            assertEquals(listOf(Risk.SENSITIVE), interaction.approvalRequests.map { it.risk })
+            assertEquals(listOf("set_alarm #1", "send_sms #2", "set_alarm #3"), executed)
         }
 
     @Test

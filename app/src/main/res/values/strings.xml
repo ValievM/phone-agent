@@ -95,6 +95,8 @@
     <string name="tool_call_arguments">Аргументы</string>
     <string name="tool_call_toggle_arguments">Показать или скрыть аргументы вызова</string>
     <string name="approval_sheet_title">Разрешить действие?</string>
+    <string name="sensitive_approval_title">Проверьте и подтвердите</string>
+    <string name="sensitive_approval_warning">Это действие нельзя отменить. Проверьте адресата и текст.</string>
     <string name="approval_sheet_details">Подробности</string>
     <string name="approval_reject">Отклонить</string>
     <string name="approval_approve">Разрешить</string>
