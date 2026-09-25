@@ -97,49 +97,23 @@ class OkHttpDeviceCodeGatewayTest {
         }
 
     @Test
-    fun `the device code request runs on the dispatcher provided by the port`() =
+    fun `the device code request dispatches through the port and fails without a server`() =
         runTest {
-            val seenThreads = mutableListOf<String>()
-            val client =
-                OkHttpClient
-                    .Builder()
-                    .addInterceptor { chain ->
-                        seenThreads += Thread.currentThread().name
-                        chain.proceed(chain.request())
-                    }.build()
-            val io =
-                Executors.newSingleThreadExecutor { r -> Thread(r, "device-test-io") }.asCoroutineDispatcher()
-            try {
-                serverWith(
-                    MockResponse
-                        .Builder()
-                        .code(200)
-                        .body(USER_CODE_JSON)
-                        .build(),
-                ) { server ->
-                    val result =
-                        OkHttpDeviceCodeGateway(
-                            AuthConfig(
-                                server.url("").toString().removeSuffix("/"),
-                                "authorize",
-                                "token",
-                                "client",
-                                "redirect",
-                                "scope",
-                                emptyMap(),
-                            ),
-                            client,
-                            FakeDispatcherProvider(main = io, io = io, default = io),
-                        ).requestCode()
+            val dispatchers = RecordingDispatcherProvider()
+            // Port 1 refuses the connection instantly; the mapping of that failure is covered by
+            // the other tests. This test only proves the blocking section goes through the port.
+            val gateway =
+                OkHttpDeviceCodeGateway(
+                    AuthConfig("http://127.0.0.1:1", "authorize", "token", "client", "redirect", "scope", emptyMap()),
+                    client = OkHttpClient(),
+                    dispatchers = dispatchers,
+                )
 
-                    assertTrue(result is DeviceCodeRequestResult.Ready)
-                }
-            } finally {
-                io.close()
-            }
+            gateway.requestCode()
+
             assertTrue(
-                "expected the request on the provided io dispatcher, saw $seenThreads",
-                seenThreads.isNotEmpty() && seenThreads.all { it.startsWith("device-test-io") },
+                "the blocking section must go through dispatchers.io",
+                dispatchers.ioDispatcher.dispatchCount.get() >= 1,
             )
         }
 

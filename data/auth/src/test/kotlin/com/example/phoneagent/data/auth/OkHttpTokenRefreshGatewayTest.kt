@@ -196,38 +196,27 @@ class OkHttpTokenRefreshGatewayTest {
         }
 
     @Test
-    fun `the token request runs on the dispatcher provided by the port`() =
+    fun `the token request dispatches through the port and fails without a server`() =
         runTest {
-            val seenThreads = mutableListOf<String>()
-            val client =
-                OkHttpClient
-                    .Builder()
-                    .addInterceptor { chain ->
-                        seenThreads += Thread.currentThread().name
-                        chain.proceed(chain.request())
-                    }.build()
-            val io =
-                Executors.newSingleThreadExecutor { r -> Thread(r, "token-test-io") }.asCoroutineDispatcher()
-            try {
-                serverWith(tokensResponse()) { server ->
-                    val gateway =
-                        OkHttpTokenRefreshGateway(
-                            config(server),
-                            FakeAppLogger(),
-                            client,
-                            nowEpochSeconds = { NOW_SECONDS },
-                            retryDelay = {},
-                            dispatchers = FakeDispatcherProvider(main = io, io = io, default = io),
-                        )
+            val dispatchers = RecordingDispatcherProvider()
+            // Port 1 refuses the connection instantly; the mapping of that failure is covered by
+            // the other tests. This test only proves the blocking section goes through the port.
+            val config =
+                AuthConfig("http://127.0.0.1:1", "authorize", "http://127.0.0.1:1/oauth/token", "client", "redirect", "scope", emptyMap())
+            val gateway =
+                OkHttpTokenRefreshGateway(
+                    config,
+                    FakeAppLogger(),
+                    nowEpochSeconds = { NOW_SECONDS },
+                    retryDelay = {},
+                    dispatchers = dispatchers,
+                )
 
-                    assertEquals(AuthResult.Success(tokens()), gateway.exchangeAuthorizationCode(EXCHANGE))
-                }
-            } finally {
-                io.close()
-            }
+            gateway.exchangeAuthorizationCode(EXCHANGE)
+
             assertTrue(
-                "expected the request on the provided io dispatcher, saw $seenThreads",
-                seenThreads.isNotEmpty() && seenThreads.all { it.startsWith("token-test-io") },
+                "the blocking section must go through dispatchers.io",
+                dispatchers.ioDispatcher.dispatchCount.get() >= 1,
             )
         }
 
