@@ -1,11 +1,15 @@
 package com.example.phoneagent.data.auth
 
+import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.Executors
 
 class OkHttpDeviceCodeGatewayTest {
     @Test
@@ -90,6 +94,53 @@ class OkHttpDeviceCodeGatewayTest {
             ) { server ->
                 assertEquals(DeviceCodeRequestResult.Failure(AuthFailure.MalformedToken), gateway(server).requestCode())
             }
+        }
+
+    @Test
+    fun `the device code request runs on the dispatcher provided by the port`() =
+        runTest {
+            val seenThreads = mutableListOf<String>()
+            val client =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        seenThreads += Thread.currentThread().name
+                        chain.proceed(chain.request())
+                    }.build()
+            val io =
+                Executors.newSingleThreadExecutor { r -> Thread(r, "device-test-io") }.asCoroutineDispatcher()
+            try {
+                serverWith(
+                    MockResponse
+                        .Builder()
+                        .code(200)
+                        .body(USER_CODE_JSON)
+                        .build(),
+                ) { server ->
+                    val result =
+                        OkHttpDeviceCodeGateway(
+                            AuthConfig(
+                                server.url("").toString().removeSuffix("/"),
+                                "authorize",
+                                "token",
+                                "client",
+                                "redirect",
+                                "scope",
+                                emptyMap(),
+                            ),
+                            client,
+                            FakeDispatcherProvider(main = io, io = io, default = io),
+                        ).requestCode()
+
+                    assertTrue(result is DeviceCodeRequestResult.Ready)
+                }
+            } finally {
+                io.close()
+            }
+            assertTrue(
+                "expected the request on the provided io dispatcher, saw $seenThreads",
+                seenThreads.isNotEmpty() && seenThreads.all { it.startsWith("device-test-io") },
+            )
         }
 
     private fun gateway(server: MockWebServer): OkHttpDeviceCodeGateway =

@@ -74,7 +74,8 @@ internal object AuthNetworkModule {
         config: AuthConfig,
         logger: AppLogger,
         client: OkHttpClient,
-    ): TokenRefreshGateway = OkHttpTokenRefreshGateway(config, logger, client)
+        dispatchers: DispatcherProvider,
+    ): TokenRefreshGateway = OkHttpTokenRefreshGateway(config, logger, client, dispatchers = dispatchers)
 
     @Provides
     @Singleton
@@ -89,7 +90,8 @@ internal object AuthNetworkModule {
     fun provideDeviceCodeGateway(
         config: AuthConfig,
         client: OkHttpClient,
-    ): DeviceCodeGateway = OkHttpDeviceCodeGateway(config, client)
+        dispatchers: DispatcherProvider,
+    ): DeviceCodeGateway = OkHttpDeviceCodeGateway(config, client, dispatchers = dispatchers)
 }
 
 @Module
@@ -111,7 +113,10 @@ internal object AuthRuntimeModule {
 
     @Provides
     @Singleton
-    fun provideCallbackReceiver(logger: AppLogger): CallbackReceiver = LoopbackCallbackReceiver(logger)
+    fun provideCallbackReceiver(
+        logger: AppLogger,
+        dispatchers: DispatcherProvider,
+    ): CallbackReceiver = LoopbackCallbackReceiver(logger, dispatchers = dispatchers)
 
     @Provides
     @Singleton
