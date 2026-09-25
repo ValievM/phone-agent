@@ -234,6 +234,50 @@ class ToolPipelineTest {
         }
 
     @Test
+    fun `a batch containing a SENSITIVE call is declined without asking`() =
+        runTest {
+            val confirmTool = describingTool("set_alarm", Risk.CONFIRM, describeError = null) { ToolResult.Success("ok") }
+            val sensitiveTool = describingTool("wipe_data", Risk.SENSITIVE, describeError = null) { ToolResult.Success("ok") }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(confirmTool, sensitiveTool)), interaction = interaction, maxBatchSize = 4)
+            val calls = listOf(call("set_alarm"), call("wipe_data"))
+
+            val approved = pipeline.confirmBatch(calls)
+
+            assertTrue(!approved)
+            assertTrue(interaction.batchRequests.isEmpty())
+        }
+
+    @Test
+    fun `a batch containing a SAFE call is declined without asking`() =
+        runTest {
+            val confirmTool = describingTool("set_alarm", Risk.CONFIRM, describeError = null) { ToolResult.Success("ok") }
+            val safeTool = describingTool("find_files", Risk.SAFE, describeError = null) { ToolResult.Success("ok") }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(confirmTool, safeTool)), interaction = interaction, maxBatchSize = 4)
+            val calls = listOf(call("set_alarm"), call("find_files"))
+
+            val approved = pipeline.confirmBatch(calls)
+
+            assertTrue(!approved)
+            assertTrue(interaction.batchRequests.isEmpty())
+        }
+
+    @Test
+    fun `a batch containing an unknown tool is declined without asking and without throwing`() =
+        runTest {
+            val confirmTool = describingTool("set_alarm", Risk.CONFIRM, describeError = null) { ToolResult.Success("ok") }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(confirmTool)), interaction = interaction, maxBatchSize = 4)
+            val calls = listOf(call("set_alarm"), call("vanished_tool"))
+
+            val approved = pipeline.confirmBatch(calls)
+
+            assertTrue(!approved)
+            assertTrue(interaction.batchRequests.isEmpty())
+        }
+
+    @Test
     fun `a CancellationException from describe is rethrown, never turned into a card`() {
         val tool = describingTool("find_files", Risk.SAFE, describeError = CancellationException("stop")) { ToolResult.Success("ok") }
         val pipeline = pipeline(registry = ToolRegistry(setOf(tool)))
