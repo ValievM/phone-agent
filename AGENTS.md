@@ -10,7 +10,7 @@ Android-приложение (Kotlin + Compose): чат с Codex + узкие и
 - Константы входа и бэкенда: `docs/backend-notes.md` (после этапа 0), раньше `docs/research/backend-facts.md`.
 - Serena, Context7 (только в этом проекте): `docs/tooling/serena-context7.md`.
 
-Документ важнее твоих знаний. Документация только в `docs/`, новый файл добавляй в `docs/README.md`. Решение изменилось: обнови документ в том же коммите и запусти `python3 scripts/check_docs.py`.
+Документ важнее твоих знаний. Документация только в `docs/` (кроме `OWNER-TASKS.md` в корне), новый файл добавляй в `docs/README.md`. Решение изменилось: обнови документ в том же коммите и запусти `python3 scripts/check_docs.py`.
 
 ## Как работать
 1. Пойми состояние (git status, чек-лист этапа). Для нетривиального изменения дай короткий план (что, зачем, риски, как проверим) и дождись «ок».
@@ -51,7 +51,7 @@ python3 scripts/check_docs.py
 - В MVP нет `MANAGE_EXTERNAL_STORAGE`, AccessibilityService, SMS и звонков.
 
 ## Serena и Context7
-Оба включены только тут (project-scoped `.codex/config.toml`), в остальных проектах выключены — не трогай без причины. Serena — symbol-навигация, не работает — `rg`/`grep`. Context7: API библиотек (`resolve-library-id` → `query-docs`), без токенов/ключей в запросе. Контракт OpenAI: `docs/backend-notes.md`.
+Оба включены только тут (`.codex/config.toml`), в остальных проектах выключены. Serena — symbol-навигация, не работает — `rg`/`grep`. Context7: API библиотек (`resolve-library-id` → `query-docs`), без токенов/ключей в запросе. Контракт OpenAI: `docs/backend-notes.md`.
 
 ## Результат
 Комментарии и имена в коде на английском, тексты для пользователя русские.
