@@ -34,7 +34,10 @@ internal object FindFilesCopy {
 
     fun invalidArguments(reason: String?): String = "Invalid find_files arguments: $reason"
 
-    fun fileSystemQueryFailed(message: String?): String = "File system query failed: $message"
+    /** Model-facing reason: fixed text on purpose - the exception may embed paths/URIs. */
+    const val FILE_SYSTEM_QUERY_FAILED: String = "File system query failed: the folder could not be read."
+
+    fun fileSystemQueryFailed(): String = FILE_SYSTEM_QUERY_FAILED
 
     fun matchesFoundHeader(count: Int): String = "Found $count matching item(s) in the selected folder:"
 

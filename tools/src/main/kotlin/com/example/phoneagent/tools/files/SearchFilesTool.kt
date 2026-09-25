@@ -104,8 +104,9 @@ internal class SearchFilesTool
                 ToolResult.Success(SearchFilesPolicy.toJson(result))
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (exception: Exception) {
-                ToolResult.Failed(SearchFilesCopy.searchFailed(exception.message))
+            } catch (expected: Exception) {
+                // Fixed reason on purpose: the provider exception may embed URIs/paths.
+                ToolResult.Failed(SearchFilesCopy.searchFailed())
             }
         }
 

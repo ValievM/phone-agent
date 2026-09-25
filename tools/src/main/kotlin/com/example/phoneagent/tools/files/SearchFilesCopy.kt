@@ -27,5 +27,8 @@ internal object SearchFilesCopy {
             SearchFilesValidationError.QUERY_TOO_LONG -> "query must be at most ${SearchFilesArgs.MAX_QUERY_LENGTH} characters"
         }
 
-    fun searchFailed(message: String?): String = "MediaStore search failed: ${message ?: "unknown provider error"}"
+    /** Model-facing reason: fixed text on purpose - the provider exception may embed URIs/paths. */
+    const val SEARCH_FAILED: String = "MediaStore search failed: the provider reported an error."
+
+    fun searchFailed(): String = SEARCH_FAILED
 }
