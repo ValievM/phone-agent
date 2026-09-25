@@ -112,14 +112,17 @@ public class ToolPipeline(
     ): ToolOutcome {
         val missing = missingRequiredFields(tool.spec.inputSchema, args)
         // CONFIRM/SENSITIVE with a broken describe refuse to run: no execution, no confirmation
-        // sheet (a SAFE tool keeps running under the neutral card from [describe]).
-        val refusedByDescribe =
-            tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && describeSafely(tool, args) == null
+        // sheet (a SAFE tool keeps running under the neutral card from [describe]). The description is
+        // asked for exactly once and that same value is what the user is shown, so a describe that
+        // breaks on a later call cannot abort the turn.
+        val description =
+            if (tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED) describeSafely(tool, args) else null
+        val refusedByDescribe = tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && description == null
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
         } else if (refusedByDescribe) {
             ToolOutcome.Failed("the tool could not describe its action, so it was not run")
-        } else if (!approve(tool, args, approval)) {
+        } else if (!approve(tool, args, approval, description)) {
             ToolOutcome.Rejected("user declined")
         } else {
             deniedCapability(tool)?.let { ToolOutcome.Failed(tool.deniedMessage(it)) } ?: execute(tool, args)
@@ -137,12 +140,13 @@ public class ToolPipeline(
         tool: Tool,
         args: JsonObject,
         approval: Approval,
+        description: CallDescription?,
     ): Boolean =
         when {
             approval == Approval.GRANTED -> true
             approval == Approval.DECLINED -> false
             tool.spec.risk == Risk.SAFE -> true
-            else -> userInteraction.confirm(ApprovalRequest(tool.describe(args), tool.spec.risk, args))
+            else -> userInteraction.confirm(ApprovalRequest(checkNotNull(description), tool.spec.risk, args))
         }
 
     private suspend fun execute(

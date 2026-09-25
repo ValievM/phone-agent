@@ -11,7 +11,12 @@ public data class AgentConfig(
     public val maxSteps: Int = 5,
     /** Tool executions allowed per turn; a step requesting more is rejected whole, nothing in it runs. */
     public val maxToolCallsPerTurn: Int = 30,
-)
+) {
+    init {
+        // A limit below one would fail every turn that uses a tool.
+        require(maxToolCallsPerTurn >= 1) { "maxToolCallsPerTurn must be at least 1, was $maxToolCallsPerTurn" }
+    }
+}
 
 /** What the UI feed renders as [AgentLoop] runs a turn; the actual approval prompt is a separate concern (UserInteractionBridge). */
 public sealed interface AgentEvent {

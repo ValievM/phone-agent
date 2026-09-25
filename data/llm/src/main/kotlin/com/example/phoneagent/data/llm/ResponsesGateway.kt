@@ -66,11 +66,11 @@ public class ResponsesGateway(
     private val settingsRepository: SettingsRepository,
     private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
-    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
     // Test seam: lets a test capture the Call OkHttp created, to assert it gets cancelled when
     // the collecting coroutine is (see docs/stages/3-model-client.md item 3.5).
     private val callFactory: Call.Factory = client,
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : ModelGateway {
     override fun stream(request: ModelRequest): Flow<ModelEvent> =
         channelFlow {

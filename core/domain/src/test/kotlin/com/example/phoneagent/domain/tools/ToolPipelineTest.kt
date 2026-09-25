@@ -171,6 +171,53 @@ class ToolPipelineTest {
         }
 
     @Test
+    fun `a SENSITIVE tool with a broken describe also refuses to run without asking`() =
+        runTest {
+            var executed = false
+            val tool =
+                describingTool("send_sms", Risk.SENSITIVE, describeError = IllegalStateException("boom")) {
+                    executed = true
+                    ToolResult.Success("ok")
+                }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction)
+
+            val outcome = pipeline.run("send_sms", buildJsonObject {})
+
+            assertTrue(outcome is ToolOutcome.Failed)
+            assertTrue(interaction.approvalRequests.isEmpty())
+            assertTrue(!executed)
+        }
+
+    @Test
+    fun `a describe that works once and then breaks cannot break the turn because it is asked for only once`() =
+        runTest {
+            var describeCalls = 0
+            val tool =
+                object : Tool {
+                    override val spec = ToolSpec("set_alarm", "test tool", buildJsonObject { put("type", "object") }, Risk.CONFIRM)
+
+                    override fun describe(args: JsonObject): CallDescription {
+                        describeCalls++
+                        check(describeCalls == 1) { "describe was asked for again" }
+                        return CallDescription("set_alarm", "summary")
+                    }
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult = ToolResult.Success("ok")
+                }
+            val interaction = FakeUserInteraction()
+
+            val outcome = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction).run("set_alarm", buildJsonObject {})
+
+            assertEquals(ToolOutcome.Success("ok"), outcome)
+            assertEquals(1, describeCalls)
+            assertEquals(CallDescription("set_alarm", "summary"), interaction.approvalRequests.single().description)
+        }
+
+    @Test
     fun `a batch with a broken describe is declined without asking`() =
         runTest {
             val broken =

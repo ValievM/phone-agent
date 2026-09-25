@@ -318,6 +318,45 @@ class AgentLoopTest {
         assertEquals(CallDescription(title = "vanished_tool", summary = "Unknown tool"), loop().describe(call))
     }
 
+    @Test
+    fun `the tool call limit counts calls across the steps of one turn, not per step`() =
+        runTest {
+            fun step(vararg names: String) =
+                listOf(
+                    *names
+                        .map {
+                            ModelEvent.ToolCallRequested(ToolCall(CallId("call-$it-${gateway.responseQueue.size}"), it, buildJsonObject {}))
+                        }.toTypedArray(),
+                    ModelEvent.Completed(),
+                )
+            gateway.responseQueue.addLast(step("tool_a", "tool_b"))
+            gateway.responseQueue.addLast(step("tool_a", "tool_b"))
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("tool_a") { ToolResult.Success("a-done") },
+                        fakeTool("tool_b") { ToolResult.Success("b-done") },
+                    ),
+                )
+
+            val events = loop(registry, AgentConfig(maxToolCallsPerTurn = 3)).run(emptyList(), "twice").toList()
+
+            assertEquals("only the first step fits into the budget of 3: $executedCalls", listOf("tool_a", "tool_b"), executedCalls)
+            val failure = events.last() as AgentEvent.TurnFailed
+            assertEquals(AgentError.StepLimit, failure.error)
+            assertEquals(2, failure.newItems.count { it is HistoryItem.ToolCallItem })
+        }
+
+    @Test
+    fun `a tool call limit below one is rejected when the config is built`() {
+        for (invalid in listOf(0, -1)) {
+            val error = runCatching { AgentConfig(maxToolCallsPerTurn = invalid) }.exceptionOrNull()
+
+            assertTrue("limit $invalid must be rejected, got $error", error is IllegalArgumentException)
+        }
+        assertEquals(1, AgentConfig(maxToolCallsPerTurn = 1).maxToolCallsPerTurn)
+    }
+
     private fun fakeTool(
         name: String,
         risk: Risk = Risk.SAFE,

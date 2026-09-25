@@ -61,7 +61,7 @@ internal object ModelModule {
         dispatchers: DispatcherProvider,
     ): ModelGateway {
         val client = OkHttpClient.Builder().readTimeout(MODEL_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS).build()
-        return ResponsesGateway(profile, credentialsProvider, settingsRepository, logger, client, dispatchers)
+        return ResponsesGateway(profile, credentialsProvider, settingsRepository, logger, client = client, dispatchers = dispatchers)
     }
 
     @Provides
