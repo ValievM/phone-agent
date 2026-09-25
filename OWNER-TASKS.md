@@ -1,6 +1,6 @@
 # ЗАДАЧИ ВЛАДЕЛЬЦА
 
-Все задачи проекта на GitHub: [issues](https://github.com/ValievM/phone-agent/issues), устройство и метки в [tracker.md](docs/tooling/tracker.md). Здесь только то, что нужно от тебя. Обновляет Claude. Обновлено: 2026-09-25.
+Все задачи проекта на GitHub: [issues](https://github.com/ValievM/phone-agent/issues), устройство и метки в [tracker.md](docs/tooling/tracker.md). Здесь только то, что нужно от тебя. Обновляет Claude. Обновлено: 2026-09-26 (влито в `main`: #2, #3, #4, #5, #6, #14, #34; на GitHub пока не пушено).
 
 **Твой список одним фильтром:** [всё, что ждёт тебя](https://github.com/ValievM/phone-agent/issues?q=is%3Aopen+label%3A%22who%3Aowner%22).
 
@@ -28,8 +28,8 @@
 ## Кто чем занят
 | Кто | В работе | Готово к выдаче |
 |---|---|---|
-| GPT (рой) | [#1](https://github.com/ValievM/phone-agent/issues/1) T13, [#2](https://github.com/ValievM/phone-agent/issues/2) отказ пачки | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении», записки [#35](https://github.com/ValievM/phone-agent/issues/35) (безопасный «Повторить») и [#36](https://github.com/ValievM/phone-agent/issues/36) (статус «передано»); проверяет сдачи GLM |
-| GLM (очередь) | [#3](https://github.com/ValievM/phone-agent/issues/3) G2b, [#4](https://github.com/ValievM/phone-agent/issues/4) защита `confirmBatch`, [#5](https://github.com/ValievM/phone-agent/issues/5) контракт `UserInteraction` | [#6](https://github.com/ValievM/phone-agent/issues/6) контекст целыми ходами, [#14](https://github.com/ValievM/phone-agent/issues/14) `INSTALL.md`, [#34](https://github.com/ValievM/phone-agent/issues/34) проверка «нет фона» |
-| Claude | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры, [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток |
+| GPT (рой) | [#1](https://github.com/ValievM/phone-agent/issues/1) T13: осталось 2 мелкие правки, тесты разрешены | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении», записки [#35](https://github.com/ValievM/phone-agent/issues/35) (безопасный «Повторить») и [#36](https://github.com/ValievM/phone-agent/issues/36) (статус «передано»); проверяет сдачи GLM |
+| GLM (очередь) | очередь пуста, всё сдано и влито | [#32](https://github.com/ValievM/phone-agent/issues/32) технический долг (Claude распишет точно) |
+| Claude | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры 6.1 и 6.2 (нужен телефон), [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток |
 
 `[x]` в `docs/manual-verification*.md` ставишь только ты.
