@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -141,6 +142,23 @@ class FindFilesToolTest {
             val result = toolWith(brokenRoot).execute(args("match"), context)
 
             assertTrue(result is ToolResult.Failed)
+        }
+
+    @Test
+    fun `a file system failure never echoes the exception text to the model`() =
+        runTest {
+            val secretUri = "content://secret/path"
+            val brokenRoot =
+                FakeDocumentNode(
+                    name = "root",
+                    isDirectory = true,
+                    childrenError = SecurityException("failed to read $secretUri"),
+                )
+
+            val result = toolWith(brokenRoot).execute(args("match"), context)
+
+            assertTrue(result is ToolResult.Failed)
+            assertFalse((result as ToolResult.Failed).reason.contains(secretUri))
         }
 
     @Test

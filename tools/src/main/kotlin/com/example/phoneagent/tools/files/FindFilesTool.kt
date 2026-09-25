@@ -101,8 +101,9 @@ internal class FindFilesTool
             } catch (cancellation: CancellationException) {
                 // A Stop during the walk must stay a cancellation, not become a failure report.
                 throw cancellation
-            } catch (exception: Exception) {
-                ToolResult.Failed(FindFilesCopy.fileSystemQueryFailed(exception.message))
+            } catch (expected: Exception) {
+                // Fixed reason on purpose: the exception may embed paths/URIs.
+                ToolResult.Failed(FindFilesCopy.fileSystemQueryFailed())
             }
 
         private companion object {

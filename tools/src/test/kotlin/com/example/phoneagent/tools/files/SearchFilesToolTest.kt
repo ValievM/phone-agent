@@ -35,6 +35,24 @@ class SearchFilesToolTest {
         }
 
     @Test
+    fun `a provider failure never echoes the provider exception text to the model`() =
+        runTest {
+            val secretUri = "content://secret/path"
+            val search =
+                object : MediaStoreSearch {
+                    override fun search(
+                        query: String,
+                        shouldContinue: () -> Boolean,
+                    ): MediaStoreQueryResult = error("failed to read $secretUri")
+                }
+
+            val result = tool(FakeUserInteraction(), search).execute(args("report"), context())
+
+            assertTrue(result is ToolResult.Failed)
+            assertFalse((result as ToolResult.Failed).reason.contains(secretUri))
+        }
+
+    @Test
     fun `queries after capability is available and returns the structured result`() =
         runTest {
             val interaction = FakeUserInteraction()
