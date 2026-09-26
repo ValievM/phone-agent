@@ -15,6 +15,7 @@ import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -109,22 +111,112 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `sign out delegates to the authentication coordinator`() =
+    fun `sign out without deleting history delegates to the authentication coordinator`() =
         runTest(dispatcher.scheduler) {
             val authCoordinator = FakeAuthCoordinator(AppAuthStatus.SignedIn(AuthMethod.API_KEY))
+            val conversationRepository = FakeConversationRepository()
             val viewModel =
                 SettingsViewModel(
                     authCoordinator = authCoordinator,
                     settingsRepository = RecordingSettingsRepository(AppSettings()),
                     modelCatalog = FakeModelCatalog(),
-                    conversationRepository = FakeConversationRepository(),
+                    conversationRepository = conversationRepository,
                     logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
-            viewModel.onEvent(SettingsUiEvent.SignOut)
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = false))
             advanceUntilIdle()
 
+            assertEquals(1, authCoordinator.signOutCalls)
+            assertTrue(authCoordinator.state.value is AppAuthStatus.SignedOut)
+            assertEquals(0, conversationRepository.replaceCalls)
+        }
+
+    @Test
+    fun `sign out clears history before signing out when requested`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository = FakeConversationRepository(operations)
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = true))
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory", "signOut"), operations)
+            assertEquals(listOf(emptyList<HistoryItem>()), conversationRepository.replacements)
+        }
+
+    @Test
+    fun `failed history deletion keeps the account signed in`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository =
+                FakeConversationRepository(operations).apply { replaceFailure = IOException("history unavailable") }
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = true))
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory"), operations)
+            assertEquals(0, authCoordinator.signOutCalls)
+            assertTrue(authCoordinator.state.value is AppAuthStatus.SignedIn)
+            assertTrue(viewModel.state.value.historyClearUnavailable)
+        }
+
+    @Test
+    fun `repeated sign out while history is being deleted starts only once`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository =
+                FakeConversationRepository(operations).apply { replaceGate = CompletableDeferred() }
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            val event = SettingsUiEvent.SignOut(clearHistory = true)
+            viewModel.onEvent(event)
+            runCurrent()
+            viewModel.onEvent(event)
+            runCurrent()
+
+            assertEquals(1, conversationRepository.replaceCalls)
+            assertEquals(0, authCoordinator.signOutCalls)
+            conversationRepository.replaceGate?.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory", "signOut"), operations)
             assertEquals(1, authCoordinator.signOutCalls)
         }
 
@@ -368,7 +460,7 @@ class SettingsViewModelTest {
                 )
             advanceUntilIdle()
 
-            viewModel.onEvent(SettingsUiEvent.SignOut)
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = false))
             advanceUntilIdle()
 
             assertSafeWarning(records, "sign out failed")
@@ -488,6 +580,7 @@ class SettingsViewModelTest {
 
     private class FakeAuthCoordinator(
         initial: AppAuthStatus = AppAuthStatus.SignedOut(),
+        private val operations: MutableList<String> = mutableListOf(),
     ) : AuthCoordinator {
         override val state = MutableStateFlow(initial)
         var signOutCalls = 0
@@ -502,20 +595,29 @@ class SettingsViewModelTest {
         override suspend fun signInWithApiKey(key: String) = Unit
 
         override suspend fun signOut() {
+            operations += "signOut"
             signOutCalls += 1
             signOutFailure?.let { throw it }
+            state.value = AppAuthStatus.SignedOut()
         }
 
         override fun openDeviceVerificationPage() = Unit
     }
 
-    private class FakeConversationRepository : ConversationRepository {
+    private class FakeConversationRepository(
+        private val operations: MutableList<String> = mutableListOf(),
+    ) : ConversationRepository {
         val replacements = mutableListOf<List<HistoryItem>>()
         var replaceFailure: IOException? = null
+        var replaceCalls = 0
+        var replaceGate: CompletableDeferred<Unit>? = null
 
         override suspend fun load(): List<HistoryItem> = emptyList()
 
         override suspend fun replace(items: List<HistoryItem>) {
+            replaceCalls += 1
+            operations += "clearHistory"
+            replaceGate?.await()
             replaceFailure?.let { throw it }
             replacements += items
         }

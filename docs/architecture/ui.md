@@ -19,3 +19,4 @@
 - ViewModel собирает `Flow<AgentEvent>` в `ChatUiState`. Логики выполнения и безопасности во ViewModel нет.
 - Тексты ошибок (`AgentError` → строка) — только здесь.
 - ViewModel не держит `Context` и `Activity`.
+- Выход подтверждается `ConfirmationSheet`: при выборе удаления истории она стирается до `AuthCoordinator.signOut()`; если очистка не удалась, сессия остаётся активной. Открытая шторка хранит состояние через `rememberSaveable`.
