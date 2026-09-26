@@ -90,12 +90,18 @@ internal fun TurnState.isInProgress(): Boolean = this is TurnState.Running || th
 internal fun TurnState.hasRetryAction(): Boolean = this is TurnState.FailedRetryable || this is TurnState.Interrupted
 
 internal fun ChatUiState.errorForDisplay(): AgentError? {
-    val syncError = (historySync as? HistorySyncState.Failed)?.error
-    return syncError ?: when (val currentTurn = turn) {
+    val syncError = (historySync as? HistorySyncState.Failed)
+    // Priority per the owner-approved order: a failed LOAD hides the screen's trustworthiness,
+    // then the turn error (its Retry must stay visible even if saving failed), then the save error.
+    when (syncError?.operation) {
+        StorageOperation.LOAD -> return syncError.error
+        null, StorageOperation.SAVE -> Unit
+    }
+    return when (val currentTurn = turn) {
         is TurnState.FailedRetryable -> currentTurn.error
         is TurnState.FailedTerminal -> currentTurn.error
         is TurnState.Interrupted -> AgentError.Interrupted
-        is TurnState.Idle, is TurnState.Running, is TurnState.AwaitingApproval, is TurnState.Stopped -> null
+        is TurnState.Idle, is TurnState.Running, is TurnState.AwaitingApproval, is TurnState.Stopped -> syncError?.error
     }
 }
 
