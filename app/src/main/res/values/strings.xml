@@ -47,9 +47,12 @@
     <string name="settings_models_unavailable">Список моделей сейчас недоступен. Сохранённый выбор не изменён.</string>
     <string name="settings_search_folder_title">Папка для поиска файлов</string>
     <string name="settings_search_folder_selected">Папка выбрана. Поиск ограничен этой папкой и её вложенными папками.</string>
+    <string name="settings_search_folder_selected_name">Выбрана папка «%1$s».</string>
+    <string name="settings_search_folder_selected_fallback">Папка выбрана</string>
     <string name="settings_search_folder_not_selected">Папка не выбрана. Поиск по папкам пока недоступен.</string>
     <string name="settings_search_folder_choose">Выбрать папку</string>
     <string name="settings_search_folder_change">Изменить папку</string>
+    <string name="settings_search_folder_downloads_hint">Android не разрешает выбрать «Загрузки» целиком. Выберите другую папку или вложенную в неё.</string>
     <string name="settings_search_folder_permission_error">Не удалось сохранить доступ к папке. Выберите её ещё раз.</string>
     <string name="settings_history_title">История чата</string>
     <string name="settings_history_description">Удаление истории синхронизируется с открытым чатом.</string>

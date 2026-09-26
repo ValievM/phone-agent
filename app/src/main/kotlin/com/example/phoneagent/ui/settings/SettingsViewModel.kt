@@ -70,6 +70,7 @@ class SettingsViewModel
                             themeMode = currentSettings.toThemeMode(),
                             useSystemColors = currentSettings.useDynamicColors,
                             searchFolderSelected = currentSettings.searchFolderUri != null,
+                            searchFolderUri = currentSettings.searchFolderUri,
                             settingsUnavailable = false,
                         )
                     }
@@ -170,6 +171,7 @@ class SettingsViewModel
                                 themeMode = updatedSettings.toThemeMode(),
                                 useSystemColors = updatedSettings.useDynamicColors,
                                 searchFolderSelected = updatedSettings.searchFolderUri != null,
+                                searchFolderUri = updatedSettings.searchFolderUri,
                                 folderPermissionUnavailable = false,
                                 settingsUnavailable = false,
                                 themeSaveFailed = false,

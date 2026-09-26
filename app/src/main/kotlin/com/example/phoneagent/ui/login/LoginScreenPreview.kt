@@ -14,6 +14,10 @@ private fun LoginLoadingPreview() = AppTheme { PreviewLogin(LoginUiState(isLoadi
 
 @Preview(showBackground = true)
 @Composable
+private fun LoginRestoringPreview() = AppTheme { PreviewLogin(LoginUiState(isRestoring = true)) }
+
+@Preview(showBackground = true)
+@Composable
 private fun LoginErrorPreview() = AppTheme { PreviewLogin(LoginUiState(error = LoginError.NETWORK)) }
 
 @Preview(showBackground = true)

@@ -47,6 +47,7 @@ import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppMotion
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+import com.example.phoneagent.ui.sanitizeUntrustedUiText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -55,7 +56,6 @@ private val prettyJson = Json { prettyPrint = true }
 private fun JsonObject.toPrettyString(): String = prettyJson.encodeToString(JsonObject.serializer(), this)
 
 private val StatusIconSize = 20.dp
-private const val MAX_HANDOFF_TARGET_CHARACTERS = 40
 internal const val TOOL_CALL_STATUS_TEST_TAG = "tool_call_status"
 internal const val TOOL_CALL_STATUS_ICON_TEST_TAG = "tool_call_status_icon"
 
@@ -280,62 +280,21 @@ internal fun ToolCallStatus.look(): StatusLook {
 @Composable
 private fun ToolCallStatus.label(): String =
     when (this) {
-        ToolCallStatus.AwaitingApproval -> {
-            stringResource(R.string.tool_call_status_awaiting)
-        }
-
-        ToolCallStatus.Running -> {
-            stringResource(R.string.tool_call_status_running)
-        }
-
-        is ToolCallStatus.Done -> {
-            summary
-        }
-
-        is ToolCallStatus.FilesFound -> {
-            stringResource(R.string.file_search_completed, count)
-        }
-
-        is ToolCallStatus.HandedOff -> {
-            stringResource(R.string.tool_call_status_handed_off, sanitizeHandoffTarget(target))
-        }
-
-        ToolCallStatus.NotShown -> {
-            stringResource(R.string.tool_call_status_not_shown)
-        }
-
-        is ToolCallStatus.Failed -> {
+        ToolCallStatus.AwaitingApproval -> stringResource(R.string.tool_call_status_awaiting)
+        ToolCallStatus.Running -> stringResource(R.string.tool_call_status_running)
+        is ToolCallStatus.Done -> summary
+        is ToolCallStatus.FilesFound -> stringResource(R.string.file_search_completed, count)
+        is ToolCallStatus.HandedOff -> stringResource(R.string.tool_call_status_handed_off, sanitizeUntrustedUiText(target))
+        ToolCallStatus.NotShown -> stringResource(R.string.tool_call_status_not_shown)
+        is ToolCallStatus.Failed ->
             if (reason == TOOL_EXECUTION_TIMEOUT_REASON) {
                 stringResource(R.string.tool_call_status_timeout)
             } else {
                 reason
             }
-        }
-
-        ToolCallStatus.Rejected -> {
-            stringResource(R.string.tool_call_status_rejected)
-        }
-
-        ToolCallStatus.Cancelled -> {
-            stringResource(R.string.tool_call_status_cancelled)
-        }
+        ToolCallStatus.Rejected -> stringResource(R.string.tool_call_status_rejected)
+        ToolCallStatus.Cancelled -> stringResource(R.string.tool_call_status_cancelled)
     }
-
-private fun sanitizeHandoffTarget(target: String): String {
-    val sanitized = StringBuilder(minOf(target.length, MAX_HANDOFF_TARGET_CHARACTERS * 2))
-    var offset = 0
-    var visibleCharacters = 0
-
-    while (offset < target.length && visibleCharacters < MAX_HANDOFF_TARGET_CHARACTERS) {
-        val codePoint = target.codePointAt(offset)
-        offset += Character.charCount(codePoint)
-        if (!Character.isISOControl(codePoint)) {
-            sanitized.appendCodePoint(codePoint)
-            visibleCharacters++
-        }
-    }
-    return sanitized.toString()
-}
 
 /** The decorative status mark: timer, spinner, check, send, warning, error, refusal or stop. */
 @Composable
