@@ -2,11 +2,15 @@ package com.example.phoneagent.ui.settings
 
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -15,8 +19,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.StatusMessage
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
@@ -33,15 +39,50 @@ internal fun AppearanceSection(
 ) {
     SettingsSection(title = stringResource(R.string.settings_appearance_title)) {
         val modes = ThemeMode.entries
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            modes.forEachIndexed { index, mode ->
-                SegmentedButton(
-                    selected = state.themeMode == mode,
-                    onClick = { onEvent(SettingsUiEvent.SelectThemeMode(mode)) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
-                    enabled = state.canEditSettings,
-                ) {
-                    Text(stringResource(mode.label()))
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val useList = maxWidth <= 320.dp || LocalDensity.current.fontScale >= 1.5f
+            if (useList) {
+                Column {
+                    modes.forEach { mode ->
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .selectable(
+                                        selected = state.themeMode == mode,
+                                        enabled = state.canEditSettings,
+                                        role = Role.RadioButton,
+                                        onClick = { onEvent(SettingsUiEvent.SelectThemeMode(mode)) },
+                                    ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = state.themeMode == mode,
+                                onClick = null,
+                                enabled = state.canEditSettings,
+                            )
+                            Text(
+                                text = stringResource(mode.label()),
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            } else {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    modes.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            modifier = Modifier.weight(1f),
+                            selected = state.themeMode == mode,
+                            onClick = { onEvent(SettingsUiEvent.SelectThemeMode(mode)) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                            enabled = state.canEditSettings,
+                        ) {
+                            Text(stringResource(mode.label()), maxLines = 1)
+                        }
+                    }
                 }
             }
         }
