@@ -7,6 +7,7 @@ import com.example.phoneagent.domain.model.ModelCatalogResult
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.info
 import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -53,9 +54,14 @@ public class OkHttpModelCatalog(
                             .build()
 
                     client.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) return@withContext ModelCatalogResult.Unavailable
+                        if (!response.isSuccessful) {
+                            logCatalogResult(ModelCatalogResult.Unavailable, response.code)
+                            return@withContext ModelCatalogResult.Unavailable
+                        }
                         val body = response.body.string()
-                        parseModels(body)
+                        val result = parseModels(body)
+                        logCatalogResult(result, response.code)
+                        result
                     }
                 }
             }
@@ -70,6 +76,33 @@ public class OkHttpModelCatalog(
             )
             ModelCatalogResult.Unavailable
         }
+
+    private fun logCatalogResult(
+        result: ModelCatalogResult,
+        httpCode: Int,
+    ) {
+        when (result) {
+            is ModelCatalogResult.Available -> {
+                logger.info(
+                    TAG,
+                    "model catalog loaded",
+                    fields =
+                        mapOf(
+                            "count" to result.models.size.toString(),
+                            "http" to httpCode.toString(),
+                        ),
+                )
+            }
+
+            ModelCatalogResult.Unavailable -> {
+                logger.warn(
+                    TAG,
+                    "load model catalog failed",
+                    fields = mapOf("http" to httpCode.toString()),
+                )
+            }
+        }
+    }
 
     private fun parseModels(body: String): ModelCatalogResult {
         val root = Json.parseToJsonElement(body).jsonObject

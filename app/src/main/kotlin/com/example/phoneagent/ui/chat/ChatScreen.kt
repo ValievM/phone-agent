@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,7 +21,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +39,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.ui.designsystem.components.AppTopAppBar
 import com.example.phoneagent.ui.designsystem.components.Composer
 import com.example.phoneagent.ui.designsystem.components.ComposerMode
 import com.example.phoneagent.ui.designsystem.components.FileHit
@@ -71,7 +70,6 @@ fun ChatRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     state: ChatUiState,
@@ -86,7 +84,7 @@ fun ChatScreen(
         // The bottom is left to the composer: its bar runs under the navigation bar and rises with the keyboard.
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
         topBar = {
-            TopAppBar(
+            AppTopAppBar(
                 title = { Text(stringResource(R.string.chat_title)) },
                 actions = {
                     IconButton(onClick = onOpenSettings) {

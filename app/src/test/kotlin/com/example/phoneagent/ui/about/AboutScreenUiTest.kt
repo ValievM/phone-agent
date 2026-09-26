@@ -63,9 +63,7 @@ class AboutScreenUiTest {
                     versionName = versionName,
                     licenseTexts = licenseTexts,
                     expandedLicenseKinds = expandedLicenseKinds,
-                    onToggleLicense = {},
-                    onOpenProject = {},
-                    onBack = onBack,
+                    onEvent = { event -> if (event == AboutUiEvent.NavigateBack) onBack() },
                 )
             }
         }
@@ -149,11 +147,12 @@ class AboutScreenUiTest {
                     versionName = "1.2.3",
                     licenseTexts = licenseTexts,
                     expandedLicenseKinds = expanded,
-                    onToggleLicense = { kind ->
-                        expanded = if (kind in expanded) expanded - kind else expanded + kind
+                    onEvent = { event ->
+                        if (event is AboutUiEvent.ToggleLicense) {
+                            val kind = event.kind
+                            expanded = if (kind in expanded) expanded - kind else expanded + kind
+                        }
                     },
-                    onOpenProject = {},
-                    onBack = {},
                 )
             }
         }
@@ -192,11 +191,12 @@ class AboutScreenUiTest {
                     versionName = "1.2.3",
                     licenseTexts = licenseTexts,
                     expandedLicenseKinds = expanded,
-                    onToggleLicense = { kind ->
-                        expanded = if (kind in expanded) expanded - kind else expanded + kind
+                    onEvent = { event ->
+                        if (event is AboutUiEvent.ToggleLicense) {
+                            val kind = event.kind
+                            expanded = if (kind in expanded) expanded - kind else expanded + kind
+                        }
                     },
-                    onOpenProject = {},
-                    onBack = {},
                 )
             }
         }
@@ -219,11 +219,12 @@ class AboutScreenUiTest {
                     versionName = "1.2.3",
                     licenseTexts = licenseTexts,
                     expandedLicenseKinds = expanded,
-                    onToggleLicense = { kind ->
-                        expanded = if (kind in expanded) expanded - kind else expanded + kind
+                    onEvent = { event ->
+                        if (event is AboutUiEvent.ToggleLicense) {
+                            val kind = event.kind
+                            expanded = if (kind in expanded) expanded - kind else expanded + kind
+                        }
                     },
-                    onOpenProject = {},
-                    onBack = {},
                 )
             }
         }
@@ -325,9 +326,12 @@ class AboutScreenNarrowLargeFontUiTest {
                         versionName = "1.2.3",
                         licenseTexts = licenseTexts,
                         expandedLicenseKinds = expanded,
-                        onToggleLicense = { kind -> expanded = if (kind in expanded) expanded - kind else expanded + kind },
-                        onOpenProject = {},
-                        onBack = {},
+                        onEvent = { event ->
+                            if (event is AboutUiEvent.ToggleLicense) {
+                                val kind = event.kind
+                                expanded = if (kind in expanded) expanded - kind else expanded + kind
+                            }
+                        },
                     )
                 }
             }
@@ -387,9 +391,7 @@ class AboutScreenWideUiTest {
                     versionName = "1.2.3",
                     licenseTexts = LicenseTextResources.readAll(context.resources),
                     expandedLicenseKinds = emptySet(),
-                    onToggleLicense = {},
-                    onOpenProject = {},
-                    onBack = {},
+                    onEvent = {},
                 )
             }
         }

@@ -15,9 +15,7 @@ private fun AboutPreviewFrame(expandedLicenseKinds: Set<LicenseKind> = emptySet(
             versionName = "0.1.0",
             licenseTexts = LicenseKind.entries.associateWith { previewLicenseText },
             expandedLicenseKinds = expandedLicenseKinds,
-            onToggleLicense = {},
-            onOpenProject = {},
-            onBack = {},
+            onEvent = {},
         )
     }
 }

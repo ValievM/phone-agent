@@ -36,16 +36,26 @@ fun AboutRoute(
         versionName = versionName,
         licenseTexts = licenseTexts,
         expandedLicenseKinds = expandedLicenseKinds,
-        onToggleLicense = { kind ->
-            expandedLicenseNames =
-                if (kind.name in expandedLicenseNames) {
-                    expandedLicenseNames - kind.name
-                } else {
-                    expandedLicenseNames + kind.name
+        onEvent = { event ->
+            when (event) {
+                is AboutUiEvent.ToggleLicense -> {
+                    expandedLicenseNames =
+                        if (event.kind.name in expandedLicenseNames) {
+                            expandedLicenseNames - event.kind.name
+                        } else {
+                            expandedLicenseNames + event.kind.name
+                        }
                 }
+
+                is AboutUiEvent.OpenProject -> {
+                    pendingLink = evaluateLink(event.url)
+                }
+
+                AboutUiEvent.NavigateBack -> {
+                    onBack()
+                }
+            }
         },
-        onOpenProject = { url -> pendingLink = evaluateLink(url) },
-        onBack = onBack,
         modifier = modifier,
     )
 

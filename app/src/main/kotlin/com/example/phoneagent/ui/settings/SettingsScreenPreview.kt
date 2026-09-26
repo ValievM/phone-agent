@@ -82,3 +82,15 @@ private fun SettingsFolderLongNamePreview() =
         ReadyState,
         selectedFolderName = "Документы из папки Telegram и загрузок с длинным названием".take(MAX_UNTRUSTED_UI_TEXT_CHARACTERS),
     )
+
+@PreviewLightDark
+@PreviewFontScale
+@Preview(name = "320dp at 200% font", widthDp = 320, fontScale = 2f)
+@Composable
+private fun SettingsSingleModelPreview() = SettingsPreviewFrame(ReadyState.copy(availableModels = listOf("gpt-5.6-luna")))
+
+@PreviewLightDark
+@PreviewFontScale
+@Preview(name = "320dp at 200% font", widthDp = 320, fontScale = 2f)
+@Composable
+private fun SettingsEmptyModelCatalogPreview() = SettingsPreviewFrame(ReadyState.copy(availableModels = emptyList()))

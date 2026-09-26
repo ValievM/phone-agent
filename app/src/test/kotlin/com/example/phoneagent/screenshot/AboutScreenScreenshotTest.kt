@@ -41,9 +41,7 @@ class AboutScreenScreenshotTest {
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = emptySet(),
-                onToggleLicense = {},
-                onOpenProject = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 
@@ -67,9 +65,7 @@ class AboutScreenScreenshotTest {
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = setOf(LicenseKind.APACHE_2_0),
-                onToggleLicense = {},
-                onOpenProject = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 }
@@ -95,9 +91,7 @@ class AboutScreenNarrowScreenshotTest {
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = emptySet(),
-                onToggleLicense = {},
-                onOpenProject = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 }

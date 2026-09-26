@@ -43,7 +43,7 @@ internal const val ABOUT_PROJECT_LINK_TAG_PREFIX = "about-project-link"
 internal fun LicenseEntriesSection(
     title: String,
     entries: List<LicenseEntry>,
-    onOpenProject: (String) -> Unit,
+    onEvent: (AboutUiEvent) -> Unit,
 ) {
     SettingsSection(title = title) {
         Column {
@@ -54,7 +54,7 @@ internal fun LicenseEntriesSection(
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
-                LicenseEntryContent(entry = entry, onOpenProject = onOpenProject)
+                LicenseEntryContent(entry = entry, onEvent = onEvent)
             }
         }
     }
@@ -63,7 +63,7 @@ internal fun LicenseEntriesSection(
 @Composable
 internal fun LicenseEntryContent(
     entry: LicenseEntry,
-    onOpenProject: (String) -> Unit,
+    onEvent: (AboutUiEvent) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.extraSmall)) {
         Row(
@@ -94,7 +94,7 @@ internal fun LicenseEntryContent(
                     stringResource(R.string.about_project_link_numbered, index + 1, projectUrls.size)
                 }
             TextButton(
-                onClick = { onOpenProject(url) },
+                onClick = { onEvent(AboutUiEvent.OpenProject(url)) },
                 modifier =
                     Modifier
                         .testTag("$ABOUT_PROJECT_LINK_TAG_PREFIX-${entry.name}-$index")

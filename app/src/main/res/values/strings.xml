@@ -41,10 +41,12 @@
     <string name="settings_system_colors_title">Цвета системы</string>
     <string name="settings_system_colors_description">Цвета из обоев телефона вместо фирменных. Android 12 и новее.</string>
     <string name="settings_model_title">Модель</string>
-    <string name="settings_model_description">Выберите модель для следующих запросов.</string>
+    <string name="settings_model_description">Модель для следующих запросов.</string>
     <string name="settings_model_default">По умолчанию (gpt-5.6-luna)</string>
     <string name="settings_models_loading">Загружаем список моделей…</string>
     <string name="settings_models_unavailable">Список моделей сейчас недоступен. Сохранённый выбор не изменён.</string>
+    <string name="settings_model_single_available">Модель: %1$s (единственная доступная)</string>
+    <string name="settings_models_empty">Список моделей пуст. Выбор недоступен.</string>
     <string name="settings_search_folder_title">Папка для поиска файлов</string>
     <string name="settings_search_folder_selected">Папка выбрана. Поиск ограничен этой папкой и её вложенными папками.</string>
     <string name="settings_search_folder_selected_name">Выбрана папка «%1$s».</string>
