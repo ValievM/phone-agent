@@ -2,8 +2,11 @@ package com.example.phoneagent.ui.chat
 
 import com.example.phoneagent.domain.agent.AgentError
 import com.example.phoneagent.domain.agent.AgentLoop
+import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.ContextWindowPolicy
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.conversation.ItemId
+import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
@@ -14,8 +17,14 @@ import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.storage.ConversationRepository
+import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
+import com.example.phoneagent.domain.tools.ToolResult
+import com.example.phoneagent.domain.tools.ToolSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -28,6 +37,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -109,6 +120,109 @@ class ChatViewModelRetryTest {
                 listOf("Привет", "Full answer"),
                 repository.load().map { (it as? HistoryItem.UserMessage)?.text ?: (it as HistoryItem.AssistantMessage).text },
             )
+        }
+
+    @Test
+    fun `retry continues after a completed tool call and keeps its card`() =
+        runTest(dispatcher.scheduler) {
+            val question = "Поставь будильник"
+            val call = ToolCall(CallId("alarm-call"), "set_alarm", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
+                    responseQueue.addLast(listOf(ModelEvent.Failed(AgentError.Offline)))
+                    responseQueue.addLast(listOf(ModelEvent.TextDelta("Будильник установлен"), ModelEvent.Completed()))
+                }
+            var executions = 0
+            val alarmTool =
+                object : Tool {
+                    override val spec =
+                        ToolSpec(
+                            name = "set_alarm",
+                            description = "test alarm",
+                            inputSchema = buildJsonObject {},
+                            risk = Risk.CONFIRM,
+                        )
+
+                    override fun describe(args: JsonObject): CallDescription = CallDescription("set_alarm", "calling set_alarm")
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult {
+                        executions++
+                        return ToolResult.Success("Установлен")
+                    }
+                }
+            val repository = RetryFakeRepository()
+            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(alarmTool))), repository, logger = FakeAppLogger())
+
+            viewModel.onEvent(ChatUiEvent.Submit(question))
+            advanceUntilIdle()
+            viewModel.onEvent(ChatUiEvent.Retry)
+            advanceUntilIdle()
+
+            val retryHistory = gateway.requests.last().history
+            assertEquals(1, retryHistory.filterIsInstance<HistoryItem.UserMessage>().size)
+            assertEquals(listOf(call.callId), retryHistory.filterIsInstance<HistoryItem.ToolCallItem>().map { it.callId })
+            assertEquals(listOf(call.callId), retryHistory.filterIsInstance<HistoryItem.ToolOutput>().map { it.callId })
+            assertEquals(1, executions)
+            assertEquals(
+                1,
+                viewModel.state.value.messages
+                    .count { it.toolCall != null },
+            )
+            assertEquals(
+                listOf(ChatRole.USER, ChatRole.TOOL, ChatRole.ASSISTANT),
+                viewModel.state.value.messages
+                    .map(ChatMessage::role),
+            )
+            assertEquals(
+                "Будильник установлен",
+                viewModel.state.value.messages
+                    .last()
+                    .text,
+            )
+            assertEquals(1, repository.load().count { it is HistoryItem.ToolOutput })
+        }
+
+    @Test
+    fun `continued retry uses the saved user id while running`() =
+        runTest(dispatcher.scheduler) {
+            val question = "Найди файл"
+            val call = ToolCall(CallId("saved-call"), "find_files", buildJsonObject {})
+            val gateway = FailAfterToolThenHangGateway(call)
+            val tool =
+                object : Tool {
+                    override val spec =
+                        ToolSpec(
+                            name = "find_files",
+                            description = "test search",
+                            inputSchema = buildJsonObject {},
+                            risk = Risk.SAFE,
+                        )
+
+                    override fun describe(args: JsonObject): CallDescription = CallDescription("find_files", "calling find_files")
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult = ToolResult.Success("found")
+                }
+            val repository = RetryFakeRepository()
+            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(tool))), repository, logger = FakeAppLogger())
+            viewModel.onEvent(ChatUiEvent.Submit(question))
+            advanceUntilIdle()
+            val savedQuestion = repository.load().filterIsInstance<HistoryItem.UserMessage>().single()
+
+            viewModel.onEvent(ChatUiEvent.Retry)
+            runCurrent()
+
+            val running = viewModel.state.value.turn as TurnState.Running
+            assertEquals(savedQuestion.itemId, running.questionId)
+            assertEquals(question, savedQuestion.text)
+            viewModel.onEvent(ChatUiEvent.Stop)
+            runCurrent()
         }
 
     @Test
@@ -228,12 +342,15 @@ class ChatViewModelRetryTest {
         return Triple(ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger()), gateway, repository)
     }
 
-    private fun agentLoop(gateway: ModelGateway): AgentLoop =
+    private fun agentLoop(
+        gateway: ModelGateway,
+        registry: ToolRegistry = ToolRegistry(emptySet()),
+    ): AgentLoop =
         AgentLoop(
             modelGateway = gateway,
             toolPipeline =
                 ToolPipeline(
-                    registry = ToolRegistry(emptySet()),
+                    registry = registry,
                     userInteraction = FakeUserInteraction(),
                     clock = FakeClock(),
                     logger = FakeAppLogger(),
@@ -254,6 +371,31 @@ class ChatViewModelRetryTest {
             this.items = items
             mutableItems.value = items
         }
+    }
+
+    private class FailAfterToolThenHangGateway(
+        private val call: ToolCall,
+    ) : ModelGateway {
+        private var calls = 0
+
+        override fun stream(request: ModelRequest): Flow<ModelEvent> =
+            flow {
+                calls++
+                when (calls) {
+                    1 -> {
+                        emit(ModelEvent.ToolCallRequested(call))
+                        emit(ModelEvent.Completed())
+                    }
+
+                    2 -> {
+                        emit(ModelEvent.Failed(AgentError.Offline))
+                    }
+
+                    else -> {
+                        awaitCancellation()
+                    }
+                }
+            }
     }
 
     private class FailThenHangGateway : ModelGateway {
