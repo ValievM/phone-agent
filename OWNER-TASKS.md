@@ -18,3 +18,6 @@
 
 ## Где что смотреть
 [Все задачи на GitHub](https://github.com/ValievM/phone-agent/issues) · [что делают агенты](https://github.com/ValievM/phone-agent/issues?q=is%3Aopen+label%3Astatus%3Adoing) · [ждёт проверки](https://github.com/ValievM/phone-agent/issues?q=is%3Aopen+label%3A%22who%3Aowner%22).
+
+## Поставить сборку на телефон (одной командой)
+Телефон по USB, отладка включена. В папке проекта: `make install-dev` (последняя `dev`) или `make install-main` (`main`); `make devices` покажет телефон, `make logs` журнал приложения. Собирается в отдельной папке, рабочие папки не трогает.
