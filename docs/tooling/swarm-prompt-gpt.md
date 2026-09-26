@@ -39,8 +39,8 @@
 
 ## 4. Замок Gradle (один запуск на всю машину)
 Одновременно на этой машине работает ровно один Gradle (все агенты и Claude), иначе сборки конфликтуют. Проверки перед коммитом:
-  bash -c 'L=/tmp/phone-agent-gradle.lock; until mkdir "$L" 2>/dev/null; do if [ -e "$L" ] && [ ! -d "$L" ]; then rm -f "$L"; else find "$L" -maxdepth 0 -type d -mmin +45 -exec rm -rf {} \; 2>/dev/null; fi; sleep 20; done; echo "$$ $(pwd) $(date +%H:%M)" > "$L/owner"; trap "rm -rf $L" EXIT; ./gradlew :app:kspReleaseKotlin :tools:kspReleaseKotlin && ./gradlew spotlessApply && ./gradlew check && python3 scripts/check_docs.py'
-Любой другой запуск ./gradlew (сборка манифеста, один тест) оборачивай тем же замком. Брошенный замок (папка старше 45 минут или файл на её месте) команда снимает сама; файл owner внутри показывает, кто держит замок. Запуск дольше 25 минут без вывода считай зависшим: чужие процессы не убивай, напиши владельцу PID (ps -axo pid,etime,command | grep -i gradle).
+  bash -c 'L=/tmp/phone-agent-gradle.lock; until mkdir "$L" 2>/dev/null; do if [ -e "$L" ] && [ ! -d "$L" ]; then rm -f "$L"; elif [ -n "$(find "$L" -maxdepth 0 -type d -mmin +3 2>/dev/null)" ] && ! pgrep -f "GradleWrapperMain|Gradle Test Executor" >/dev/null; then rm -rf "$L"; fi; sleep 20; done; echo "$$ $(pwd) $(date +%H:%M)" > "$L/owner"; trap "rm -rf $L" EXIT; ./gradlew :app:kspReleaseKotlin :tools:kspReleaseKotlin && ./gradlew spotlessApply && ./gradlew check && python3 scripts/check_docs.py'
+Любой другой запуск ./gradlew (сборка манифеста, один тест) оборачивай тем же замком. Брошенный замок (папка старше 3 минут при отсутствии запущенной сборки Gradle, или файл на её месте) команда снимает сама; запускай отдельным bash -c, не в постоянной оболочке; файл owner внутри показывает, кто держит замок. Запуск дольше 25 минут без вывода считай зависшим: чужие процессы не убивай, напиши владельцу PID (ps -axo pid,etime,command | grep -i gradle).
 
 ## 5. Сдача своей задачи (проверка другим GPT)
 1. Исполнитель (ты или твой субагент) закончил: коммиты в ветке, check зелёный, отчёт по шаблону из раздела 9.
