@@ -136,7 +136,6 @@
     <string name="file_open_chooser_title">Открыть файл с помощью</string>
     <string name="file_open_failed">Не удалось открыть файл. Проверьте доступ или установите приложение для этого типа файла.</string>
     <string name="preview_file_name">Отчёт за сентябрь.pdf</string>
-    <string name="preview_file_size">1,2 МБ</string>
     <string name="preview_files_found_title">Файлы найдены</string>
     <string name="preview_files_found_summary">Результаты поиска по запросу</string>
 </resources>

@@ -75,6 +75,3 @@ public fun AppLogger.error(
     fields: Map<String, String> = emptyMap(),
     throwable: Throwable? = null,
 ): Unit = log(LogLevel.ERROR, tag, message, fields, throwable)
-
-/** One id per logical operation (e.g. a sign-in attempt), so its scattered log lines can be tied together. */
-public fun newCorrelationId(): String = UUID.randomUUID().toString()
