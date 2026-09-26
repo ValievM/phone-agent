@@ -84,7 +84,8 @@ MutableApiKeyAuthProvider ..|> AuthProvider
 | `MutableApiKeyAuthProvider` | Провайдер `API_KEY` в общей карте: ключ кладётся полем `pendingKey`, затем `signIn()` создаёт `ApiKeyAuth` через `ApiKeyAuthFactory` и стирает поле |
 | `LoginViewModel`, `LoginRoute` | `AuthCoordinator.state` → `LoginUiState`; `restore()` в `init`; `LoginRoute` показывает `AppNavigation` при `isSignedIn`, поле API-ключа не сохраняется в `Bundle` |
 | `SettingsViewModel` | Три параллельных `launch` в `init` (статус входа, каталог моделей, настройки); запись настроек под `Mutex`; `clearHistory()` = `replace(emptyList())`; выход |
-| `SettingsRoute` | Выбор папки `OpenDocumentTree` + `takePersistableUriPermission`, затем `SaveSearchFolder(uri)` |
+| `SettingsRoute` | Выбор папки `OpenDocumentTree` + `takePersistableUriPermission`, затем `SaveSearchFolder(uri)`; читает версию для строки «О приложении» и передаёт переход к `AppDestination.About` |
+| `AboutRoute` | Читает `versionName` через `PackageManager` и тексты лицензий из `res/raw`; `AboutScreen` показывает каталог, а состояние раскрытия сохраняет через `rememberSaveable` |
 
 ## Хранилище и логи
 

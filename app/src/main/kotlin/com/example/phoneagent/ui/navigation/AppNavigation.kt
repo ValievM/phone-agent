@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import com.example.phoneagent.ui.about.AboutRoute
 import com.example.phoneagent.ui.chat.ChatRoute
 import com.example.phoneagent.ui.settings.SettingsRoute
 
@@ -13,6 +14,8 @@ sealed interface AppDestination {
     data object Chat : AppDestination
 
     data object Settings : AppDestination
+
+    data object About : AppDestination
 }
 
 @Composable
@@ -32,7 +35,16 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
                 AppDestination.Settings -> {
                     NavEntry(key) {
-                        SettingsRoute(onBack = { backStack.removeLastOrNull() })
+                        SettingsRoute(
+                            onBack = { backStack.removeLastOrNull() },
+                            onOpenAbout = { backStack += AppDestination.About },
+                        )
+                    }
+                }
+
+                AppDestination.About -> {
+                    NavEntry(key) {
+                        AboutRoute(onBack = { backStack.removeLastOrNull() })
                     }
                 }
             }

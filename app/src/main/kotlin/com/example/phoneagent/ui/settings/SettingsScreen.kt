@@ -1,5 +1,6 @@
 package com.example.phoneagent.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,13 @@ import com.example.phoneagent.ui.designsystem.layout.contentColumn
 import com.example.phoneagent.ui.designsystem.layout.screenMargin
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
+internal const val SETTINGS_CONTENT_LIST_TAG = "settings-content-list"
+
+data class SettingsAboutEntry(
+    val versionName: String,
+    val onOpen: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -56,6 +66,7 @@ fun SettingsScreen(
     onEvent: (SettingsUiEvent) -> Unit,
     onChooseFolder: () -> Unit,
     onBack: () -> Unit,
+    aboutEntry: SettingsAboutEntry,
     modifier: Modifier = Modifier,
 ) {
     var showClearHistoryConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -79,7 +90,7 @@ fun SettingsScreen(
         val margin = screenMargin()
         // The list scrolls under the system bars: the insets are content padding, not a frame around it.
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag(SETTINGS_CONTENT_LIST_TAG),
             contentPadding =
                 PaddingValues(
                     start = insets.calculateStartPadding(direction) + margin,
@@ -94,6 +105,7 @@ fun SettingsScreen(
             item { ModelSection(state, onEvent) }
             item { SearchFolderSection(state, onChooseFolder) }
             item { HistorySection(state) { showClearHistoryConfirmation = true } }
+            item { AboutAppRow(aboutEntry) }
             if (state.settingsUnavailable) item { StatusMessage(stringResource(R.string.settings_unavailable), Modifier.contentColumn()) }
         }
     }
@@ -106,6 +118,34 @@ fun SettingsScreen(
             },
             onDismiss = { showClearHistoryConfirmation = false },
         )
+    }
+}
+
+@Composable
+private fun AboutAppRow(entry: SettingsAboutEntry) {
+    Surface(
+        modifier =
+            Modifier
+                .contentColumn()
+                .clickable(
+                    onClickLabel = stringResource(R.string.settings_about_action),
+                    role = Role.Button,
+                    onClick = entry.onOpen,
+                ),
+        shape = AppTheme.shapeTokens.card,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(AppTheme.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.compact),
+        ) {
+            Text(stringResource(R.string.settings_about_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.settings_about_version, entry.versionName),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
