@@ -27,8 +27,8 @@ import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
 /**
- * Confirmation before opening a link from a model reply. It is drawn from the parsed link
- * ([LinkDecision]), never from the reply text, so the domain shown is the real one.
+ * Confirmation before opening a link. The displayed domain comes from the parsed [LinkDecision],
+ * never from untrusted display text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

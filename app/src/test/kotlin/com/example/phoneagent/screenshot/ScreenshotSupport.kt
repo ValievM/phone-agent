@@ -45,6 +45,7 @@ internal fun ComposeContentTestRule.snapshot(
     fillScreen: Boolean = false,
     wholeScreen: Boolean = false,
     immediateWork: Boolean = false,
+    beforeCapture: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     var current by mutableStateOf(variants.first())
@@ -65,6 +66,8 @@ internal fun ComposeContentTestRule.snapshot(
     }
     variants.forEach { variant ->
         runOnIdle { current = variant }
+        waitForIdle()
+        beforeCapture?.invoke()
         waitForIdle()
         val path = "$SCREENSHOT_DIR/${name}_${variant.suffix}.png"
         if (wholeScreen) captureScreenRoboImage(path) else onRoot().captureRoboImage(path)

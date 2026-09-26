@@ -1,4 +1,4 @@
-package com.example.phoneagent.ui.chat
+package com.example.phoneagent.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Context
