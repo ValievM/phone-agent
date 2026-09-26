@@ -14,7 +14,7 @@ GPT-1 (who:gpt1) отвечает за логику: :core:domain, :tools, :data
 ## 0. Старт
 1. Прочитай AGENTS.md целиком.
 2. Проверь доступ к GitHub: gh issue list --repo ValievM/phone-agent --label "who:gptN" --state open. Если gh не работает, остановись и напиши владельцу «нет доступа к GitHub»; задач не выдумывай.
-3. Твоя очередь: открытые issues с who:gptN. Порядок: (а) сначала доведи то, что уже status:doing (ветка есть); (б) проверки сдач GLM (who:gptN + status:review, см. раздел 6); (в) status:ready: сначала с меткой mvp, внутри по возрастанию номера; (г) issues без status:* это бэклог, не бери без прямого указания.
+3. Твоя очередь: открытые issues с who:gptN. Порядок: (а) сначала доведи то, что уже status:doing (ветка есть); (б) проверки чужих сдач: другого GPT и GLM (who:gptN + status:review, раздел 6); (в) status:ready: сначала с меткой mvp, внутри по возрастанию номера; (г) issues без status:* это бэклог, не бери без прямого указания.
 4. Читай issue целиком: gh issue view N --repo ValievM/phone-agent --comments. Строка «Ветка / Worktree» вверху задаёт имена. Если её нет: ветка <тип>/<N>-<слово>, worktree <слово>.
 
 ## 1. Захват задачи
