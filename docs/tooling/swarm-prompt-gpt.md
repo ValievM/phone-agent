@@ -27,9 +27,9 @@
 - Каждая задача только в своём worktree и своей ветке. Чужие ветки и worktree не трогай, не ребейзь, не мёржь. Общие файлы (docs/README.md, scripts/check_docs.py) правь минимально: конфликты разрешает Claude.
 
 ## 3. Правила разработки (жёсткие)
-- Основную папку /Users/valiev/phone-agent НЕ трогай (без правок и checkout). Worktree: git worktree add /Users/valiev/phone-agent-worktrees/<имя> -b <ветка> main, затем скопируй local.properties из /Users/valiev/phone-agent.
+- Основную папку /Users/valiev/phone-agent НЕ трогай (без правок и checkout). Worktree: git worktree add /Users/valiev/phone-agent-worktrees/<имя> -b <ветка> dev, затем скопируй local.properties из /Users/valiev/phone-agent.
 - План: issue это согласованный план. «ок» на него не проси, действуй по нему.
-- В main не коммить, не мёржь, в origin не пушь. Одна задача = одна ветка = 1-3 маленьких коммита; в конце сообщения: Refs #N.
+- Ветки от dev (не от main). В dev и main не коммить, не мёржь, в origin не пушь. Одна задача = одна ветка = 1-3 маленьких коммита; в конце сообщения: Refs #N.
 - Перед КАЖДЫМ коммитом Gradle только по разделу 4: ksp-задачи, spotlessApply, check и python3 scripts/check_docs.py. Читай вывод целиком. Красное: не коммить.
 - TDD для логики: красный тест (покажи, что упал по нужной причине), минимальный код, зелёный. Тест-кейсы из issue пиши сразу и показывай в отчёте. Тесты не ослаблять, не удалять, не @Ignore; существующий тест менять только если issue прямо разрешает.
 - Доказательство мутацией для каждого нового теста с логикой: сломай код, покажи красный, верни.
