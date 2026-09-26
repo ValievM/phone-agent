@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultPopTransitionSpec
 import com.example.phoneagent.ui.about.AboutRoute
 import com.example.phoneagent.ui.chat.ChatRoute
 import com.example.phoneagent.ui.settings.SettingsRoute
@@ -20,31 +21,55 @@ sealed interface AppDestination {
 
 @Composable
 fun AppNavigation(modifier: Modifier = Modifier) {
+    AppNavigationHost(
+        modifier = modifier,
+        chatContent = { onOpenSettings -> ChatRoute(onOpenSettings = onOpenSettings) },
+        settingsContent = { onBack, onOpenAbout ->
+            SettingsRoute(
+                onBack = onBack,
+                onOpenAbout = onOpenAbout,
+            )
+        },
+        aboutContent = { onBack -> AboutRoute(onBack = onBack) },
+    )
+}
+
+@Composable
+internal fun AppNavigationHost(
+    chatContent: @Composable (onOpenSettings: () -> Unit) -> Unit,
+    settingsContent: @Composable (onBack: () -> Unit, onOpenAbout: () -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+    aboutContent: @Composable (onBack: () -> Unit) -> Unit,
+) {
     val backStack = remember { mutableStateListOf<AppDestination>(AppDestination.Chat) }
+    // Navigation 3 scales predictive pops by default; use the same fade as an ordinary pop.
+    val popTransition = remember { defaultPopTransitionSpec<AppDestination>() }
     NavDisplay(
         backStack = backStack,
         modifier = modifier,
         onBack = { backStack.removeLastOrNull() },
+        popTransitionSpec = popTransition,
+        predictivePopTransitionSpec = { popTransition.invoke(this) },
         entryProvider = { key ->
             when (key) {
                 AppDestination.Chat -> {
                     NavEntry(key) {
-                        ChatRoute(onOpenSettings = { backStack += AppDestination.Settings })
+                        chatContent { backStack += AppDestination.Settings }
                     }
                 }
 
                 AppDestination.Settings -> {
                     NavEntry(key) {
-                        SettingsRoute(
-                            onBack = { backStack.removeLastOrNull() },
-                            onOpenAbout = { backStack += AppDestination.About },
+                        settingsContent(
+                            { backStack.removeLastOrNull() },
+                            { backStack += AppDestination.About },
                         )
                     }
                 }
 
                 AppDestination.About -> {
                     NavEntry(key) {
-                        AboutRoute(onBack = { backStack.removeLastOrNull() })
+                        aboutContent { backStack.removeLastOrNull() }
                     }
                 }
             }
