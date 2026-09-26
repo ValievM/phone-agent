@@ -7,10 +7,10 @@
 2. **Вёрстка потом:** превью состояний, затем скриншот-тесты (Roborazzi) для `Composer`, `ToolCallCard` (все состояния), `ApprovalSheet`, `AssistantMessage` с markdown. Эталонные снимки записываем, когда дизайн утверждён.
 3. **Семантика:** проверки `contentDescription`, ролей, порядка фокуса для ключевых экранов.
 4. **Как запускать скриншот-тесты** (Roborazzi + Robolectric, `app/src/test/kotlin/.../screenshot/`):
-   - `./gradlew check` — тесты идут как обычные: каждый компонент отрисовывается в светлой и тёмной темах (и при шрифте 2.0), но картинки не пишутся и не сравниваются. Это дымовая проверка, что вёрстка не падает.
-   - `./gradlew :app:recordRoborazziDebug` — записать снимки в `app/src/test/screenshots/`.
-   - `./gradlew :app:verifyRoborazziDebug` — сравнить с эталонами, упасть при отличиях; `compareRoborazziDebug` — отчёт с diff.
-   - **Эталоны пока не закоммичены**: дизайн ещё не утверждён, `app/src/test/screenshots/` в `.gitignore`. Когда пользователь утвердит вид: убрать строку из `.gitignore`, записать снимки, закоммитить, добавить `verifyRoborazziDebug` в проверки.
+   - `./gradlew check` — UI-снимки запускаются как обычные тесты, картинки не пишутся и не сравниваются; это дымовая проверка вёрстки.
+   - `./gradlew :app:recordRoborazziDebug` — записать снимки в `app/src/test/screenshots/`; используйте `--tests` для выбора экранов.
+   - `./gradlew :app:verifyRoborazziDebug --tests 'com.example.phoneagent.screenshot.ScreensScreenshotTest.settings*' --tests 'com.example.phoneagent.screenshot.AboutScreenScreenshotTest' --tests 'com.example.phoneagent.screenshot.AboutScreenNarrowScreenshotTest' --tests 'com.example.phoneagent.screenshot.ChatScreenScreenshotTest'` — сравнить выбранные снимки с эталонами; `compareRoborazziDebug` создаёт diff.
+   - **Эталоны утверждает владелец**: issue #49 явно разрешил снимки настроек, «О приложении» и чата. `.gitignore` допускает только `settings_*.png`, `about_screen*.png`, `chat_*.png`; остальные снимки остаются игнорируемыми до отдельного одобрения. Пока утверждена только часть экранов, фильтрованную проверку эталонов запускайте отдельно; подключить её к `check` можно после одобрения остальных снимков.
    - Размеры: `NarrowPhoneScreenshotTest` (320dp), `TabletScreenshotTest` (840dp), `LandscapePhoneScreenshotTest` (800x360dp) рисуют чат, пустой чат и вход; экраны входа, настроек, корня и шторки при шрифте 200% в `ScreensScreenshotTest` и `*ScreenshotTest`.
    - Поведение размеров держат обычные тесты: `SheetsAdaptiveUiTest` (кнопки шторок достижимы при 15 пунктах, шрифте 200% и 320dp), `ContentColumnUiTest` (колонка 640dp по центру).
    - Новый компонент или состояние: тест в `screenshot/` через `composeRule.snapshot("имя") { … }` (варианты Light/Dark/LargeFont, `fillScreen` для экранов, `wholeScreen` для шторок и диалогов).
