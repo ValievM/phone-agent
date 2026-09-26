@@ -8,11 +8,12 @@ import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
@@ -46,6 +47,7 @@ class ToolPipelineHardeningTest {
         runTest {
             var requested = false
             var cancellationObserved = false
+            val permissionWait = CompletableDeferred<Unit>()
             val interaction =
                 object : UserInteraction {
                     override suspend fun confirm(request: ApprovalRequest): Boolean = true
@@ -54,8 +56,9 @@ class ToolPipelineHardeningTest {
 
                     override suspend fun ensure(capability: Capability): CapabilityResult {
                         requested = true
-                        try {
-                            awaitCancellation()
+                        return try {
+                            permissionWait.await()
+                            CapabilityResult.Available
                         } finally {
                             cancellationObserved = true
                         }
@@ -67,9 +70,12 @@ class ToolPipelineHardeningTest {
 
             assertTrue(requested)
             call.cancel()
-            val cancellation = runCatching { call.await() }.exceptionOrNull()
+            val cancellation = runCatching { withTimeout(1_000) { call.await() } }.exceptionOrNull()
+            val completedPromptly = call.isCompleted
+            if (!cancellationObserved) permissionWait.complete(Unit)
 
             assertTrue(cancellation is CancellationException)
+            assertTrue("Stop must complete the permission wait promptly", completedPromptly)
             assertTrue(cancellationObserved)
         }
 

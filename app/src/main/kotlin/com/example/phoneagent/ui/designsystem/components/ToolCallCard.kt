@@ -280,20 +280,45 @@ internal fun ToolCallStatus.look(): StatusLook {
 @Composable
 private fun ToolCallStatus.label(): String =
     when (this) {
-        ToolCallStatus.AwaitingApproval -> stringResource(R.string.tool_call_status_awaiting)
-        ToolCallStatus.Running -> stringResource(R.string.tool_call_status_running)
-        is ToolCallStatus.Done -> summary
-        is ToolCallStatus.FilesFound -> stringResource(R.string.file_search_completed, count)
-        is ToolCallStatus.HandedOff -> stringResource(R.string.tool_call_status_handed_off, sanitizeUntrustedUiText(target))
-        ToolCallStatus.NotShown -> stringResource(R.string.tool_call_status_not_shown)
-        is ToolCallStatus.Failed ->
+        ToolCallStatus.AwaitingApproval -> {
+            stringResource(R.string.tool_call_status_awaiting)
+        }
+
+        ToolCallStatus.Running -> {
+            stringResource(R.string.tool_call_status_running)
+        }
+
+        is ToolCallStatus.Done -> {
+            summary
+        }
+
+        is ToolCallStatus.FilesFound -> {
+            stringResource(R.string.file_search_completed, count)
+        }
+
+        is ToolCallStatus.HandedOff -> {
+            stringResource(R.string.tool_call_status_handed_off, sanitizeUntrustedUiText(target))
+        }
+
+        ToolCallStatus.NotShown -> {
+            stringResource(R.string.tool_call_status_not_shown)
+        }
+
+        is ToolCallStatus.Failed -> {
             if (reason == TOOL_EXECUTION_TIMEOUT_REASON) {
                 stringResource(R.string.tool_call_status_timeout)
             } else {
                 reason
             }
-        ToolCallStatus.Rejected -> stringResource(R.string.tool_call_status_rejected)
-        ToolCallStatus.Cancelled -> stringResource(R.string.tool_call_status_cancelled)
+        }
+
+        ToolCallStatus.Rejected -> {
+            stringResource(R.string.tool_call_status_rejected)
+        }
+
+        ToolCallStatus.Cancelled -> {
+            stringResource(R.string.tool_call_status_cancelled)
+        }
     }
 
 /** The decorative status mark: timer, spinner, check, send, warning, error, refusal or stop. */
