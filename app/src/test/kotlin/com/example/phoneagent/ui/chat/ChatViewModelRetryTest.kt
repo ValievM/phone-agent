@@ -155,7 +155,7 @@ class ChatViewModelRetryTest {
                     }
                 }
             val repository = RetryFakeRepository()
-            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(alarmTool))), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(alarmTool))), repository, logger = FakeAppLogger())
 
             viewModel.onEvent(ChatUiEvent.Submit(question))
             advanceUntilIdle()
@@ -210,7 +210,7 @@ class ChatViewModelRetryTest {
                     ): ToolResult = ToolResult.Success("found")
                 }
             val repository = RetryFakeRepository()
-            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(tool))), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway, ToolRegistry(setOf(tool))), repository, logger = FakeAppLogger())
             viewModel.onEvent(ChatUiEvent.Submit(question))
             advanceUntilIdle()
             val savedQuestion = repository.load().filterIsInstance<HistoryItem.UserMessage>().single()
