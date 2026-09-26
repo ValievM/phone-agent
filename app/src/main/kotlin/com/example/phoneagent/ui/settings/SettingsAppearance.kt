@@ -27,6 +27,8 @@ import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.components.StatusMessage
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 
+private const val LARGE_FONT_SCALE_THRESHOLD = 1.5f
+
 /**
  * Theme choice (system / light / dark) and the separate "system colors" switch (Android 12+). Both are
  * off until the saved settings have been read, and stay off if reading them failed, so a tap can never
@@ -40,7 +42,7 @@ internal fun AppearanceSection(
     SettingsSection(title = stringResource(R.string.settings_appearance_title)) {
         val modes = ThemeMode.entries
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val useList = maxWidth <= 320.dp || LocalDensity.current.fontScale >= 1.5f
+            val useList = maxWidth <= 320.dp || LocalDensity.current.fontScale >= LARGE_FONT_SCALE_THRESHOLD
             if (useList) {
                 Column {
                     modes.forEach { mode ->
