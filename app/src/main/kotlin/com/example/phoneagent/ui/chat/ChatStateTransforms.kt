@@ -91,7 +91,7 @@ internal fun TurnState.hasRetryAction(): Boolean = this is TurnState.FailedRetry
 
 internal fun ChatUiState.errorForDisplay(): AgentError? {
     val syncError = (historySync as? HistorySyncState.Failed)
-    // Priority per the owner-approved order: a failed LOAD hides the screen's trustworthiness,
+    // Priority: a failed LOAD hides the screen's trustworthiness,
     // then the turn error (its Retry must stay visible even if saving failed), then the save error.
     when (syncError?.operation) {
         StorageOperation.LOAD -> return syncError.error
