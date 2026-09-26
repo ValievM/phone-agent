@@ -97,10 +97,13 @@ object LicenseCatalog {
                     "https://github.com/JetBrains/markdown; https://github.com/SnipMeDev/Highlights",
                 additionalNotices = listOf(LicenseNotice("Erik Hellman", LicenseKind.MIT)),
             ),
+            // 3.0.2_preview2 source marks the JSR-305 reference implementation as New BSD:
+            // https://github.com/findbugsproject/findbugs/blob/3.0.2_preview2/findbugs/licenses/LICENSE-jsr305.txt
+            // Full notice and holder: https://chromium.googlesource.com/external/jsr-305/+/fdfdc61084f5084c0ea2fd344c3840c4bda3e893/ri/LICENSE
             LicenseEntry(
                 "JSR-305",
-                "Правообладатель не указан в POM",
-                LicenseKind.APACHE_2_0,
+                "JSR305 expert group",
+                LicenseKind.BSD_3_CLAUSE,
                 "http://findbugs.sourceforge.net/",
             ),
             // Holder source for the release version: https://github.com/jspecify/jspecify/blob/v1.0.0/AUTHORS

@@ -33,8 +33,11 @@ class LicenseTextsTest {
                             "Copyright 2008 Google Inc.  All rights reserved.",
                             "Redistribution and use",
                             "support library is itself covered by the above license.",
+                            "Copyright (c) 2007-2009, JSR305 expert group",
+                            "Neither the name of the JSR305 expert group nor the names of its",
+                            "POSSIBILITY OF SUCH DAMAGE.",
                         ),
-                    minimumLength = 1_700,
+                    minimumLength = 4_700,
                 ),
                 LicenseTextExpectation(
                     resourceName = "license_mit",
@@ -96,6 +99,16 @@ class LicenseTextsTest {
             assertTrue("BSD license bundle must contain $marker", text.contains(marker))
         }
         assertTrue("Both BSD notices must be included in full", text.length > 2_700)
+    }
+
+    @Test
+    fun `JSR-305 BSD text includes its complete disclaimer`() {
+        val text = rawText("license_bsd_3_clause")
+        val jsr305Start = text.indexOf("Copyright (c) 2007-2009, JSR305 expert group")
+        val finalDisclaimer = text.indexOf("POSSIBILITY OF SUCH DAMAGE.", jsr305Start)
+
+        assertTrue("JSR-305 BSD notice must include its copyright holder", jsr305Start >= 0)
+        assertTrue("JSR-305 BSD notice must include its complete disclaimer", finalDisclaimer > jsr305Start)
     }
 
     private fun rawText(resourceName: String): String {

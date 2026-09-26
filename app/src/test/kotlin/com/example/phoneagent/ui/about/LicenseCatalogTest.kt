@@ -20,7 +20,7 @@ class LicenseCatalogTest {
                 "OkHttp и Okio" to LicenseKind.APACHE_2_0,
                 "Kotlin: стандартная библиотека, корутины, сериализация и неизменяемые коллекции" to LicenseKind.APACHE_2_0,
                 "Markdown renderer и подсветка кода" to LicenseKind.APACHE_2_0,
-                "JSR-305" to LicenseKind.APACHE_2_0,
+                "JSR-305" to LicenseKind.BSD_3_CLAUSE,
                 "JSpecify" to LicenseKind.APACHE_2_0,
                 "Аннотации JetBrains" to LicenseKind.APACHE_2_0,
                 "Protocol Buffers (внутри DataStore)" to LicenseKind.BSD_3_CLAUSE,
@@ -63,9 +63,11 @@ class LicenseCatalogTest {
 
     @Test
     fun `Java annotation entries name verified rights holders`() {
+        val jsr305Entry = LicenseCatalog.entries.single { it.name == "JSR-305" }
         val jspecifyEntry = LicenseCatalog.entries.single { it.name == "JSpecify" }
         val jetBrainsEntry = LicenseCatalog.entries.single { it.name == "Аннотации JetBrains" }
 
+        assertEquals("JSR305 expert group", jsr305Entry.holder)
         assertEquals("Google LLC; SpotBugs Team", jspecifyEntry.holder)
         assertEquals("JetBrains s.r.o.", jetBrainsEntry.holder)
     }
