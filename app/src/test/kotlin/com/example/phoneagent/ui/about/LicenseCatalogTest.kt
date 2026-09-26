@@ -66,7 +66,7 @@ class LicenseCatalogTest {
         val jspecifyEntry = LicenseCatalog.entries.single { it.name == "JSpecify" }
         val jetBrainsEntry = LicenseCatalog.entries.single { it.name == "Аннотации JetBrains" }
 
-        assertEquals("Google LLC; Oracle America, Inc.; SpotBugs Team", jspecifyEntry.holder)
+        assertEquals("Google LLC; SpotBugs Team", jspecifyEntry.holder)
         assertEquals("JetBrains s.r.o.", jetBrainsEntry.holder)
     }
 

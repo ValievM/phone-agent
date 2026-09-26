@@ -36,6 +36,7 @@ class SettingsViewModel
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(SettingsUiState())
         private val settingsMutex = Mutex()
+        private val signOutMutex = Mutex()
         private var currentSettings = AppSettings()
 
         val state: StateFlow<SettingsUiState> = mutableState.asStateFlow()
@@ -100,8 +101,8 @@ class SettingsViewModel
                     updateSettings(onFailure = { it.copy(themeSaveFailed = true) }) { it.copy(useDynamicColors = event.enabled) }
                 }
 
-                SettingsUiEvent.SignOut -> {
-                    signOut()
+                is SettingsUiEvent.SignOut -> {
+                    signOut(event.clearHistory)
                 }
 
                 is SettingsUiEvent.SaveSearchFolder -> {
@@ -118,20 +119,26 @@ class SettingsViewModel
             }
         }
 
-        private fun signOut() {
+        private fun signOut(clearHistory: Boolean) {
             viewModelScope.launch {
+                if (!signOutMutex.tryLock()) return@launch
                 try {
-                    authCoordinator.signOut()
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    logger.warn(
-                        TAG,
-                        "sign out failed",
-                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
-                        throwable = exception,
-                    )
-                    mutableState.update { it.copy(settingsUnavailable = true) }
+                    if (clearHistory && !clearHistoryNow()) return@launch
+                    try {
+                        authCoordinator.signOut()
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        logger.warn(
+                            TAG,
+                            "sign out failed",
+                            fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                            throwable = exception,
+                        )
+                        mutableState.update { it.copy(settingsUnavailable = true) }
+                    }
+                } finally {
+                    signOutMutex.unlock()
                 }
             }
         }
@@ -184,23 +191,26 @@ class SettingsViewModel
         }
 
         private fun clearHistory() {
-            viewModelScope.launch {
-                try {
-                    conversationRepository.replace(emptyList())
-                    mutableState.update { it.copy(historyClearUnavailable = false) }
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    logger.warn(
-                        TAG,
-                        "clear conversation history failed",
-                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
-                        throwable = exception,
-                    )
-                    mutableState.update { it.copy(historyClearUnavailable = true) }
-                }
-            }
+            viewModelScope.launch { clearHistoryNow() }
         }
+
+        private suspend fun clearHistoryNow(): Boolean =
+            try {
+                conversationRepository.replace(emptyList())
+                mutableState.update { it.copy(historyClearUnavailable = false) }
+                true
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "clear conversation history failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
+                mutableState.update { it.copy(historyClearUnavailable = true) }
+                false
+            }
 
         private suspend fun loadModelCatalog(): ModelCatalogResult =
             try {

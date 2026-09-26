@@ -103,9 +103,10 @@ object LicenseCatalog {
                 LicenseKind.APACHE_2_0,
                 "http://findbugs.sourceforge.net/",
             ),
+            // Holder source for the release version: https://github.com/jspecify/jspecify/blob/v1.0.0/AUTHORS
             LicenseEntry(
                 "JSpecify",
-                "Google LLC; Oracle America, Inc.; SpotBugs Team",
+                "Google LLC; SpotBugs Team",
                 LicenseKind.APACHE_2_0,
                 "https://github.com/jspecify/jspecify",
             ),
