@@ -5,11 +5,17 @@ import com.example.phoneagent.auth.AppSignInMethod
 import com.example.phoneagent.auth.AuthCoordinator
 import com.example.phoneagent.data.auth.AuthMethod
 import com.example.phoneagent.domain.conversation.HistoryItem
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelCatalogResult
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.LogLevel
+import com.example.phoneagent.domain.platform.RedactingAppLogger
+import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +24,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -26,6 +33,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -54,6 +62,7 @@ class SettingsViewModelTest {
                     settingsRepository = settingsRepository,
                     modelCatalog = FakeModelCatalog(),
                     conversationRepository = FakeConversationRepository(),
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
@@ -72,6 +81,7 @@ class SettingsViewModelTest {
                     settingsRepository = RecordingSettingsRepository(AppSettings()),
                     modelCatalog = FakeModelCatalog(),
                     conversationRepository = FakeConversationRepository(),
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
@@ -88,6 +98,7 @@ class SettingsViewModelTest {
                     settingsRepository = RecordingSettingsRepository(AppSettings(model = savedModel)),
                     modelCatalog = FakeModelCatalog(ModelCatalogResult.Unavailable),
                     conversationRepository = FakeConversationRepository(),
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
@@ -100,21 +111,112 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `sign out delegates to the authentication coordinator`() =
+    fun `sign out without deleting history delegates to the authentication coordinator`() =
         runTest(dispatcher.scheduler) {
             val authCoordinator = FakeAuthCoordinator(AppAuthStatus.SignedIn(AuthMethod.API_KEY))
+            val conversationRepository = FakeConversationRepository()
             val viewModel =
                 SettingsViewModel(
                     authCoordinator = authCoordinator,
                     settingsRepository = RecordingSettingsRepository(AppSettings()),
                     modelCatalog = FakeModelCatalog(),
-                    conversationRepository = FakeConversationRepository(),
+                    conversationRepository = conversationRepository,
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
-            viewModel.onEvent(SettingsUiEvent.SignOut)
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = false))
             advanceUntilIdle()
 
+            assertEquals(1, authCoordinator.signOutCalls)
+            assertTrue(authCoordinator.state.value is AppAuthStatus.SignedOut)
+            assertEquals(0, conversationRepository.replaceCalls)
+        }
+
+    @Test
+    fun `sign out clears history before signing out when requested`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository = FakeConversationRepository(operations)
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = true))
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory", "signOut"), operations)
+            assertEquals(listOf(emptyList<HistoryItem>()), conversationRepository.replacements)
+        }
+
+    @Test
+    fun `failed history deletion keeps the account signed in`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository =
+                FakeConversationRepository(operations).apply { replaceFailure = IOException("history unavailable") }
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = true))
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory"), operations)
+            assertEquals(0, authCoordinator.signOutCalls)
+            assertTrue(authCoordinator.state.value is AppAuthStatus.SignedIn)
+            assertTrue(viewModel.state.value.historyClearUnavailable)
+        }
+
+    @Test
+    fun `repeated sign out while history is being deleted starts only once`() =
+        runTest(dispatcher.scheduler) {
+            val operations = mutableListOf<String>()
+            val authCoordinator =
+                FakeAuthCoordinator(
+                    initial = AppAuthStatus.SignedIn(AuthMethod.API_KEY),
+                    operations = operations,
+                )
+            val conversationRepository =
+                FakeConversationRepository(operations).apply { replaceGate = CompletableDeferred() }
+            val viewModel =
+                viewModelWith(
+                    settingsRepository = RecordingSettingsRepository(AppSettings()),
+                    authCoordinator = authCoordinator,
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            val event = SettingsUiEvent.SignOut(clearHistory = true)
+            viewModel.onEvent(event)
+            runCurrent()
+            viewModel.onEvent(event)
+            runCurrent()
+
+            assertEquals(1, conversationRepository.replaceCalls)
+            assertEquals(0, authCoordinator.signOutCalls)
+            conversationRepository.replaceGate?.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(listOf("clearHistory", "signOut"), operations)
             assertEquals(1, authCoordinator.signOutCalls)
         }
 
@@ -129,6 +231,7 @@ class SettingsViewModelTest {
                     settingsRepository = settingsRepository,
                     modelCatalog = FakeModelCatalog(),
                     conversationRepository = FakeConversationRepository(),
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
@@ -151,6 +254,7 @@ class SettingsViewModelTest {
                     settingsRepository = RecordingSettingsRepository(AppSettings()),
                     modelCatalog = FakeModelCatalog(),
                     conversationRepository = conversationRepository,
+                    logger = FakeAppLogger(),
                 )
             advanceUntilIdle()
 
@@ -315,10 +419,11 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `a cancelled save is not reported as a failure`() =
+    fun `a cancelled save is not reported as a failure or logged`() =
         runTest(dispatcher.scheduler) {
             val repository = RecordingSettingsRepository(AppSettings())
-            val viewModel = viewModelWith(repository)
+            val logger = FakeAppLogger()
+            val viewModel = viewModelWith(repository, logger = logger)
             advanceUntilIdle()
             repository.cancelSaves = true
 
@@ -327,15 +432,116 @@ class SettingsViewModelTest {
 
             assertFalse(viewModel.state.value.themeSaveFailed)
             assertFalse(viewModel.state.value.settingsUnavailable)
+            assertTrue(logger.events.isEmpty())
         }
 
-    private fun viewModelWith(settingsRepository: SettingsRepository) =
-        SettingsViewModel(
-            authCoordinator = FakeAuthCoordinator(),
-            settingsRepository = settingsRepository,
-            modelCatalog = FakeModelCatalog(),
-            conversationRepository = FakeConversationRepository(),
-        )
+    @Test
+    fun `failed settings load logs a safe warning`() =
+        runTest(dispatcher.scheduler) {
+            val records = FakeAppLogger()
+            val repository = RecordingSettingsRepository(AppSettings()).apply { loadFailure = IOException(SECRET_PATH) }
+            viewModelWith(repository, logger = RedactingAppLogger(records))
+
+            advanceUntilIdle()
+
+            assertSafeWarning(records, "load settings failed")
+        }
+
+    @Test
+    fun `failed sign out logs a safe warning`() =
+        runTest(dispatcher.scheduler) {
+            val records = FakeAppLogger()
+            val authCoordinator = FakeAuthCoordinator().apply { signOutFailure = IOException(SECRET_PATH) }
+            val viewModel =
+                viewModelWith(
+                    RecordingSettingsRepository(AppSettings()),
+                    logger = RedactingAppLogger(records),
+                    authCoordinator = authCoordinator,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SignOut(clearHistory = false))
+            advanceUntilIdle()
+
+            assertSafeWarning(records, "sign out failed")
+        }
+
+    @Test
+    fun `failed settings save logs a safe warning`() =
+        runTest(dispatcher.scheduler) {
+            val records = FakeAppLogger()
+            val repository = RecordingSettingsRepository(AppSettings()).apply { saveFailure = IOException(SECRET_PATH) }
+            val viewModel = viewModelWith(repository, logger = RedactingAppLogger(records))
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.SelectThemeMode(ThemeMode.DARK))
+            advanceUntilIdle()
+
+            assertSafeWarning(records, "save settings failed")
+        }
+
+    @Test
+    fun `failed history clear logs a safe warning`() =
+        runTest(dispatcher.scheduler) {
+            val records = FakeAppLogger()
+            val conversationRepository = FakeConversationRepository().apply { replaceFailure = IOException(SECRET_PATH) }
+            val viewModel =
+                viewModelWith(
+                    RecordingSettingsRepository(AppSettings()),
+                    logger = RedactingAppLogger(records),
+                    conversationRepository = conversationRepository,
+                )
+            advanceUntilIdle()
+
+            viewModel.onEvent(SettingsUiEvent.ClearHistory)
+            advanceUntilIdle()
+
+            assertSafeWarning(records, "clear conversation history failed")
+        }
+
+    @Test
+    fun `failed model catalog load logs a safe warning`() =
+        runTest(dispatcher.scheduler) {
+            val records = FakeAppLogger()
+            val modelCatalog = FakeModelCatalog(failure = IOException(SECRET_PATH))
+            viewModelWith(RecordingSettingsRepository(AppSettings()), logger = RedactingAppLogger(records), modelCatalog = modelCatalog)
+
+            advanceUntilIdle()
+
+            assertSafeWarning(records, "load model catalog failed")
+        }
+
+    private fun assertSafeWarning(
+        records: FakeAppLogger,
+        operation: String,
+    ) {
+        assertEquals(1, records.events.size)
+        val event = records.events.single()
+        assertEquals(LogLevel.WARN, event.level)
+        assertEquals("SettingsViewModel", event.tag)
+        assertEquals(operation, event.message)
+        assertFalse(event.toString().contains(SECRET_PATH))
+        assertEquals("IOException", event.fields["exceptionType"])
+        assertTrue(event.throwable is SanitizedThrowable)
+    }
+
+    private companion object {
+        const val SECRET_PATH = "secret-path"
+    }
+
+    private fun viewModelWith(
+        settingsRepository: SettingsRepository,
+        logger: AppLogger = FakeAppLogger(),
+        authCoordinator: AuthCoordinator = FakeAuthCoordinator(),
+        modelCatalog: ModelCatalog = FakeModelCatalog(),
+        conversationRepository: ConversationRepository = FakeConversationRepository(),
+    ) = SettingsViewModel(
+        authCoordinator = authCoordinator,
+        settingsRepository = settingsRepository,
+        modelCatalog = modelCatalog,
+        conversationRepository = conversationRepository,
+        logger = logger,
+    )
 
     private class RecordingSettingsRepository(
         private var current: AppSettings,
@@ -344,14 +550,18 @@ class SettingsViewModelTest {
         var failSaves = false
         var failLoad = false
         var cancelSaves = false
+        var loadFailure: IOException? = null
+        var saveFailure: IOException? = null
 
         override suspend fun load(): AppSettings {
+            loadFailure?.let { throw it }
             if (failLoad) throw java.io.IOException("cannot read settings")
             return current
         }
 
         override suspend fun save(settings: AppSettings) {
             if (cancelSaves) throw kotlinx.coroutines.CancellationException("save cancelled")
+            saveFailure?.let { throw it }
             if (failSaves) throw java.io.IOException("cannot write settings")
             savedSettings += settings
             current = settings
@@ -360,15 +570,21 @@ class SettingsViewModelTest {
 
     private class FakeModelCatalog(
         private val result: ModelCatalogResult = ModelCatalogResult.Available(listOf("gpt-5.6-luna", "gpt-5.6-terra")),
+        private val failure: IOException? = null,
     ) : ModelCatalog {
-        override suspend fun load(): ModelCatalogResult = result
+        override suspend fun load(): ModelCatalogResult {
+            failure?.let { throw it }
+            return result
+        }
     }
 
     private class FakeAuthCoordinator(
         initial: AppAuthStatus = AppAuthStatus.SignedOut(),
+        private val operations: MutableList<String> = mutableListOf(),
     ) : AuthCoordinator {
         override val state = MutableStateFlow(initial)
         var signOutCalls = 0
+        var signOutFailure: IOException? = null
 
         override suspend fun restore() = Unit
 
@@ -379,18 +595,30 @@ class SettingsViewModelTest {
         override suspend fun signInWithApiKey(key: String) = Unit
 
         override suspend fun signOut() {
+            operations += "signOut"
             signOutCalls += 1
+            signOutFailure?.let { throw it }
+            state.value = AppAuthStatus.SignedOut()
         }
 
         override fun openDeviceVerificationPage() = Unit
     }
 
-    private class FakeConversationRepository : ConversationRepository {
+    private class FakeConversationRepository(
+        private val operations: MutableList<String> = mutableListOf(),
+    ) : ConversationRepository {
         val replacements = mutableListOf<List<HistoryItem>>()
+        var replaceFailure: IOException? = null
+        var replaceCalls = 0
+        var replaceGate: CompletableDeferred<Unit>? = null
 
         override suspend fun load(): List<HistoryItem> = emptyList()
 
         override suspend fun replace(items: List<HistoryItem>) {
+            replaceCalls += 1
+            operations += "clearHistory"
+            replaceGate?.await()
+            replaceFailure?.let { throw it }
             replacements += items
         }
 

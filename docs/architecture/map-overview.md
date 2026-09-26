@@ -84,7 +84,7 @@ flowchart TD
 
 ## Автоматические правила (Konsist)
 
-`app/src/test/kotlin/com/example/phoneagent/architecture/ArchitectureTest.kt` (Konsist) смотрит только `*/src/main/*`, по импортам и тексту файла. 12 правил: нет `GlobalScope`/`runBlocking`/`Thread.sleep`; `android.util.Log` только в `AndroidLogcatLogger`; `core/domain` не импортирует `android*`, `okhttp3`, `dagger`, `data.*`, а `data/llm` не импортирует `android*`, `dagger`, `data.auth`; `ui/` не импортирует `data.*`, `tools.*`; `designsystem` не импортирует `ui.chat`, `ui.navigation`; нет загрузчика картинок; markdown-библиотека только в `AssistantMarkdown`; сообщения логов без интерполяции; `Color(0x` только в theme, нет `Text("...")`; ViewModel не импортирует `Activity`/`Context`/`View`; пакеты `:tools` не импортируют друг друга; реализации `Tool` лежат в `:tools` и названы `*Tool`.
+`app/src/test/kotlin/com/example/phoneagent/architecture/ArchitectureTest.kt` (Konsist) проверяет production-код в `*/src/main/*`; отдельное правило о реальных сокетах, `Thread.sleep` и ожиданиях без таймаута сканирует `src/test` и `src/testFixtures`, но не `androidTest`. Полный актуальный список правил — [testing.md](testing.md).
 
 Не покрыто: жёсткий `Dispatchers.*`, `RandomIdGenerator` мимо порта.
 

@@ -73,8 +73,6 @@ internal object SearchFilesPolicy {
         )
     }
 
-    fun toJson(result: SearchFilesResult): String = toOutput(result).text
-
     fun toOutput(result: SearchFilesResult): SearchFilesOutput {
         val items = mutableListOf<kotlinx.serialization.json.JsonObject>()
         val files = mutableListOf<ToolFile>()

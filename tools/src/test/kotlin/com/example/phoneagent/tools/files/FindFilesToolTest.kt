@@ -4,6 +4,9 @@ import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.LogLevel
+import com.example.phoneagent.domain.platform.RedactingAppLogger
+import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
@@ -22,7 +25,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -145,7 +147,7 @@ class FindFilesToolTest {
         }
 
     @Test
-    fun `a file system failure never echoes the exception text to the model`() =
+    fun `a file system failure logs safely and never echoes exception text to the model`() =
         runTest {
             val secretUri = "content://secret/path"
             val brokenRoot =
@@ -154,11 +156,21 @@ class FindFilesToolTest {
                     isDirectory = true,
                     childrenError = SecurityException("failed to read $secretUri"),
                 )
+            val records = FakeAppLogger()
+            val toolContext = ToolContext(clock, RedactingAppLogger(records))
 
-            val result = toolWith(brokenRoot).execute(args("match"), context)
+            val result = toolWith(brokenRoot).execute(args("match"), toolContext)
 
             assertTrue(result is ToolResult.Failed)
             assertFalse((result as ToolResult.Failed).reason.contains(secretUri))
+            assertEquals(1, records.events.size)
+            val event = records.events.single()
+            assertEquals(LogLevel.WARN, event.level)
+            assertEquals("FindFilesTool", event.tag)
+            assertEquals("find files failed", event.message)
+            assertEquals("SecurityException", event.fields["exceptionType"])
+            assertTrue(event.throwable is SanitizedThrowable)
+            assertFalse(event.toString().contains(secretUri))
         }
 
     @Test

@@ -58,6 +58,10 @@
     <string name="settings_history_confirm_message">Все сохранённые сообщения будут удалены без возможности восстановления. Удаление здесь не управляет данными, которые уже получил сервис модели.</string>
     <string name="settings_history_confirm_action">Удалить</string>
     <string name="settings_history_clear_error">Не удалось очистить историю. Попробуйте ещё раз.</string>
+    <string name="settings_sign_out_confirm_title">Выйти из аккаунта?</string>
+    <string name="settings_sign_out_confirm_message">Выберите, что сделать с историей чата на этом устройстве.</string>
+    <string name="settings_sign_out_delete_history">Выйти и удалить историю</string>
+    <string name="settings_sign_out_keep_history">Выйти, историю оставить</string>
     <string name="theme_load_failed">Не удалось загрузить настройки</string>
     <string name="theme_settings_stale">Не удалось обновить настройки. Показана последняя сохранённая тема.</string>
     <string name="settings_theme_save_failed">Не удалось сохранить тему. Попробуйте ещё раз.</string>
@@ -144,7 +148,6 @@
     <string name="file_open_chooser_title">Открыть файл с помощью</string>
     <string name="file_open_failed">Не удалось открыть файл. Проверьте доступ или установите приложение для этого типа файла.</string>
     <string name="preview_file_name">Отчёт за сентябрь.pdf</string>
-    <string name="preview_file_size">1,2 МБ</string>
     <string name="preview_files_found_title">Файлы найдены</string>
     <string name="preview_files_found_summary">Результаты поиска по запросу</string>
 </resources>

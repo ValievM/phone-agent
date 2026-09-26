@@ -49,3 +49,4 @@
 11. Литералы цвета `Color(0x…)` только в `ui/designsystem/theme`; `designsystem` не импортирует экраны.
 12. Нет строковых литералов в `Text("…")` в `ui/**` (все тексты в `strings.xml`); возможность проверки Konsist подтверждаем на этапе 1.
 13. Markdown-библиотека используется только внутри `AssistantMarkdown`; модуль загрузки картинок (`-coil3`) не подключается.
+14. Unit-тесты (`src/test`, `src/testFixtures`) не используют реальные сокеты, `Thread.sleep` и ожидания без таймаута (`ServerSocket`, `runBlocking`, `CountDownLatch`) — проверяет `ArchitectureTest`; причина: 25.09.2026 такой тест завис на 80+ минут и держал Gradle. Инструментальным тестам (`androidTest`) сокеты допустимы.

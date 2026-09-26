@@ -15,7 +15,9 @@ sealed interface SettingsUiEvent {
         val enabled: Boolean,
     ) : SettingsUiEvent
 
-    data object SignOut : SettingsUiEvent
+    data class SignOut(
+        val clearHistory: Boolean,
+    ) : SettingsUiEvent
 
     data class SaveSearchFolder(
         val uri: String?,

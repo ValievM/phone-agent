@@ -123,7 +123,7 @@ class ChatViewModelRestoreTest {
                 contextWindowPolicy = ContextWindowPolicy { it },
                 idGenerator = FakeIdGenerator(),
             )
-        return ChatViewModel(loop, repository)
+        return ChatViewModel(loop, repository, logger = FakeAppLogger())
     }
 
     @Test

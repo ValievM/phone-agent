@@ -20,8 +20,31 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 
+private data class ToolInvocation(
+    val name: String,
+    val arguments: kotlinx.serialization.json.JsonObject,
+)
+
+private fun completedInvocationsFrom(history: List<HistoryItem>): MutableSet<ToolInvocation> {
+    val currentTurnStart = history.indexOfLast { it is HistoryItem.UserMessage } + 1
+    val completedCallIds = mutableSetOf<CallId>()
+    for (index in currentTurnStart until history.size) {
+        val item = history[index]
+        if (item is HistoryItem.ToolOutput) completedCallIds += item.callId
+    }
+
+    val invocations = mutableSetOf<ToolInvocation>()
+    for (index in currentTurnStart until history.size) {
+        val item = history[index]
+        if (item is HistoryItem.ToolCallItem && item.callId in completedCallIds) {
+            invocations += ToolInvocation(item.name, item.arguments)
+        }
+    }
+    return invocations
+}
+
 /**
- * Drives one user turn to completion: sends the model a request, executes any tool calls it asks
+ * Drives or continues one user turn to completion: sends the model a request, executes any tool calls it asks
  * for (in order, per architecture/core.md — the model may request several in one response), feeds
  * their outputs back, and repeats until the model replies with no more calls, fails, or the step
  * limit is hit. A cold [Flow] — not tied to a ViewModel or Android; cancelling the collector
@@ -40,40 +63,28 @@ public class AgentLoop(
         onApprovalResolved: suspend (List<CallId>) -> Unit = {},
     ): Flow<AgentEvent> =
         flow {
-            val newItems = mutableListOf<HistoryItem>(HistoryItem.UserMessage(idGenerator.newItemId(), input))
-            var step = 0
-            var toolCallsMade = 0
-            while (true) {
-                step++
-                if (step > config.maxSteps) {
-                    emit(AgentEvent.TurnFailed(AgentError.StepLimit, newItems.toList()))
-                    return@flow
-                }
-                val turn = runModelTurn(history + newItems)
-                if (turn.failure != null) {
-                    emit(AgentEvent.TurnFailed(turn.failure, newItems.toList()))
-                    return@flow
-                }
-                if (turn.text.isNotEmpty()) {
-                    newItems += HistoryItem.AssistantMessage(idGenerator.newItemId(), turn.text)
-                }
-                if (turn.toolCalls.isEmpty()) {
-                    emit(AgentEvent.TurnCompleted(newItems.toList()))
-                    return@flow
-                }
-                if (toolCallsMade + turn.toolCalls.size > config.maxToolCallsPerTurn) {
-                    // The step does not fit into the per-turn tool budget: reject it whole - no
-                    // call in it runs, everything already done stays in history.
-                    emit(AgentEvent.TurnFailed(AgentError.StepLimit, newItems.toList()))
-                    return@flow
-                }
-                toolCallsMade += turn.toolCalls.size
-                val sharedDecisions = confirmGroups(turn.toolCalls, onApprovalResolved)
-                for (call in turn.toolCalls) {
-                    newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, call.arguments)
-                    newItems += runToolCall(call, sharedDecisions[call.callId], onApprovalResolved)
-                }
-            }
+            val context =
+                TurnContext(
+                    history = history,
+                    newItems = mutableListOf(HistoryItem.UserMessage(idGenerator.newItemId(), input)),
+                    completedInvocations = mutableSetOf(),
+                )
+            runTurn(context, onApprovalResolved)
+        }
+
+    /** Resumes an existing turn without adding a user message; terminal events contain only new items. */
+    public fun continueTurn(
+        history: List<HistoryItem>,
+        onApprovalResolved: suspend (List<CallId>) -> Unit = {},
+    ): Flow<AgentEvent> =
+        flow {
+            val context =
+                TurnContext(
+                    history = history,
+                    newItems = mutableListOf(),
+                    completedInvocations = completedInvocationsFrom(history),
+                )
+            runTurn(context, onApprovalResolved)
         }
 
     private suspend fun FlowCollector<AgentEvent>.runModelTurn(history: List<HistoryItem>): ModelTurn {
@@ -151,24 +162,93 @@ public class AgentLoop(
     private suspend fun FlowCollector<AgentEvent>.runToolCall(
         call: ToolCall,
         sharedDecision: Approval?,
+        requireConfirmation: Boolean,
         onApprovalResolved: suspend (List<CallId>) -> Unit,
     ): HistoryItem.ToolOutput {
         if (sharedDecision == null) {
             val description = describe(call)
             emit(AgentEvent.ToolCallStarted(call, description))
-            toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE }?.let { risk ->
+            toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE || requireConfirmation }?.let { risk ->
                 emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
             }
         }
         val outcome =
-            toolPipeline.run(call.name, call.arguments, sharedDecision ?: Approval.ASK) {
-                onApprovalResolved(listOf(call.callId))
-            }
+            toolPipeline.run(
+                name = call.name,
+                args = call.arguments,
+                approval = sharedDecision ?: Approval.ASK,
+                requireConfirmation = requireConfirmation,
+                onApprovalResolved = { onApprovalResolved(listOf(call.callId)) },
+            )
         emit(AgentEvent.ToolCallFinished(call, outcome))
         return HistoryItem.ToolOutput(idGenerator.newItemId(), call.callId, outcome.toOutputText())
     }
 
     private fun unknownToolDescription(name: String): CallDescription = CallDescription(title = name, summary = "Unknown tool")
+
+    private suspend fun FlowCollector<AgentEvent>.runTurn(
+        context: TurnContext,
+        onApprovalResolved: suspend (List<CallId>) -> Unit,
+    ) {
+        var terminalEvent: AgentEvent? = null
+        while (terminalEvent == null) {
+            terminalEvent = runModelStep(context, onApprovalResolved)
+        }
+        emit(checkNotNull(terminalEvent))
+    }
+
+    private suspend fun FlowCollector<AgentEvent>.runModelStep(
+        context: TurnContext,
+        onApprovalResolved: suspend (List<CallId>) -> Unit,
+    ): AgentEvent? {
+        context.step++
+        val turn =
+            if (context.step > config.maxSteps) {
+                null
+            } else {
+                runModelTurn(context.history + context.newItems)
+            }
+        val failure = turn?.failure ?: if (turn == null) AgentError.StepLimit else null
+        if (failure != null) {
+            return AgentEvent.TurnFailed(failure, context.newItems.toList())
+        }
+
+        val completedTurn = checkNotNull(turn)
+        if (completedTurn.text.isNotEmpty()) {
+            context.newItems += HistoryItem.AssistantMessage(idGenerator.newItemId(), completedTurn.text)
+        }
+        return when {
+            completedTurn.toolCalls.isEmpty() -> {
+                AgentEvent.TurnCompleted(context.newItems.toList())
+            }
+
+            context.toolCallsMade + completedTurn.toolCalls.size > config.maxToolCallsPerTurn -> {
+                AgentEvent.TurnFailed(AgentError.StepLimit, context.newItems.toList())
+            }
+
+            else -> {
+                context.toolCallsMade += completedTurn.toolCalls.size
+                val sharedDecisions = confirmGroups(completedTurn.toolCalls, onApprovalResolved)
+                for (call in completedTurn.toolCalls) {
+                    val invocation = ToolInvocation(call.name, call.arguments)
+                    val requireConfirmation = invocation in context.completedInvocations
+                    context.newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, call.arguments)
+                    context.newItems +=
+                        runToolCall(call, sharedDecisions[call.callId], requireConfirmation, onApprovalResolved)
+                    context.completedInvocations += invocation
+                }
+                null
+            }
+        }
+    }
+
+    private data class TurnContext(
+        val history: List<HistoryItem>,
+        val newItems: MutableList<HistoryItem>,
+        val completedInvocations: MutableSet<ToolInvocation>,
+        var step: Int = 0,
+        var toolCallsMade: Int = 0,
+    )
 
     private data class ModelTurn(
         val text: String,

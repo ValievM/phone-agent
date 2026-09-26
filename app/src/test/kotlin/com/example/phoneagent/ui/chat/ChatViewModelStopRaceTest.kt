@@ -53,7 +53,7 @@ class ChatViewModelStopRaceTest {
     fun `a submit right after stop keeps the new turn running and blocks further submits`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()
-            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             // Start the first turn for real (it hangs on the gateway), then Stop and re-submit

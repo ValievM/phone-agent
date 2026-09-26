@@ -5,6 +5,7 @@ import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
+import com.example.phoneagent.domain.interaction.ApprovalRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
@@ -60,6 +61,48 @@ class ToolPipelineTest {
 
             assertEquals(ToolOutcome.Success("found nothing"), outcome)
             assertTrue(interaction.approvalRequests.isEmpty())
+        }
+
+    @Test
+    fun `a SAFE tool asks when confirmation is explicitly required`() =
+        runTest {
+            var executed = false
+            val arguments = buildJsonObject {}
+            val interaction = FakeUserInteraction().apply { approvalResult = false }
+            val tool =
+                fakeTool("find_files", risk = Risk.SAFE) {
+                    executed = true
+                    ToolResult.Success("found")
+                }
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction)
+
+            val outcome = pipeline.run("find_files", arguments, requireConfirmation = true)
+
+            assertEquals(ToolOutcome.Rejected("user declined"), outcome)
+            assertEquals(
+                listOf(ApprovalRequest(CallDescription("find_files", "summary"), Risk.SAFE, arguments)),
+                interaction.approvalRequests,
+            )
+            assertTrue(!executed)
+        }
+
+    @Test
+    fun `a SAFE tool with an unusable description is not run when confirmation is required`() =
+        runTest {
+            var executed = false
+            val interaction = FakeUserInteraction().apply { approvalResult = true }
+            val tool =
+                describingTool("find_files", Risk.SAFE, describeError = IllegalStateException("cannot describe")) {
+                    executed = true
+                    ToolResult.Success("found")
+                }
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction)
+
+            val outcome = pipeline.run("find_files", buildJsonObject {}, requireConfirmation = true)
+
+            assertEquals(ToolOutcome.Failed("the tool could not describe its action, so it was not run"), outcome)
+            assertTrue(interaction.approvalRequests.isEmpty())
+            assertTrue(!executed)
         }
 
     @Test

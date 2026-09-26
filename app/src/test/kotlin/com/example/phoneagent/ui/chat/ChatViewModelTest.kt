@@ -118,11 +118,12 @@ class ChatViewModelTest {
                         },
                     ),
                     repository,
+                    logger = FakeAppLogger(),
                 )
             firstRun.onEvent(ChatUiEvent.Submit("Earlier question"))
             advanceUntilIdle()
 
-            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             assertEquals(
                 listOf(ChatRole.USER to "Earlier question", ChatRole.ASSISTANT to "Earlier answer"),
@@ -141,7 +142,7 @@ class ChatViewModelTest {
                         HistoryItem.AssistantMessage(ItemId("saved-assistant"), "Earlier answer"),
                     ),
                 )
-            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             repository.replace(emptyList())
@@ -161,7 +162,7 @@ class ChatViewModelTest {
                 )
             val repository = FakeConversationRepository(initialHistory)
             val gateway = HangingModelGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
@@ -213,7 +214,7 @@ class ChatViewModelTest {
                     }
                 }
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Answer"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             runCurrent()
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
@@ -262,7 +263,7 @@ class ChatViewModelTest {
                             emit(ModelEvent.Completed())
                         }
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
@@ -306,7 +307,7 @@ class ChatViewModelTest {
                             emit(ModelEvent.Failed(AgentError.Offline))
                         }
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
@@ -547,7 +548,8 @@ class ChatViewModelTest {
             idGenerator = FakeIdGenerator(),
         )
 
-    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel = ChatViewModel(agentLoop, FakeConversationRepository(emptyList()))
+    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel =
+        ChatViewModel(agentLoop, FakeConversationRepository(emptyList()), logger = FakeAppLogger())
 
     private class FakeConversationRepository(
         initialItems: List<HistoryItem>,

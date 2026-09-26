@@ -59,6 +59,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var showClearHistoryConfirmation by rememberSaveable { mutableStateOf(false) }
+    var showSignOutConfirmation by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -89,7 +90,7 @@ fun SettingsScreen(
                 ),
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.medium),
         ) {
-            item { AccountSection(state, onEvent) }
+            item { AccountSection(state, onSignOut = { showSignOutConfirmation = true }) }
             item { AppearanceSection(state, onEvent) }
             item { ModelSection(state, onEvent) }
             item { SearchFolderSection(state, onChooseFolder) }
@@ -107,12 +108,20 @@ fun SettingsScreen(
             onDismiss = { showClearHistoryConfirmation = false },
         )
     }
+    SettingsSignOutConfirmation(
+        visible = showSignOutConfirmation,
+        onSignOut = { clearHistory ->
+            showSignOutConfirmation = false
+            onEvent(SettingsUiEvent.SignOut(clearHistory = clearHistory))
+        },
+        onDismiss = { showSignOutConfirmation = false },
+    )
 }
 
 @Composable
 private fun AccountSection(
     state: SettingsUiState,
-    onEvent: (SettingsUiEvent) -> Unit,
+    onSignOut: () -> Unit,
 ) {
     SettingsSection(title = stringResource(R.string.settings_account_title)) {
         val accountText =
@@ -123,7 +132,7 @@ private fun AccountSection(
             }
         Text(stringResource(accountText), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.isSignedIn) {
-            SecondaryButton(onClick = { onEvent(SettingsUiEvent.SignOut) }) {
+            SecondaryButton(onClick = onSignOut) {
                 Text(stringResource(R.string.sign_out))
             }
         }
