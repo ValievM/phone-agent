@@ -343,7 +343,7 @@ class ChatViewModelProcessDeathTest {
         }
 
     @Test
-    fun `a final save error remains visible when the model turn also fails`() =
+    fun `a turn error wins over a final save failure`() =
         runTest(dispatcher.scheduler) {
             val repository = FailLastSaveRepository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(AgentError.Timeout)) }
@@ -355,7 +355,7 @@ class ChatViewModelProcessDeathTest {
 
             assertEquals(HistorySyncState.Failed(StorageOperation.SAVE), viewModel.state.value.historySync)
             assertEquals(
-                AgentError.Unexpected("Failed to save conversation history"),
+                AgentError.Timeout,
                 viewModel.state.value.errorForDisplay(),
             )
             assertTrue(viewModel.state.value.turn is TurnState.FailedRetryable)
