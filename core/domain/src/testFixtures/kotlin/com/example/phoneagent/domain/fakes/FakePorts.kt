@@ -128,6 +128,7 @@ public class FakeUserInteraction : UserInteraction {
      */
     public val scriptedApprovals: ArrayDeque<Boolean> = ArrayDeque()
     public val scriptedBatchApprovals: ArrayDeque<Boolean> = ArrayDeque()
+    public val scriptedCapabilities: ArrayDeque<CapabilityResult> = ArrayDeque()
 
     override suspend fun confirm(request: ApprovalRequest): Boolean {
         approvalRequests += request
@@ -141,7 +142,7 @@ public class FakeUserInteraction : UserInteraction {
 
     override suspend fun ensure(capability: Capability): CapabilityResult {
         capabilityRequests += capability
-        return capabilityResult
+        return scriptedCapabilities.removeFirstOrNull() ?: capabilityResult
     }
 }
 
