@@ -8,7 +8,9 @@ import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolFile
 import com.example.phoneagent.domain.tools.ToolResult
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
@@ -81,6 +83,57 @@ class SearchFilesToolTest {
             )
             assertEquals("false", root.getValue("truncated").jsonPrimitive.content)
         }
+
+    @Test
+    fun `successful search returns typed files while keeping the saved output format`() =
+        runTest {
+            val hit = SearchFileMetadata("report.pdf", "content://report", "Download/report.pdf", 42, 123, "application/pdf")
+            val result =
+                tool(FakeUserInteraction(), RecordingMediaStoreSearch(records = listOf(hit)))
+                    .execute(args("report"), context()) as ToolResult.Success
+
+            val expectedText =
+                listOf(
+                    """{"items":[{"name":"report.pdf","uri":"content://report","path":"Download/report.pdf","size":42,""",
+                    """"dateModified":123,"mimeType":"application/pdf"}],"truncated":false,"partialAccess":false}""",
+                ).joinToString("")
+            assertEquals(expectedText, result.text)
+            assertEquals(
+                ToolContent.FilesFound(
+                    listOf(ToolFile("report.pdf", "content://report", 42, "application/pdf")),
+                ),
+                result.content,
+            )
+        }
+
+    @Test
+    fun `old saved search output restores the same typed file metadata`() {
+        val savedOutput =
+            listOf(
+                """{"items":[{"name":"Договор.pdf","uri":"content://media/external/file/1","path":""",
+                """"Документы/Договор.pdf","size":1200,"dateModified":42,"mimeType":"application/pdf"}],"truncated":false}""",
+            ).joinToString("")
+
+        val content = tool(FakeUserInteraction(), RecordingMediaStoreSearch()).restoreContent(savedOutput)
+
+        assertEquals(
+            ToolContent.FilesFound(
+                listOf(ToolFile("Договор.pdf", "content://media/external/file/1", 1200L, "application/pdf")),
+            ),
+            content,
+        )
+    }
+
+    @Test
+    fun `malformed legacy output and unsafe file rows restore without openable hits`() {
+        val searchTool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+        val savedOutput =
+            """{"items":[{"name":"private.txt","uri":"file:///private/private.txt","size":1,"mimeType":"text/plain"},""" +
+                """{"name":"bad-size.txt","uri":"content://media/external/file/2","size":"2"}]}"""
+
+        assertEquals(ToolContent.FilesFound(emptyList()), searchTool.restoreContent("not JSON"))
+        assertEquals(ToolContent.FilesFound(emptyList()), searchTool.restoreContent(savedOutput))
+    }
 
     @Test
     fun `malformed arguments fail without requesting permission or querying`() =

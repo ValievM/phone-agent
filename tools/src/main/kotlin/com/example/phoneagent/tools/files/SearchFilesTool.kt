@@ -8,6 +8,7 @@ import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
@@ -67,6 +68,8 @@ internal class SearchFilesTool
             )
         }
 
+        override fun restoreContent(outputText: String): ToolContent? = SearchFilesContentCodec.restoreContent(outputText)
+
         override suspend fun execute(
             args: JsonObject,
             context: ToolContext,
@@ -103,7 +106,8 @@ internal class SearchFilesTool
                         sourceIncomplete = searched.truncated || budgetReached,
                         partialAccess = searched.inaccessible,
                     )
-                ToolResult.Success(SearchFilesPolicy.toJson(result))
+                val output = SearchFilesPolicy.toOutput(result)
+                ToolResult.Success(output.text, output.content)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (expected: Exception) {

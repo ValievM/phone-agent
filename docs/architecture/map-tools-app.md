@@ -107,8 +107,9 @@ class ErrorPresentation {
   placement
   retryable
 }
-class FileHitMapper {
+class ToolContentMapper {
   toFileHits()
+  toCardStatus()
 }
 ChatRoute --> ChatViewModel : hiltViewModel
 ChatRoute ..> ChatScreen
@@ -119,7 +120,8 @@ ChatViewModel --> ConversationRepository
 ChatViewModel ..> ChatUiState
 ChatViewModel ..> ChatUiEvent
 ChatViewModel ..> ChatStateTransforms
-ChatViewModel ..> FileHitMapper
+ChatViewModel ..> ToolContentMapper
+ChatViewModel ..> AgentLoop : restores tool content
 ChatUiState o-- ChatMessage
 ChatMessage --> ToolCallMessage
 ToolCallMessage --> ToolCallStatus
@@ -135,7 +137,8 @@ MessageList ..> AssistantMessage
 | `ChatContract.kt` | `ChatUiState`, `ChatMessage`, `ToolCallMessage`, `ChatRole`, `ChatUiEvent` |
 | `ChatStateTransforms.kt` | Чистые функции над `ChatUiState`; `withLoadedHistory` помечает незавершённый ход как `Interrupted` |
 | `ErrorPresentation.kt` | Единственное место `AgentError` → строка, место показа и `retryable`; `when` без `else` |
-| `FileHitMapper.kt` | Разбор JSON вывода `search_files` в `FileHit` (имя инструмента зашито) |
+| `ToolContentMapper.kt` | Преобразует доменный `ToolContent` в модель карточки; протокол инструмента и JSON не разбирает |
+| `SearchFilesTool.restoreContent()` | Восстанавливает типизированные метаданные из прежнего JSON вывода; формат текста истории не меняется |
 | `MessageList.kt`, `FeedFollow.kt` | Обратная `LazyColumn`; логика «следовать за новым» и чип «к новым» вынесена в чистые функции |
 
 ### `ui/designsystem`

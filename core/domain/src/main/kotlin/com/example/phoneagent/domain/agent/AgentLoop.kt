@@ -12,6 +12,7 @@ import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.tools.Approval
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.toOutputText
@@ -139,6 +140,12 @@ public class AgentLoop(
     /** What the card and the confirmation of [call] say; a tool that no longer exists is shown under its name. */
     public fun describe(call: ToolCall): CallDescription =
         toolPipeline.describe(call.name, call.arguments) ?: unknownToolDescription(call.name)
+
+    /** Restores a tool's typed result from the unchanged output text stored in conversation history. */
+    public fun restoreToolContent(
+        name: String,
+        outputText: String,
+    ): ToolContent? = toolPipeline.restoreContent(name, outputText)
 
     /** [sharedDecision] is null when the call was not part of a shared question and is asked on its own. */
     private suspend fun FlowCollector<AgentEvent>.runToolCall(
