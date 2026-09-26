@@ -50,6 +50,37 @@ internal class SearchFilesTool
                                         put("maxLength", SearchFilesArgs.MAX_QUERY_LENGTH)
                                     },
                                 )
+                                put(
+                                    "alternatives",
+                                    buildJsonObject {
+                                        put("type", "array")
+                                        put("description", SearchFilesCopy.ALTERNATIVES_SCHEMA_DESCRIPTION)
+                                        put("maxItems", SearchFilesArgs.MAX_ALTERNATIVES)
+                                        put(
+                                            "items",
+                                            buildJsonObject {
+                                                put("type", "string")
+                                                put("minLength", 1)
+                                                put("maxLength", SearchFilesArgs.MAX_QUERY_LENGTH)
+                                            },
+                                        )
+                                    },
+                                )
+                                put(
+                                    "types",
+                                    buildJsonObject {
+                                        put("type", "array")
+                                        put("description", SearchFilesCopy.TYPES_SCHEMA_DESCRIPTION)
+                                        put("maxItems", SearchFileType.arguments.size)
+                                        put(
+                                            "items",
+                                            buildJsonObject {
+                                                put("type", "string")
+                                                put("enum", JsonArray(SearchFileType.arguments.map(::JsonPrimitive)))
+                                            },
+                                        )
+                                    },
+                                )
                             },
                         )
                         put("required", JsonArray(listOf(JsonPrimitive("query"))))
@@ -61,7 +92,7 @@ internal class SearchFilesTool
         override fun deniedMessage(capability: Capability): String = SearchFilesCopy.PERMISSION_DENIED
 
         override fun describe(args: JsonObject): CallDescription {
-            val query = (parseAndValidate(args) as? ParsedSearchArgs.Valid)?.query?.takeIf(String::isNotBlank)
+            val query = (parseAndValidate(args) as? ParsedSearchArgs.Valid)?.criteria?.query?.takeIf(String::isNotBlank)
             return CallDescription(
                 title = SearchFilesCopy.CARD_TITLE,
                 summary = query?.let(SearchFilesCopy::cardSummary) ?: SearchFilesCopy.CARD_SUMMARY,
@@ -77,11 +108,11 @@ internal class SearchFilesTool
         ): ToolResult =
             when (val parsed = parseAndValidate(args)) {
                 is ParsedSearchArgs.Invalid -> ToolResult.Failed(parsed.reason)
-                is ParsedSearchArgs.Valid -> searchFiles(parsed.query, context)
+                is ParsedSearchArgs.Valid -> searchFiles(parsed.criteria, context)
             }
 
         private suspend fun searchFiles(
-            query: String,
+            criteria: FileSearchCriteria,
             context: ToolContext,
         ): ToolResult {
             if (userInteraction.ensure(Capability.FILES) is CapabilityResult.Denied) {
@@ -99,7 +130,7 @@ internal class SearchFilesTool
             }
 
             return try {
-                val searched = withContext(dispatchers.io) { mediaStoreSearch.search(query, ::shouldContinue) }
+                val searched = withContext(dispatchers.io) { mediaStoreSearch.search(criteria, ::shouldContinue) }
                 if (!shouldContinue()) budgetReached = true
                 val result =
                     SearchFilesPolicy.process(
@@ -107,7 +138,7 @@ internal class SearchFilesTool
                         sourceIncomplete = searched.truncated || budgetReached,
                         partialAccess = searched.inaccessible,
                     )
-                val output = SearchFilesPolicy.toOutput(result)
+                val output = SearchFilesPolicy.toOutput(result, criteria.attemptedQueries)
                 ToolResult.Success(output.text, output.content)
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -131,7 +162,7 @@ internal class SearchFilesTool
                 try {
                     val parsed = json.decodeFromJsonElement(SearchFilesArgs.serializer(), args)
                     when (val error = parsed.validationError()) {
-                        null -> ParsedSearchArgs.Valid(parsed.query)
+                        null -> ParsedSearchArgs.Valid(parsed.criteria())
                         else -> ParsedSearchArgs.Invalid(SearchFilesCopy.validationError(error))
                     }
                 } catch (_: SerializationException) {
@@ -142,7 +173,7 @@ internal class SearchFilesTool
 
 private sealed interface ParsedSearchArgs {
     data class Valid(
-        val query: String,
+        val criteria: FileSearchCriteria,
     ) : ParsedSearchArgs
 
     data class Invalid(

@@ -5,27 +5,16 @@ import kotlinx.serialization.Serializable
 /** Arguments of a find_files call, decoded from the model's JSON by [FindFilesTool]. */
 @Serializable
 internal data class FindFilesArgs(
-    /** Substring to look for in file and folder names; matched as plain data, case-insensitively. */
+    /** Primary search phrase; results are matched as plain, untrusted name data. */
     val query: String,
+    val alternatives: List<String> = emptyList(),
+    val types: List<String> = emptyList(),
 ) {
-    /** Null when the query is usable; otherwise a short reason for the model to correct itself. */
-    fun validationError(): String? =
-        when {
-            query.isBlank() -> {
-                FindFilesCopy.QUERY_BLANK
-            }
+    fun criteria(): FileSearchCriteria = FileSearchCriteria(query, alternatives, types)
 
-            query.length > MAX_QUERY_LENGTH -> {
-                FindFilesCopy.queryTooLong(query.length, MAX_QUERY_LENGTH)
-            }
-
-            else -> {
-                null
-            }
-        }
+    fun validationError(): SearchFilesValidationError? = criteria().validationError()
 
     internal companion object {
-        // Generous for a file-name substring (file names are rarely longer than 255 chars).
-        const val MAX_QUERY_LENGTH = 200
+        const val MAX_QUERY_LENGTH = FILE_SEARCH_MAX_QUERY_LENGTH
     }
 }

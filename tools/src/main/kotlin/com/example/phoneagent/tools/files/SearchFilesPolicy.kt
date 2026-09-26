@@ -73,7 +73,10 @@ internal object SearchFilesPolicy {
         )
     }
 
-    fun toOutput(result: SearchFilesResult): SearchFilesOutput {
+    fun toOutput(
+        result: SearchFilesResult,
+        attemptedQueries: List<String> = emptyList(),
+    ): SearchFilesOutput {
         val items = mutableListOf<kotlinx.serialization.json.JsonObject>()
         val files = mutableListOf<ToolFile>()
         var truncated = result.truncated
@@ -88,21 +91,44 @@ internal object SearchFilesPolicy {
             items += candidate
             SearchFilesContentCodec.toToolFile(item)?.let(files::add)
         }
-        return SearchFilesOutput(
-            text = serialize(items, truncated || items.size < result.items.size, partialAccess = result.partialAccess),
-            content = ToolContent.FilesFound(files),
-        )
+        val outputTruncated = truncated || items.size < result.items.size
+        var attempts = if (items.isEmpty()) attemptedQueries else emptyList()
+        var attemptsTruncated = false
+        var text = serialize(items, outputTruncated, result.partialAccess, attempts, attemptsTruncated)
+        while (text.toByteArray(Charsets.UTF_8).size > SearchFilesLimits.MAX_OUTPUT_BYTES && attempts.isNotEmpty()) {
+            val longest = attempts.indices.maxByOrNull { index -> attempts[index].codePointCount(0, attempts[index].length) } ?: break
+            val value = attempts[longest]
+            val shortened =
+                if (value.isEmpty()) {
+                    attempts.toMutableList().also { it.removeAt(longest) }
+                } else {
+                    attempts.toMutableList().also {
+                        val end = value.offsetByCodePoints(value.length, -1)
+                        it[longest] = value.substring(0, end)
+                    }
+                }
+            attempts = shortened
+            attemptsTruncated = true
+            text = serialize(items, outputTruncated, result.partialAccess, attempts, attemptsTruncated)
+        }
+        return SearchFilesOutput(text, ToolContent.FilesFound(files))
     }
 
     private fun serialize(
         items: List<kotlinx.serialization.json.JsonObject>,
         truncated: Boolean,
         partialAccess: Boolean,
+        attemptedQueries: List<String> = emptyList(),
+        attemptsTruncated: Boolean = false,
     ): String =
         buildJsonObject {
             put("items", JsonArray(items))
             put("truncated", truncated)
             put("partialAccess", partialAccess)
+            if (attemptedQueries.isNotEmpty() || attemptsTruncated) {
+                put("attempted", JsonArray(attemptedQueries.map(::JsonPrimitive)))
+            }
+            if (attemptsTruncated) put("attemptsTruncated", true)
         }.toString()
 
     private fun SearchFileMetadata.toJsonObject() =

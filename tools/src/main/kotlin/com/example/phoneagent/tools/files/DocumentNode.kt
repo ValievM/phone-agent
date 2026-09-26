@@ -13,6 +13,8 @@ internal interface DocumentNode {
     val name: String
 
     val isDirectory: Boolean
+    val mimeType: String?
+        get() = null
 
     /** Child documents; empty for files and for empty directories. */
     fun children(): List<DocumentNode>

@@ -16,9 +16,12 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -33,7 +36,16 @@ class FindFilesToolTest {
     private val logger = FakeAppLogger()
     private val context = ToolContext(clock, logger)
 
-    private fun args(query: String): JsonObject = buildJsonObject { put("query", query) }
+    private fun args(
+        query: String,
+        alternatives: List<String> = emptyList(),
+        types: List<String> = emptyList(),
+    ): JsonObject =
+        buildJsonObject {
+            put("query", query)
+            if (alternatives.isNotEmpty()) put("alternatives", JsonArray(alternatives.map { JsonPrimitive(it) }))
+            if (types.isNotEmpty()) put("types", JsonArray(types.map { JsonPrimitive(it) }))
+        }
 
     private fun toolWith(root: FakeDocumentNode?): FindFilesTool = FindFilesTool(FakeSelectedFolder(root))
 
@@ -47,6 +59,26 @@ class FindFilesToolTest {
         assertEquals("object", spec.inputSchema["type"]?.jsonPrimitive?.content)
         val required = spec.inputSchema["required"]?.jsonArray ?: error("required missing")
         assertTrue(required.any { it.jsonPrimitive.content == "query" })
+        val properties = spec.inputSchema.getValue("properties").jsonObject
+        assertEquals(
+            "5",
+            properties
+                .getValue("alternatives")
+                .jsonObject
+                .getValue("maxItems")
+                .jsonPrimitive.content,
+        )
+        assertEquals(
+            listOf("pdf", "doc", "image", "video", "audio", "archive"),
+            properties
+                .getValue("types")
+                .jsonObject
+                .getValue("items")
+                .jsonObject
+                .getValue("enum")
+                .jsonArray
+                .map { it.jsonPrimitive.content },
+        )
     }
 
     @Test
@@ -108,6 +140,90 @@ class FindFilesToolTest {
             val text = (result as ToolResult.Success).text
             assertTrue(text.contains("report.txt"))
             assertTrue(text.contains("sub/report.txt"))
+        }
+
+    @Test
+    fun `matches the requested filename without regard to case`() =
+        runTest {
+            val result = toolWith(dir("root", file("Математика_за_3_часа.pdf"))).execute(args("математика"), context)
+
+            assertTrue((result as ToolResult.Success).text.contains("Математика_за_3_часа.pdf"))
+        }
+
+    @Test
+    fun `matches all query words regardless of their order`() =
+        runTest {
+            val root = dir("root", file("Математика_за_3_часа.pdf"), file("Математика_за_2_часа.pdf"))
+
+            val result = toolWith(root).execute(args("за 3 часа математика"), context) as ToolResult.Success
+
+            assertTrue(result.text.contains("Математика_за_3_часа.pdf"))
+            assertFalse(result.text.contains("Математика_за_2_часа.pdf"))
+        }
+
+    @Test
+    fun `matches ё and е interchangeably`() =
+        runTest {
+            val first = toolWith(dir("root", file("елка.txt"))).execute(args("ёлка"), context) as ToolResult.Success
+            val second = toolWith(dir("root", file("ёлка.txt"))).execute(args("елка"), context) as ToolResult.Success
+
+            assertTrue(first.text.contains("елка.txt"))
+            assertTrue(second.text.contains("ёлка.txt"))
+        }
+
+    @Test
+    fun `alternatives use OR matching and do not duplicate a filename`() =
+        runTest {
+            val root = dir("root", file("шпаргалка_cheatsheet.pdf"), file("cheatsheet.docx"))
+
+            val result =
+                toolWith(root).execute(args("not-present", alternatives = listOf("шпаргалка", "cheatsheet")), context) as
+                    ToolResult.Success
+
+            assertEquals(1, result.text.lineSequence().count { it.startsWith("- шпаргалка_cheatsheet.pdf (") })
+            assertTrue(result.text.contains("cheatsheet.docx"))
+        }
+
+    @Test
+    fun `type filter uses extensions and MIME while excluding other types`() =
+        runTest {
+            val root =
+                dir(
+                    "root",
+                    file("report.pdf"),
+                    file("report-without-extension", mimeType = "application/pdf"),
+                    file("report.docx"),
+                )
+
+            val result = toolWith(root).execute(args("report", types = listOf("pdf")), context) as ToolResult.Success
+
+            assertTrue(result.text.contains("report.pdf"))
+            assertTrue(result.text.contains("report-without-extension"))
+            assertFalse(result.text.contains("report.docx"))
+        }
+
+    @Test
+    fun `unknown type is rejected with a useful argument error`() =
+        runTest {
+            val result =
+                toolWith(dir("root", file("report.pdf")))
+                    .execute(args("report", types = listOf("executable")), context)
+
+            assertTrue(result is ToolResult.Failed)
+            assertTrue((result as ToolResult.Failed).reason.contains("types"))
+        }
+
+    @Test
+    fun `empty results list attempted terms without exposing filenames or paths`() =
+        runTest {
+            val result =
+                toolWith(dir("root", file("private-file.pdf")))
+                    .execute(args("private-query", alternatives = listOf("private-alt")), context) as ToolResult.Success
+
+            assertTrue(result.text.contains("private-query"))
+            assertTrue(result.text.contains("private-alt"))
+            assertFalse(result.text.contains("private-file.pdf"))
+            assertFalse(result.text.contains("root/private-file.pdf"))
         }
 
     @Test

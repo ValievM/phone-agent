@@ -20,7 +20,7 @@ internal data class MediaStoreQueryResult(
 
 internal fun interface MediaStoreSearch {
     fun search(
-        query: String,
+        criteria: FileSearchCriteria,
         shouldContinue: () -> Boolean,
     ): MediaStoreQueryResult
 }
@@ -34,7 +34,7 @@ internal class AndroidMediaStoreSearch
         private val resolver: ContentResolver = context.contentResolver
 
         override fun search(
-            query: String,
+            criteria: FileSearchCriteria,
             shouldContinue: () -> Boolean,
         ): MediaStoreQueryResult {
             val records = mutableListOf<SearchFileMetadata>()
@@ -42,7 +42,7 @@ internal class AndroidMediaStoreSearch
             var inaccessible = false
             collections().forEach { collection ->
                 if (shouldContinue()) {
-                    val scan = scanCollection(collection, query, shouldContinue)
+                    val scan = scanCollection(collection, criteria, shouldContinue)
                     records += scan.records
                     truncated = truncated || scan.truncated
                     inaccessible = inaccessible || scan.inaccessible
@@ -55,11 +55,11 @@ internal class AndroidMediaStoreSearch
 
         private fun scanCollection(
             collection: CollectionKind,
-            query: String,
+            criteria: FileSearchCriteria,
             shouldContinue: () -> Boolean,
         ): MediaStoreQueryResult =
             try {
-                queryCollection(collection.uri, query)?.use { rows -> scanRows(rows, collection, shouldContinue) }
+                queryCollection(collection.uri)?.use { rows -> scanRows(rows, collection, criteria, shouldContinue) }
                     ?: MediaStoreQueryResult(emptyList(), truncated = false)
             } catch (_: SecurityException) {
                 // Android may deny individual MediaStore collections for the granted scope;
@@ -70,6 +70,7 @@ internal class AndroidMediaStoreSearch
         private fun scanRows(
             rows: Cursor,
             collection: CollectionKind,
+            criteria: FileSearchCriteria,
             shouldContinue: () -> Boolean,
         ): MediaStoreQueryResult {
             val columns = ColumnIndexes(rows)
@@ -80,7 +81,7 @@ internal class AndroidMediaStoreSearch
                     complete = false
                     break
                 }
-                rows.toMetadata(collection, columns)?.let(records::add)
+                rows.toMetadata(collection, columns)?.takeIf { criteria.matches(it.name, it.mimeType) }?.let(records::add)
             }
             return MediaStoreQueryResult(records, truncated = !complete)
         }
@@ -93,15 +94,12 @@ internal class AndroidMediaStoreSearch
                 }
             }
 
-        private fun queryCollection(
-            uri: Uri,
-            query: String,
-        ): Cursor? =
+        private fun queryCollection(uri: Uri): Cursor? =
             resolver.query(
                 uri,
                 projection(),
-                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? ESCAPE '\\'",
-                arrayOf("%${query.escapeLikeWildcards()}%"),
+                null,
+                null,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
             )
 
@@ -170,6 +168,4 @@ internal class AndroidMediaStoreSearch
                         }
                     }
         }
-
-        private fun String.escapeLikeWildcards(): String = replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     }

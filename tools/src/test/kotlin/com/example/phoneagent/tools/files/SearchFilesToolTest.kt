@@ -18,6 +18,8 @@ import com.example.phoneagent.domain.tools.ToolResult
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -50,7 +52,7 @@ class SearchFilesToolTest {
             val search =
                 object : MediaStoreSearch {
                     override fun search(
-                        query: String,
+                        criteria: FileSearchCriteria,
                         shouldContinue: () -> Boolean,
                     ): MediaStoreQueryResult = error("failed to read $secretUri")
                 }
@@ -95,6 +97,156 @@ class SearchFilesToolTest {
                     .jsonPrimitive.content,
             )
             assertEquals("false", root.getValue("truncated").jsonPrimitive.content)
+        }
+
+    @Test
+    fun `matches all filename words regardless of order`() =
+        runTest {
+            val hit = SearchFileMetadata("Математика_за_3_часа.pdf", "content://math", "Download/math.pdf", 42, 123, "application/pdf")
+            val search = RecordingMediaStoreSearch(records = listOf(hit))
+
+            val result =
+                tool(FakeUserInteraction(), search)
+                    .execute(args("за 3 часа математика"), context()) as ToolResult.Success
+            val items =
+                Json
+                    .parseToJsonElement(result.text)
+                    .jsonObject
+                    .getValue("items")
+                    .jsonArray
+
+            assertEquals(
+                listOf("Математика_за_3_часа.pdf"),
+                items.map {
+                    it.jsonObject
+                        .getValue("name")
+                        .jsonPrimitive.content
+                },
+            )
+        }
+
+    @Test
+    fun `matches ё and е interchangeably`() =
+        runTest {
+            val hit = SearchFileMetadata("елка.txt", "content://tree", "Download/tree.txt", 42, 123, "text/plain")
+            val search = RecordingMediaStoreSearch(records = listOf(hit))
+
+            val result = tool(FakeUserInteraction(), search).execute(args("ёлка"), context()) as ToolResult.Success
+
+            assertEquals(
+                listOf("елка.txt"),
+                Json
+                    .parseToJsonElement(result.text)
+                    .jsonObject
+                    .getValue("items")
+                    .jsonArray
+                    .map {
+                        it.jsonObject
+                            .getValue("name")
+                            .jsonPrimitive.content
+                    },
+            )
+        }
+
+    @Test
+    fun `alternatives use OR matching and deduplicate matching media records`() =
+        runTest {
+            val duplicate =
+                SearchFileMetadata("шпаргалка_cheatsheet.pdf", "content://same", "Download/same.pdf", 42, 123, "application/pdf")
+            val other = SearchFileMetadata("cheatsheet.docx", "content://other", "Download/other.docx", 24, 120, "application/docx")
+            val search = RecordingMediaStoreSearch(records = listOf(duplicate, duplicate, other))
+
+            val result =
+                tool(FakeUserInteraction(), search)
+                    .execute(args("not-present", alternatives = listOf("шпаргалка", "cheatsheet")), context()) as
+                    ToolResult.Success
+            val items =
+                Json
+                    .parseToJsonElement(result.text)
+                    .jsonObject
+                    .getValue("items")
+                    .jsonArray
+
+            assertEquals(
+                listOf("шпаргалка_cheatsheet.pdf", "cheatsheet.docx"),
+                items.map {
+                    it.jsonObject
+                        .getValue("name")
+                        .jsonPrimitive.content
+                },
+            )
+        }
+
+    @Test
+    fun `pdf type filter excludes docx results`() =
+        runTest {
+            val pdf = SearchFileMetadata("report.pdf", "content://pdf", "Download/report.pdf", 42, 123, "application/pdf")
+            val docx =
+                SearchFileMetadata(
+                    "report.docx",
+                    "content://docx",
+                    "Download/report.docx",
+                    24,
+                    120,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            val search = RecordingMediaStoreSearch(records = listOf(pdf, docx))
+
+            val result =
+                tool(FakeUserInteraction(), search).execute(args("report", types = listOf("pdf")), context()) as
+                    ToolResult.Success
+            val items =
+                Json
+                    .parseToJsonElement(result.text)
+                    .jsonObject
+                    .getValue("items")
+                    .jsonArray
+
+            assertEquals(
+                listOf("report.pdf"),
+                items.map {
+                    it.jsonObject
+                        .getValue("name")
+                        .jsonPrimitive.content
+                },
+            )
+        }
+
+    @Test
+    fun `unknown file type fails before requesting permission`() =
+        runTest {
+            val interaction = FakeUserInteraction()
+            val search =
+                RecordingMediaStoreSearch(
+                    records = listOf(SearchFileMetadata("report.pdf", "content://report", "", 1, 1, null)),
+                )
+
+            val result =
+                tool(interaction, search).execute(args("report", types = listOf("executable")), context())
+
+            assertTrue(result is ToolResult.Failed)
+            assertTrue((result as ToolResult.Failed).reason.contains("types"))
+            assertTrue(interaction.capabilityRequests.isEmpty())
+            assertFalse(search.called)
+        }
+
+    @Test
+    fun `empty results report attempted terms without exposing file metadata`() =
+        runTest {
+            val result =
+                tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+                    .execute(args("private-query", alternatives = listOf("private-alt")), context()) as
+                    ToolResult.Success
+            val root = Json.parseToJsonElement(result.text).jsonObject
+
+            assertTrue(root.containsKey("attempted"))
+            assertEquals(
+                listOf("private-query", "private-alt"),
+                root.getValue("attempted").jsonArray.map { it.jsonPrimitive.content },
+            )
+            assertFalse(root.containsKey("name"))
+            assertFalse(root.containsKey("path"))
+            assertFalse(result.text.contains("private-file.pdf"))
         }
 
     @Test
@@ -216,13 +368,71 @@ class SearchFilesToolTest {
     }
 
     @Test
+    fun `schema advertises alternatives and closed file types`() {
+        val tool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+        val properties =
+            tool.spec.inputSchema
+                .getValue("properties")
+                .jsonObject
+        val alternatives = properties.getValue("alternatives").jsonObject
+        val types = properties.getValue("types").jsonObject
+
+        assertEquals("array", alternatives.getValue("type").jsonPrimitive.content)
+        assertEquals("5", alternatives.getValue("maxItems").jsonPrimitive.content)
+        assertEquals(
+            listOf("pdf", "doc", "image", "video", "audio", "archive"),
+            types
+                .getValue("items")
+                .jsonObject
+                .getValue("enum")
+                .jsonArray
+                .map { it.jsonPrimitive.content },
+        )
+        assertTrue(tool.spec.description.contains("synonyms"))
+        assertTrue(tool.spec.description.contains("transliteration"))
+        assertTrue(tool.spec.description.contains("English"))
+    }
+
+    @Test
+    fun `more than five alternatives fails without querying`() =
+        runTest {
+            val interaction = FakeUserInteraction()
+            val search = RecordingMediaStoreSearch()
+
+            val result =
+                tool(interaction, search)
+                    .execute(args("report", alternatives = (1..6).map { "term$it" }), context())
+
+            assertTrue(result is ToolResult.Failed)
+            assertFalse(search.called)
+            assertTrue(interaction.capabilityRequests.isEmpty())
+        }
+
+    @Test
+    fun `empty result attempted terms stay within the serialized output budget`() =
+        runTest {
+            val query = "界".repeat(SearchFilesArgs.MAX_QUERY_LENGTH)
+            val alternatives =
+                (1..5).map { "界".repeat(SearchFilesArgs.MAX_QUERY_LENGTH - 1) + ('a' + it) }
+            val result =
+                tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+                    .execute(args(query, alternatives), context()) as ToolResult.Success
+
+            assertTrue(result.text.toByteArray(Charsets.UTF_8).size <= SearchFilesLimits.MAX_OUTPUT_BYTES)
+            val output = Json.parseToJsonElement(result.text).jsonObject
+            assertTrue(output.containsKey("attempted"))
+            assertEquals(6, output.getValue("attempted").jsonArray.size)
+            assertEquals("true", output.getValue("attemptsTruncated").jsonPrimitive.content)
+        }
+
+    @Test
     fun `the media query runs on the dispatcher provided by the port`() =
         runTest {
             val seenThreads = mutableListOf<String>()
             val search =
                 object : MediaStoreSearch {
                     override fun search(
-                        query: String,
+                        criteria: FileSearchCriteria,
                         shouldContinue: () -> Boolean,
                     ): MediaStoreQueryResult {
                         seenThreads += Thread.currentThread().name
@@ -251,7 +461,15 @@ class SearchFilesToolTest {
         search: MediaStoreSearch,
     ) = SearchFilesTool(interaction, search)
 
-    private fun args(query: String) = buildJsonObject { put("query", query) }
+    private fun args(
+        query: String,
+        alternatives: List<String> = emptyList(),
+        types: List<String> = emptyList(),
+    ) = buildJsonObject {
+        put("query", query)
+        if (alternatives.isNotEmpty()) put("alternatives", JsonArray(alternatives.map { JsonPrimitive(it) }))
+        if (types.isNotEmpty()) put("types", JsonArray(types.map { JsonPrimitive(it) }))
+    }
 
     private fun context(clock: FakeClock = FakeClock()) = ToolContext(clock, FakeAppLogger())
 }
@@ -263,11 +481,14 @@ private class RecordingMediaStoreSearch(
     var query: String? = null
 
     override fun search(
-        query: String,
+        criteria: FileSearchCriteria,
         shouldContinue: () -> Boolean,
     ): MediaStoreQueryResult {
         called = true
-        this.query = query
-        return MediaStoreQueryResult(records, truncated = !shouldContinue())
+        this.query = criteria.query
+        return MediaStoreQueryResult(
+            records.filter { criteria.matches(it.name, it.mimeType) },
+            truncated = !shouldContinue(),
+        )
     }
 }

@@ -34,8 +34,8 @@ internal data class WalkLimits(
  * Breadth-first search by document name inside the user-selected folder, enforcing the hard
  * [WalkLimits]: the walk never leaves the subtree rooted at [root], never reads file contents,
  * and stops early on the depth / visited-node / time / result-count limits, reporting which
- * limits were hit so callers can explain truncation. Names are matched as plain substrings
- * only: they are untrusted data and are never interpreted as instructions.
+ * limits were hit so callers can explain truncation. [FileSearchCriteria] performs normalized
+ * word-substring matching; untrusted names are never interpreted as instructions.
  */
 internal class SafTreeWalker(
     private val clock: Clock,
@@ -44,13 +44,19 @@ internal class SafTreeWalker(
         root: DocumentNode,
         query: String,
         limits: WalkLimits = WalkLimits(),
+    ): WalkResult = search(root, FileSearchCriteria(query), limits)
+
+    fun search(
+        root: DocumentNode,
+        criteria: FileSearchCriteria,
+        limits: WalkLimits = WalkLimits(),
     ): WalkResult {
         val state = WalkState(limits)
         state.start(clock)
         val queue = ArrayDeque<Frame>()
         queue.addLast(Frame(root, depth = 0, parentPath = ""))
         while (state.stopReason == null && queue.isNotEmpty() && !state.timeBudgetExceeded(clock)) {
-            state.visit(queue.removeFirst(), query, queue)
+            state.visit(queue.removeFirst(), criteria, queue)
         }
         return state.finish(
             timeExceededNow = state.timeBudgetExceeded(clock),
@@ -84,13 +90,13 @@ internal class SafTreeWalker(
 
         fun visit(
             frame: Frame,
-            query: String,
+            criteria: FileSearchCriteria,
             queue: ArrayDeque<Frame>,
         ) {
             val (node, depth, parentPath) = frame
             visitedNodes++
             val path = joinPath(parentPath, node.name)
-            if (depth > 0 && node.name.contains(query, ignoreCase = true)) {
+            if (depth > 0 && criteria.matches(node.name, node.mimeType, node.isDirectory)) {
                 matches += FoundFile(name = node.name, relativePath = path)
                 if (matches.size >= limits.maxResults) stopReason = WalkLimit.RESULTS
             }

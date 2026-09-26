@@ -16,6 +16,7 @@ internal class SafDocumentNode(
     private val treeUri: Uri,
     private val documentId: String,
     override val name: String,
+    override val mimeType: String?,
     override val isDirectory: Boolean,
 ) : DocumentNode {
     override fun children(): List<DocumentNode> {
@@ -69,6 +70,7 @@ private fun Cursor.readChildren(
         while (moveToNext()) {
             val childId = getString(0)
             val childName = getString(1)
+            val childMimeType = getString(2)
             if (childId != null && childName != null) {
                 add(
                     SafDocumentNode(
@@ -76,7 +78,8 @@ private fun Cursor.readChildren(
                         treeUri = treeUri,
                         documentId = childId,
                         name = childName,
-                        isDirectory = getString(2) == DocumentsContract.Document.MIME_TYPE_DIR,
+                        mimeType = childMimeType,
+                        isDirectory = childMimeType == DocumentsContract.Document.MIME_TYPE_DIR,
                     ),
                 )
             }
@@ -89,12 +92,14 @@ private fun Cursor.readRoot(
     rootId: String,
 ): SafDocumentNode? =
     if (moveToFirst()) {
+        val mimeType = getString(2)
         SafDocumentNode(
             resolver = resolver,
             treeUri = treeUri,
             documentId = rootId,
             name = getString(1) ?: "",
-            isDirectory = getString(2) == DocumentsContract.Document.MIME_TYPE_DIR,
+            mimeType = mimeType,
+            isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR,
         )
     } else {
         null

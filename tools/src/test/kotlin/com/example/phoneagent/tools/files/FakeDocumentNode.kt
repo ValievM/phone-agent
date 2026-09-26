@@ -10,6 +10,7 @@ internal open class FakeDocumentNode(
     override val isDirectory: Boolean = false,
     private val childNodes: List<FakeDocumentNode> = emptyList(),
     private val childrenError: RuntimeException? = null,
+    override val mimeType: String? = null,
 ) : DocumentNode {
     var childrenCalls: Int = 0
         private set
@@ -26,4 +27,7 @@ internal fun dir(
     vararg children: FakeDocumentNode,
 ): FakeDocumentNode = FakeDocumentNode(name, isDirectory = true, childNodes = children.toList())
 
-internal fun file(name: String): FakeDocumentNode = FakeDocumentNode(name)
+internal fun file(
+    name: String,
+    mimeType: String? = null,
+): FakeDocumentNode = FakeDocumentNode(name, mimeType = mimeType)

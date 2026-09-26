@@ -49,6 +49,39 @@ internal class FindFilesTool
                                     buildJsonObject {
                                         put("type", "string")
                                         put("description", FindFilesCopy.QUERY_SCHEMA_DESCRIPTION)
+                                        put("minLength", 1)
+                                        put("maxLength", FindFilesArgs.MAX_QUERY_LENGTH)
+                                    },
+                                )
+                                put(
+                                    "alternatives",
+                                    buildJsonObject {
+                                        put("type", "array")
+                                        put("description", FindFilesCopy.ALTERNATIVES_SCHEMA_DESCRIPTION)
+                                        put("maxItems", FILE_SEARCH_MAX_ALTERNATIVES)
+                                        put(
+                                            "items",
+                                            buildJsonObject {
+                                                put("type", "string")
+                                                put("minLength", 1)
+                                                put("maxLength", FindFilesArgs.MAX_QUERY_LENGTH)
+                                            },
+                                        )
+                                    },
+                                )
+                                put(
+                                    "types",
+                                    buildJsonObject {
+                                        put("type", "array")
+                                        put("description", FindFilesCopy.TYPES_SCHEMA_DESCRIPTION)
+                                        put("maxItems", SearchFileType.arguments.size)
+                                        put(
+                                            "items",
+                                            buildJsonObject {
+                                                put("type", "string")
+                                                put("enum", JsonArray(SearchFileType.arguments.map(::JsonPrimitive)))
+                                            },
+                                        )
                                     },
                                 )
                             },
@@ -82,7 +115,7 @@ internal class FindFilesTool
                     // both the folder lookup and the walk must leave the caller's dispatcher.
                     when (val root = withContext(dispatchers.io) { selectedFolder.root() }) {
                         null -> ToolResult.Failed(FindFilesCopy.REASON_NOT_SELECTED)
-                        else -> searchSafely(root, parsed.query, context)
+                        else -> searchSafely(root, parsed.criteria, context)
                     }
                 }
             }
@@ -90,15 +123,15 @@ internal class FindFilesTool
 
         private suspend fun searchSafely(
             root: DocumentNode,
-            query: String,
+            criteria: FileSearchCriteria,
             context: ToolContext,
         ): ToolResult =
             try {
                 val result =
                     withContext(dispatchers.io) {
-                        SafTreeWalker(context.clock).search(root, query)
+                        SafTreeWalker(context.clock).search(root, criteria)
                     }
-                ToolResult.Success(result.toModelText())
+                ToolResult.Success(result.toModelText(criteria.attemptedQueries))
             } catch (cancellation: CancellationException) {
                 // A Stop during the walk must stay a cancellation, not become a failure report.
                 throw cancellation
@@ -121,7 +154,7 @@ internal class FindFilesTool
 
 private sealed interface ParsedArgs {
     data class Valid(
-        val query: String,
+        val criteria: FileSearchCriteria,
     ) : ParsedArgs
 
     data class Invalid(
@@ -132,17 +165,18 @@ private sealed interface ParsedArgs {
 private fun parseArgs(args: JsonObject): ParsedArgs =
     try {
         val parsed = json.decodeFromJsonElement(FindFilesArgs.serializer(), args)
+        val criteria = parsed.criteria()
         parsed
             .validationError()
-            ?.let { ParsedArgs.Invalid(FindFilesCopy.invalidArguments(it)) }
-            ?: ParsedArgs.Valid(parsed.query)
+            ?.let { ParsedArgs.Invalid(FindFilesCopy.validationError(it)) }
+            ?: ParsedArgs.Valid(criteria)
     } catch (expected: SerializationException) {
         ParsedArgs.Invalid(FindFilesCopy.invalidArguments(expected.message))
     }
 
-private fun WalkResult.toModelText(): String =
+private fun WalkResult.toModelText(attempts: List<String>): String =
     if (matches.isEmpty()) {
-        FindFilesCopy.NO_MATCHES
+        FindFilesCopy.noMatches(attempts)
     } else {
         buildString {
             appendLine(FindFilesCopy.matchesFoundHeader(matches.size))
