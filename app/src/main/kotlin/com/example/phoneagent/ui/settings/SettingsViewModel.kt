@@ -7,6 +7,8 @@ import com.example.phoneagent.auth.AuthCoordinator
 import com.example.phoneagent.auth.toAppSignInMethod
 import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelCatalogResult
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
@@ -30,6 +32,7 @@ class SettingsViewModel
         private val settingsRepository: SettingsRepository,
         private val modelCatalog: ModelCatalog,
         private val conversationRepository: ConversationRepository,
+        private val logger: AppLogger,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(SettingsUiState())
         private val settingsMutex = Mutex()
@@ -71,7 +74,13 @@ class SettingsViewModel
                     }
                 } catch (exception: CancellationException) {
                     throw exception
-                } catch (_: Exception) {
+                } catch (exception: Exception) {
+                    logger.warn(
+                        TAG,
+                        "load settings failed",
+                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                        throwable = exception,
+                    )
                     mutableState.update { it.copy(isLoading = false, settingsUnavailable = true, settingsLoadFailed = true) }
                 }
             }
@@ -115,7 +124,13 @@ class SettingsViewModel
                     authCoordinator.signOut()
                 } catch (exception: CancellationException) {
                     throw exception
-                } catch (_: Exception) {
+                } catch (exception: Exception) {
+                    logger.warn(
+                        TAG,
+                        "sign out failed",
+                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                        throwable = exception,
+                    )
                     mutableState.update { it.copy(settingsUnavailable = true) }
                 }
             }
@@ -155,7 +170,13 @@ class SettingsViewModel
                         }
                     } catch (exception: CancellationException) {
                         throw exception
-                    } catch (_: Exception) {
+                    } catch (exception: Exception) {
+                        logger.warn(
+                            TAG,
+                            "save settings failed",
+                            fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                            throwable = exception,
+                        )
                         mutableState.update(onFailure)
                     }
                 }
@@ -169,7 +190,13 @@ class SettingsViewModel
                     mutableState.update { it.copy(historyClearUnavailable = false) }
                 } catch (exception: CancellationException) {
                     throw exception
-                } catch (_: Exception) {
+                } catch (exception: Exception) {
+                    logger.warn(
+                        TAG,
+                        "clear conversation history failed",
+                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                        throwable = exception,
+                    )
                     mutableState.update { it.copy(historyClearUnavailable = true) }
                 }
             }
@@ -180,7 +207,13 @@ class SettingsViewModel
                 modelCatalog.load()
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "load model catalog failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
                 ModelCatalogResult.Unavailable
             }
 
@@ -202,4 +235,8 @@ class SettingsViewModel
                     copy(isSignedIn = true, sessionExpired = false, signInMethod = status.method.toAppSignInMethod())
                 }
             }
+
+        private companion object {
+            const val TAG = "SettingsViewModel"
+        }
     }

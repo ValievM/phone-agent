@@ -7,6 +7,9 @@ import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.LogLevel
+import com.example.phoneagent.domain.platform.RedactingAppLogger
+import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
@@ -41,7 +44,7 @@ class SearchFilesToolTest {
         }
 
     @Test
-    fun `a provider failure never echoes the provider exception text to the model`() =
+    fun `provider failure logs safely and never echoes exception text to the model`() =
         runTest {
             val secretUri = "content://secret/path"
             val search =
@@ -51,11 +54,21 @@ class SearchFilesToolTest {
                         shouldContinue: () -> Boolean,
                     ): MediaStoreQueryResult = error("failed to read $secretUri")
                 }
+            val records = FakeAppLogger()
+            val toolContext = ToolContext(FakeClock(), RedactingAppLogger(records))
 
-            val result = tool(FakeUserInteraction(), search).execute(args("report"), context())
+            val result = tool(FakeUserInteraction(), search).execute(args("report"), toolContext)
 
             assertTrue(result is ToolResult.Failed)
             assertFalse((result as ToolResult.Failed).reason.contains(secretUri))
+            assertEquals(1, records.events.size)
+            val event = records.events.single()
+            assertEquals(LogLevel.WARN, event.level)
+            assertEquals("SearchFilesTool", event.tag)
+            assertEquals("search files failed", event.message)
+            assertEquals("IllegalStateException", event.fields["exceptionType"])
+            assertTrue(event.throwable is SanitizedThrowable)
+            assertFalse(event.toString().contains(secretUri))
         }
 
     @Test

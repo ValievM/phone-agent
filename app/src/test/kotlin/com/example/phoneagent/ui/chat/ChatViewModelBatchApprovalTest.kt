@@ -115,7 +115,7 @@ class ChatViewModelBatchApprovalTest {
                 contextWindowPolicy = ContextWindowPolicy { it },
                 idGenerator = FakeIdGenerator(),
             )
-        return ChatViewModel(loop, FakeConversationRepository())
+        return ChatViewModel(loop, FakeConversationRepository(), logger = FakeAppLogger())
     }
 
     private class GatedInteraction(

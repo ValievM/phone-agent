@@ -199,7 +199,7 @@ class ChatViewModelRetryTest {
         runTest(dispatcher.scheduler) {
             val repository = RetryFakeRepository()
             val gateway = FailThenHangGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
             assertEquals(1, repository.load().size)
@@ -225,7 +225,7 @@ class ChatViewModelRetryTest {
     private fun viewModelWith(vararg responses: List<ModelEvent>): Triple<ChatViewModel, FakeModelGateway, RetryFakeRepository> {
         val gateway = FakeModelGateway().apply { responses.forEach(responseQueue::addLast) }
         val repository = RetryFakeRepository()
-        return Triple(ChatViewModel(agentLoop(gateway), repository), gateway, repository)
+        return Triple(ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger()), gateway, repository)
     }
 
     private fun agentLoop(gateway: ModelGateway): AgentLoop =

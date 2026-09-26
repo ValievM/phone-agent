@@ -4,8 +4,10 @@ import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
 import com.example.phoneagent.domain.model.ModelCatalog
 import com.example.phoneagent.domain.model.ModelCatalogResult
+import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.warn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -22,6 +24,7 @@ public class OkHttpModelCatalog(
     private val profile: BackendProfile,
     private val credentialsProvider: CredentialsProvider,
     private val clientVersion: String,
+    private val logger: AppLogger,
     private val client: OkHttpClient = OkHttpClient(),
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : ModelCatalog {
@@ -58,7 +61,13 @@ public class OkHttpModelCatalog(
             }
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            logger.warn(
+                TAG,
+                "load model catalog failed",
+                fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                throwable = exception,
+            )
             ModelCatalogResult.Unavailable
         }
 
@@ -82,6 +91,7 @@ public class OkHttpModelCatalog(
             ?.takeIf(String::isNotBlank)
 
     private companion object {
+        private const val TAG = "ModelCatalog"
         private const val MODELS_PATH = "models"
         private const val CLIENT_VERSION_PARAMETER = "client_version"
         private const val MODELS_FIELD = "models"

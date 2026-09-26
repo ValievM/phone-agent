@@ -38,6 +38,7 @@ internal object ModelModule {
         profile: BackendProfile,
         credentialsProvider: CredentialsProvider,
         dispatchers: DispatcherProvider,
+        logger: AppLogger,
         @ApplicationContext context: Context,
     ): ModelCatalog =
         OkHttpModelCatalog(
@@ -49,6 +50,7 @@ internal object ModelModule {
                     .versionName
                     .orEmpty(),
             dispatchers = dispatchers,
+            logger = logger,
         )
 
     @Provides

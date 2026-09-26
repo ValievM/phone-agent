@@ -3,14 +3,20 @@ package com.example.phoneagent.data.llm
 import com.example.phoneagent.domain.auth.Credentials
 import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.auth.CredentialsResult
+import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
 import com.example.phoneagent.domain.model.ModelCatalogResult
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.LogLevel
+import com.example.phoneagent.domain.platform.RedactingAppLogger
+import com.example.phoneagent.domain.platform.SanitizedThrowable
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.Executors
@@ -28,7 +34,7 @@ class OkHttpModelCatalogTest {
         }
 
     @Test
-    fun `returns unavailable when models response is malformed`() =
+    fun `malformed model response logs a safe warning`() =
         runTest {
             MockWebServer().use { server ->
                 server.start()
@@ -39,8 +45,18 @@ class OkHttpModelCatalogTest {
                         .body("not-json")
                         .build(),
                 )
+                val records = FakeAppLogger()
 
-                assertEquals(ModelCatalogResult.Unavailable, catalog(server).load())
+                assertEquals(ModelCatalogResult.Unavailable, catalog(server, RedactingAppLogger(records)).load())
+
+                assertEquals(1, records.events.size)
+                val event = records.events.single()
+                assertEquals(LogLevel.WARN, event.level)
+                assertEquals("ModelCatalog", event.tag)
+                assertEquals("load model catalog failed", event.message)
+                assertEquals("IllegalArgumentException", event.fields["exceptionType"])
+                assertTrue(event.throwable is SanitizedThrowable)
+                assertFalse(event.toString().contains("not-json"))
             }
         }
 
@@ -128,6 +144,7 @@ class OkHttpModelCatalogTest {
                             clientVersion = "test-version",
                             client = client,
                             dispatchers = FakeDispatcherProvider(main = io, io = io, default = io),
+                            logger = FakeAppLogger(),
                         ).load()
 
                     assertTrue(result is ModelCatalogResult.Available)
@@ -141,11 +158,15 @@ class OkHttpModelCatalogTest {
             )
         }
 
-    private fun catalog(server: MockWebServer): OkHttpModelCatalog =
+    private fun catalog(
+        server: MockWebServer,
+        logger: AppLogger = FakeAppLogger(),
+    ): OkHttpModelCatalog =
         OkHttpModelCatalog(
             profile = BackendProfile(server.url("/api").toString().removeSuffix("/")),
             credentialsProvider = readyCredentials(),
             clientVersion = "test-version",
             client = OkHttpClient(),
+            logger = logger,
         )
 }

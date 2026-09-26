@@ -15,8 +15,10 @@ import com.example.phoneagent.domain.conversation.TurnEvent
 import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.conversation.transitionTurn
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
@@ -39,8 +41,8 @@ class ChatViewModel
     constructor(
         private val agentLoop: AgentLoop,
         private val conversationRepository: ConversationRepository,
-        // Default only keeps the dozens of existing test constructions unchanged; DI always passes
-        // the bound generator (see AgentModule).
+        private val logger: AppLogger,
+        // The default keeps tests focused on the input they exercise; DI always passes the bound generator.
         private val idGenerator: IdGenerator = RandomIdGenerator,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
@@ -117,6 +119,12 @@ class ChatViewModel
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Exception) {
+                    logger.warn(
+                        TAG,
+                        "conversation history load failed",
+                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                        throwable = exception,
+                    )
                     mutableState.update {
                         it.copy(
                             historySync =
@@ -243,7 +251,13 @@ class ChatViewModel
             } catch (exception: CancellationException) {
                 pendingOwnEmissions.remove(items)
                 throw exception
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "conversation history save failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
                 pendingOwnEmissions.remove(items)
                 saveFailed = true
                 mutableState.update { it.copy(historySync = HistorySyncState.Failed(StorageOperation.SAVE)) }
@@ -281,6 +295,12 @@ class ChatViewModel
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "agent turn failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
                 // A bug in the loop, a gateway or a tool must not take the app down: keep the
                 // question in history and offer a retry of the whole turn.
                 if (currentTurn === turnToken) {
@@ -420,4 +440,8 @@ class ChatViewModel
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
+
+        private companion object {
+            const val TAG = "ChatViewModel"
+        }
     }
