@@ -37,6 +37,7 @@ data class SettingsUiState(
     val modelCatalogUnavailable: Boolean = false,
     val isLoadingModels: Boolean = true,
     val searchFolderSelected: Boolean = false,
+    val searchFolderUri: String? = null,
     val folderPermissionUnavailable: Boolean = false,
     val historyClearUnavailable: Boolean = false,
     val settingsUnavailable: Boolean = false,

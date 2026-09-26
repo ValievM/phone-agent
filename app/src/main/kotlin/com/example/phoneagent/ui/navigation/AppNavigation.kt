@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.ui.defaultPopTransitionSpec
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.ui.about.AboutRoute
 import com.example.phoneagent.ui.chat.ChatRoute
 import com.example.phoneagent.ui.settings.SettingsRoute
@@ -20,7 +21,10 @@ sealed interface AppDestination {
 }
 
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
+fun AppNavigation(
+    dispatcherProvider: DispatcherProvider,
+    modifier: Modifier = Modifier,
+) {
     AppNavigationHost(
         modifier = modifier,
         chatContent = { onOpenSettings -> ChatRoute(onOpenSettings = onOpenSettings) },
@@ -28,6 +32,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             SettingsRoute(
                 onBack = onBack,
                 onOpenAbout = onOpenAbout,
+                dispatcherProvider = dispatcherProvider,
             )
         },
         aboutContent = { onBack -> AboutRoute(onBack = onBack) },

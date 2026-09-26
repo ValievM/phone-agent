@@ -14,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import com.example.phoneagent.ui.designsystem.theme.resolveTheme
@@ -31,6 +32,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var userInteractionBridge: UserInteractionBridge
+
+    @Inject
+    lateinit var dispatcherProvider: DispatcherProvider
 
     private val themeViewModel: ThemeViewModel by viewModels()
 
@@ -63,7 +67,7 @@ class MainActivity : ComponentActivity() {
             }
             AppTheme(darkTheme = theme.dark, useDynamicColor = theme.dynamicColor) {
                 ThemedRoot(state = themeState, onRetry = themeViewModel::retry) {
-                    LoginRoute(authenticatedContent = { AppNavigation() })
+                    LoginRoute(authenticatedContent = { AppNavigation(dispatcherProvider = dispatcherProvider) })
                     InteractionHost(bridge = userInteractionBridge)
                 }
             }
