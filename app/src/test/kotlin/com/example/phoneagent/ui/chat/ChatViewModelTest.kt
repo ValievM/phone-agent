@@ -424,7 +424,6 @@ class ChatViewModelTest {
             assertEquals(ToolCallStatus.HandedOff("Часы"), status)
         }
 
-
     @Test
     fun `structured file content renders without knowing the tool name`() =
         runTest(dispatcher.scheduler) {

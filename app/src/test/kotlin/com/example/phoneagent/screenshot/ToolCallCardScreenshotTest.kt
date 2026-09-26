@@ -2,9 +2,9 @@ package com.example.phoneagent.screenshot
 
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.components.ToolCallCard
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
-import com.example.phoneagent.domain.tools.CallDescription
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Rule

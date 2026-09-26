@@ -2,9 +2,11 @@ package com.example.phoneagent.ui.designsystem.components
 
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
@@ -19,6 +21,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
@@ -42,85 +45,111 @@ class ToolCallCardStatusUiTest {
     @Test
     fun `every status shows its words icon and role colors in both themes at 320dp`() {
         val cases = statusCases(context)
-        var currentCase by mutableStateOf(cases.first())
-        var darkTheme by mutableStateOf(false)
-        var fontScale by mutableStateOf(1f)
-        var densityScale = 1f
-        var actualContainer = Color.Unspecified
-        var actualContent = Color.Unspecified
-        var expectedContainer = Color.Unspecified
-        var expectedContent = Color.Unspecified
+        val state = StatusTestState(cases.first())
         composeRule.mainClock.autoAdvance = false
+        composeRule.setContent { StatusTestContent(state) }
 
-        composeRule.setContent {
-            val deviceDensity = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(deviceDensity.density, fontScale)) {
-                AppTheme(darkTheme = darkTheme, useDynamicColor = false) {
-                    val colorScheme = MaterialTheme.colorScheme
-                    val extended = AppTheme.extendedColors
-                    val expectedLook =
-                        when (currentCase.role) {
-                            StatusColorRole.Warning -> extended.warningContainer to extended.onWarningContainer
-                            StatusColorRole.Primary -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
-                            StatusColorRole.Success -> extended.successContainer to extended.onSuccessContainer
-                            StatusColorRole.Error -> colorScheme.errorContainer to colorScheme.onErrorContainer
-                            StatusColorRole.Neutral -> Color.Transparent to colorScheme.onSurfaceVariant
-                        }
-                    val actualLook = currentCase.status.look()
-                    val density = LocalDensity.current
-                    SideEffect {
-                        expectedContainer = expectedLook.first
-                        expectedContent = expectedLook.second
-                        actualContainer = actualLook.container
-                        actualContent = actualLook.content
-                        densityScale = density.density
+        val configurations =
+            listOf(
+                StatusTestConfiguration(darkTheme = false, fontScale = 1f),
+                StatusTestConfiguration(darkTheme = false, fontScale = 2f),
+                StatusTestConfiguration(darkTheme = true, fontScale = 1f),
+                StatusTestConfiguration(darkTheme = true, fontScale = 2f),
+            )
+        for (configuration in configurations) {
+            verifyStatusCases(cases, state, configuration)
+        }
+    }
+
+    private fun verifyStatusCases(
+        cases: List<StatusCase>,
+        state: StatusTestState,
+        configuration: StatusTestConfiguration,
+    ) {
+        for (case in cases) {
+            composeRule.runOnIdle {
+                state.currentCase = case
+                state.darkTheme = configuration.darkTheme
+                state.fontScale = configuration.fontScale
+            }
+            composeRule.waitForIdle()
+            composeRule.mainClock.advanceTimeBy(400)
+            composeRule.waitForIdle()
+            assertStatusCase(case, state)
+        }
+    }
+
+    private fun assertStatusCase(
+        case: StatusCase,
+        state: StatusTestState,
+    ) {
+        composeRule.onNodeWithText(case.label).assertIsDisplayed()
+        val announcement = composeRule.onNodeWithText(case.label).fetchSemanticsNode().config
+        assertFalse("The decorative icon must not add a content description", announcement.contains(SemanticsProperties.ContentDescription))
+
+        val statusNode = composeRule.onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true)
+        val statusBounds = statusNode.fetchSemanticsNode().boundsInRoot
+        assertTrue("${case.label} starts outside the 320dp viewport: $statusBounds", statusBounds.left >= 0f)
+        assertTrue(
+            "${case.label} exceeds the 320dp viewport: $statusBounds",
+            statusBounds.right <= 320f * state.densityScale + 1f,
+        )
+
+        composeRule.onNodeWithTag(TOOL_CALL_STATUS_ICON_TEST_TAG, useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(
+            "${case.label} has the wrong container role in dark=${state.darkTheme}",
+            state.expectedContainer,
+            state.actualContainer,
+        )
+        assertEquals(
+            "${case.label} has the wrong content role in dark=${state.darkTheme}",
+            state.expectedContent,
+            state.actualContent,
+        )
+    }
+
+    @Composable
+    private fun StatusTestContent(state: StatusTestState) {
+        val deviceDensity = LocalDensity.current
+        CompositionLocalProvider(LocalDensity provides Density(deviceDensity.density, state.fontScale)) {
+            AppTheme(darkTheme = state.darkTheme, useDynamicColor = false) {
+                val colorScheme = MaterialTheme.colorScheme
+                val extended = AppTheme.extendedColors
+                val expectedLook =
+                    when (state.currentCase.role) {
+                        StatusColorRole.Warning -> extended.warningContainer to extended.onWarningContainer
+                        StatusColorRole.Primary -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
+                        StatusColorRole.Success -> extended.successContainer to extended.onSuccessContainer
+                        StatusColorRole.Error -> colorScheme.errorContainer to colorScheme.onErrorContainer
+                        StatusColorRole.Neutral -> Color.Transparent to colorScheme.onSurfaceVariant
                     }
-                    ToolCallCard(
-                        state = currentCase.status,
-                        description = CallDescription(title = "", summary = ""),
-                        arguments = buildJsonObject {},
-                        expanded = false,
-                        onExpandToggle = {},
-                    )
+                val actualLook = state.currentCase.status.look()
+                val density = LocalDensity.current
+                SideEffect {
+                    state.expectedContainer = expectedLook.first
+                    state.expectedContent = expectedLook.second
+                    state.actualContainer = actualLook.container
+                    state.actualContent = actualLook.content
+                    state.densityScale = density.density
                 }
+                ToolCallCard(
+                    state = state.currentCase.status,
+                    description = CallDescription(title = "", summary = ""),
+                    arguments = buildJsonObject {},
+                    expanded = false,
+                    onExpandToggle = {},
+                )
             }
         }
+    }
 
-        for (dark in listOf(false, true)) {
-            for (scale in listOf(1f, 2f)) {
-                for (case in cases) {
-                    composeRule.runOnIdle {
-                        currentCase = case
-                        darkTheme = dark
-                        fontScale = scale
-                    }
-                    composeRule.waitForIdle()
-                    composeRule.mainClock.advanceTimeBy(400)
-                    composeRule.waitForIdle()
-
-                    try {
-                        composeRule.onNodeWithText(case.label).assertIsDisplayed()
-                    } catch (failure: AssertionError) {
-                        throw AssertionError("Status ${case.status} has no visible label in dark=$dark, fontScale=$scale", failure)
-                    }
-                    val announcement = composeRule.onNodeWithText(case.label).fetchSemanticsNode().config
-                    assertFalse("The decorative icon must not add a content description", announcement.contains(SemanticsProperties.ContentDescription))
-
-                    val statusNode = composeRule.onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true)
-                    val statusBounds = statusNode.fetchSemanticsNode().boundsInRoot
-                    assertTrue("${case.label} starts outside the 320dp viewport: $statusBounds", statusBounds.left >= 0f)
-                    assertTrue(
-                        "${case.label} exceeds the 320dp viewport: $statusBounds",
-                        statusBounds.right <= 320f * densityScale + 1f,
-                    )
-
-                    val iconNode = composeRule.onNodeWithTag(TOOL_CALL_STATUS_ICON_TEST_TAG, useUnmergedTree = true)
-                    iconNode.assertIsDisplayed()
-                    assertEquals("${case.label} has the wrong container role in dark=$dark", expectedContainer, actualContainer)
-                    assertEquals("${case.label} has the wrong content role in dark=$dark", expectedContent, actualContent)
-                }
-            }
-        }
+    @Test
+    fun `handoff and not shown map to exact send and warning icons`() {
+        assertEquals(
+            AppIcons.send,
+            ToolCallStatus.HandedOff("Часы").iconResourceId(),
+        )
+        assertEquals(AppIcons.warning, ToolCallStatus.NotShown.iconResourceId())
     }
 
     @Test
@@ -155,30 +184,80 @@ class ToolCallCardStatusUiTest {
                 status = ToolCallStatus.HandedOff("Часы")
             }
             composeRule.waitForIdle()
-            val shortBounds = composeRule.onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val shortBounds =
+                composeRule
+                    .onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             composeRule.onNodeWithText(shortLabel).assertIsDisplayed()
 
             composeRule.runOnIdle { status = ToolCallStatus.HandedOff(target) }
             composeRule.waitForIdle()
             val longNode = composeRule.onNodeWithText(expectedLongLabel)
             longNode.assertIsDisplayed()
-            val longBounds = composeRule.onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            assertTrue("The long status did not wrap: short=$shortBounds long=$longBounds", longBounds.height > shortBounds.height)
-            assertTrue("The long status exceeds the 320dp viewport: $longBounds", longBounds.right <= 320f * densityScale + 1f)
+            val longBounds =
+                composeRule
+                    .onNodeWithTag(TOOL_CALL_STATUS_TEST_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue(
+                "The long status did not wrap: short=$shortBounds long=$longBounds",
+                longBounds.height > shortBounds.height,
+            )
+            assertTrue(
+                "The long status exceeds the 320dp viewport: $longBounds",
+                longBounds.right <= 320f * densityScale + 1f,
+            )
         }
     }
 
     private fun statusCases(context: Context) =
         listOf(
-            StatusCase(ToolCallStatus.AwaitingApproval, context.getString(R.string.tool_call_status_awaiting), StatusColorRole.Warning),
-            StatusCase(ToolCallStatus.Running, context.getString(R.string.tool_call_status_running), StatusColorRole.Primary),
-            StatusCase(ToolCallStatus.Done("12:30"), "12:30", StatusColorRole.Success),
-            StatusCase(ToolCallStatus.FilesFound(2), context.getString(R.string.file_search_completed, 2), StatusColorRole.Success),
-            StatusCase(ToolCallStatus.HandedOff("Часы"), context.getString(R.string.tool_call_status_handed_off, "Часы"), StatusColorRole.Primary),
-            StatusCase(ToolCallStatus.NotShown, context.getString(R.string.tool_call_status_not_shown), StatusColorRole.Warning),
-            StatusCase(ToolCallStatus.Failed("Ошибка"), "Ошибка", StatusColorRole.Error),
-            StatusCase(ToolCallStatus.Rejected, context.getString(R.string.tool_call_status_rejected), StatusColorRole.Neutral),
-            StatusCase(ToolCallStatus.Cancelled, context.getString(R.string.tool_call_status_cancelled), StatusColorRole.Neutral),
+            StatusCase(
+                status = ToolCallStatus.AwaitingApproval,
+                label = context.getString(R.string.tool_call_status_awaiting),
+                role = StatusColorRole.Warning,
+            ),
+            StatusCase(
+                status = ToolCallStatus.Running,
+                label = context.getString(R.string.tool_call_status_running),
+                role = StatusColorRole.Primary,
+            ),
+            StatusCase(
+                status = ToolCallStatus.Done("12:30"),
+                label = "12:30",
+                role = StatusColorRole.Success,
+            ),
+            StatusCase(
+                status = ToolCallStatus.FilesFound(2),
+                label = context.getString(R.string.file_search_completed, 2),
+                role = StatusColorRole.Success,
+            ),
+            StatusCase(
+                status = ToolCallStatus.HandedOff("Часы"),
+                label = context.getString(R.string.tool_call_status_handed_off, "Часы"),
+                role = StatusColorRole.Primary,
+            ),
+            StatusCase(
+                status = ToolCallStatus.NotShown,
+                label = context.getString(R.string.tool_call_status_not_shown),
+                role = StatusColorRole.Warning,
+            ),
+            StatusCase(
+                status = ToolCallStatus.Failed("Ошибка"),
+                label = "Ошибка",
+                role = StatusColorRole.Error,
+            ),
+            StatusCase(
+                status = ToolCallStatus.Rejected,
+                label = context.getString(R.string.tool_call_status_rejected),
+                role = StatusColorRole.Neutral,
+            ),
+            StatusCase(
+                status = ToolCallStatus.Cancelled,
+                label = context.getString(R.string.tool_call_status_cancelled),
+                role = StatusColorRole.Neutral,
+            ),
         )
 
     private data class StatusCase(
@@ -186,6 +265,24 @@ class ToolCallCardStatusUiTest {
         val label: String,
         val role: StatusColorRole,
     )
+
+    private data class StatusTestConfiguration(
+        val darkTheme: Boolean,
+        val fontScale: Float,
+    )
+
+    private class StatusTestState(
+        initialCase: StatusCase,
+    ) {
+        var currentCase by mutableStateOf(initialCase)
+        var darkTheme by mutableStateOf(false)
+        var fontScale by mutableFloatStateOf(1f)
+        var densityScale = 1f
+        var actualContainer = Color.Unspecified
+        var actualContent = Color.Unspecified
+        var expectedContainer = Color.Unspecified
+        var expectedContent = Color.Unspecified
+    }
 
     private enum class StatusColorRole {
         Warning,
@@ -195,4 +292,3 @@ class ToolCallCardStatusUiTest {
         Neutral,
     }
 }
-

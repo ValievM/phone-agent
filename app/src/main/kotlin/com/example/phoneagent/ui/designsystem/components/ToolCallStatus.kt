@@ -1,5 +1,7 @@
 package com.example.phoneagent.ui.designsystem.components
 
+import com.example.phoneagent.ui.designsystem.icons.AppIcons
+
 /**
  * Self-sufficient UI state of a tool call in the chat feed. Deliberately independent of
  * AgentEvent and ToolOutcome so the integration layer can map any event source onto it.
@@ -33,3 +35,14 @@ sealed interface ToolCallStatus {
 
     data object Cancelled : ToolCallStatus
 }
+
+internal fun ToolCallStatus.iconResourceId(): Int =
+    when (this) {
+        ToolCallStatus.AwaitingApproval -> AppIcons.hourglassEmpty
+        ToolCallStatus.Running, ToolCallStatus.Cancelled -> AppIcons.stop
+        is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> AppIcons.checkCircle
+        is ToolCallStatus.HandedOff -> AppIcons.send
+        ToolCallStatus.NotShown -> AppIcons.warning
+        is ToolCallStatus.Failed -> AppIcons.error
+        ToolCallStatus.Rejected -> AppIcons.block
+    }

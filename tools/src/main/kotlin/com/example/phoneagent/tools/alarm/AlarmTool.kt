@@ -2,8 +2,8 @@ package com.example.phoneagent.tools.alarm
 
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
-import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
@@ -84,10 +84,17 @@ internal class AlarmTool
                 val result = intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))
                 lastLaunch = timeSource.markNow()
                 when (result) {
-                    AlarmLaunchResult.Started ->
+                    AlarmLaunchResult.Started -> {
                         ToolResult.Success(AlarmCopy.RESULT_SUCCESS, ToolContent.HandedOff(AlarmCopy.TARGET_APP))
-                    AlarmLaunchResult.NoClockApp -> ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
-                    AlarmLaunchResult.Failed -> ToolResult.Failed(AlarmCopy.RESULT_FAILED)
+                    }
+
+                    AlarmLaunchResult.NoClockApp -> {
+                        ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
+                    }
+
+                    AlarmLaunchResult.Failed -> {
+                        ToolResult.Failed(AlarmCopy.RESULT_FAILED)
+                    }
                 }
             }
     }

@@ -8,14 +8,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.JsonObject
 
 @Composable
 private fun previewDescription(): CallDescription =
@@ -26,7 +25,7 @@ private fun previewDescription(): CallDescription =
     )
 
 @Composable
-private fun previewTimeDescription(): CallDescription =
+internal fun previewTimeDescription(): CallDescription =
     CallDescription(
         title = stringResource(R.string.preview_tool_call_time_title),
         summary = stringResource(R.string.preview_tool_call_time_summary),
@@ -41,7 +40,7 @@ private fun previewFileSearchDescription(): CallDescription =
         details = listOf(stringResource(R.string.preview_file_search_details)),
     )
 
-private fun previewTimeArguments() = buildJsonObject {}
+internal fun previewTimeArguments() = buildJsonObject {}
 
 private fun previewFileSearchArguments() =
     buildJsonObject {
@@ -52,6 +51,8 @@ private const val PREVIEW_ALARM_HOUR = 7
 
 private const val PREVIEW_ALARM_MINUTE = 30
 
+private const val PREVIEW_FILE_SIZE_BYTES = 1_200L
+
 private fun previewArguments() =
     buildJsonObject {
         put("hour", PREVIEW_ALARM_HOUR)
@@ -60,14 +61,13 @@ private fun previewArguments() =
     }
 
 @Composable
-private fun ToolCallCardPreviewFrame(
+internal fun ToolCallCardPreviewFrame(
     state: ToolCallStatus,
     expanded: Boolean = false,
     fileHits: List<FileHit> = emptyList(),
     description: CallDescription? = null,
     arguments: JsonObject = previewArguments(),
-)
-{
+) {
     AppTheme(useDynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.padding(AppTheme.spacing.large)) {
@@ -98,71 +98,20 @@ private fun ToolCallCardRunningPreview() {
 
 @PreviewLightDark
 @Composable
-private fun ToolCallCardDonePreview() {
-    ToolCallCardPreviewFrame(
-        state = ToolCallStatus.Done(summary = stringResource(R.string.preview_tool_call_result)),
-        description = previewTimeDescription(),
-        arguments = previewTimeArguments(),
-    )
-}
-
-@PreviewLightDark
-@Composable
 private fun ToolCallCardFilesFoundPreview() {
     ToolCallCardPreviewFrame(
         state = ToolCallStatus.FilesFound(1),
         expanded = true,
-        fileHits = listOf(FileHit("Договор.pdf", "content://media/external/file/1", 1200L, "application/pdf")),
+        fileHits =
+            listOf(
+                FileHit(
+                    "Договор.pdf",
+                    "content://media/external/file/1",
+                    PREVIEW_FILE_SIZE_BYTES,
+                    "application/pdf",
+                ),
+            ),
         description = previewFileSearchDescription(),
         arguments = previewFileSearchArguments(),
-    )
-}
-
-@PreviewLightDark
-@PreviewFontScale
-@Composable
-private fun ToolCallCardHandedOffPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.HandedOff("Часы"))
-}
-
-@Preview(name = "Handoff · 320dp · 200%", widthDp = 320, heightDp = 640, fontScale = 2f)
-@Composable
-private fun ToolCallCardHandedOffLongTargetPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.HandedOff("Будильники и таймеры на телефоне, приложение Часы"))
-}
-
-@PreviewLightDark
-@Composable
-private fun ToolCallCardFailedPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.Failed(reason = stringResource(R.string.preview_tool_call_reason)))
-}
-
-@PreviewLightDark
-@Composable
-private fun ToolCallCardNotShownPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.NotShown)
-}
-
-@PreviewLightDark
-@Composable
-private fun ToolCallCardRejectedPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.Rejected)
-}
-
-@PreviewLightDark
-@Composable
-private fun ToolCallCardCancelledPreview() {
-    ToolCallCardPreviewFrame(ToolCallStatus.Cancelled)
-}
-
-@PreviewLightDark
-@PreviewFontScale
-@Composable
-private fun ToolCallCardExpandedPreview() {
-    ToolCallCardPreviewFrame(
-        state = ToolCallStatus.Done(summary = stringResource(R.string.preview_tool_call_result)),
-        expanded = true,
-        description = previewTimeDescription(),
-        arguments = previewTimeArguments(),
     )
 }

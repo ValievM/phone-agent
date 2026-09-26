@@ -34,10 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
@@ -321,16 +321,7 @@ private fun StatusMark(
         )
         return
     }
-    val icon =
-        when (state) {
-            ToolCallStatus.AwaitingApproval -> AppIcons.hourglassEmpty
-            is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> AppIcons.checkCircle
-            is ToolCallStatus.HandedOff -> AppIcons.send
-            ToolCallStatus.NotShown -> AppIcons.warning
-            is ToolCallStatus.Failed -> AppIcons.error
-            ToolCallStatus.Rejected -> AppIcons.block
-            else -> AppIcons.stop
-        }
+    val icon = state.iconResourceId()
     Icon(
         painter = painterResource(icon),
         contentDescription = null,

@@ -100,7 +100,6 @@ class ChatViewModelRestoreTest {
             HistoryItem.AssistantMessage(ItemId("a1"), "Поставил будильник на 5:00."),
         )
 
-
     private fun viewModelOver(
         items: List<HistoryItem>,
         tools: Set<Tool> = setOf(alarmTool),
