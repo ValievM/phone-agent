@@ -124,6 +124,7 @@ public class ToolPipeline(
         name: String,
         args: JsonObject,
         approval: Approval = Approval.ASK,
+        requireConfirmation: Boolean = false,
         onApprovalResolved: suspend () -> Unit = {},
     ): ToolOutcome {
         val tool = registry.find(name)
@@ -131,7 +132,7 @@ public class ToolPipeline(
             if (tool == null) {
                 ToolOutcome.Failed("unknown tool: $name")
             } else {
-                runKnownTool(tool, args, approval, onApprovalResolved)
+                runKnownTool(tool, args, approval, requireConfirmation, onApprovalResolved)
             }
         logger.info(TAG, "tool call finished", fields = mapOf("name" to name, "outcome" to outcome.kind()))
         return outcome
@@ -141,28 +142,25 @@ public class ToolPipeline(
         tool: Tool,
         args: JsonObject,
         approval: Approval,
+        requireConfirmation: Boolean,
         onApprovalResolved: suspend () -> Unit,
     ): ToolOutcome {
         val missing = missingRequiredFields(tool.spec.inputSchema, args)
-        // CONFIRM/SENSITIVE with a broken describe refuse to run: no execution, no confirmation
-        // sheet (a SAFE tool keeps running under the neutral card from [describe]). The description is
-        // asked for exactly once and that same value is what the user is shown, so a describe that
-        // breaks on a later call cannot abort the turn.
-        val description =
-            if (tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && approval != Approval.NOT_PRESENTED) {
-                describeSafely(tool, args)
-            } else {
-                null
-            }
-        val refusedByDescribe =
-            tool.spec.risk != Risk.SAFE && approval != Approval.DECLINED && approval != Approval.NOT_PRESENTED && description == null
+        // A confirmation request needs a usable description; SAFE tools reach this path only when explicitly repeated.
+        val needsDescription =
+            (tool.spec.risk != Risk.SAFE || requireConfirmation) &&
+                approval != Approval.DECLINED &&
+                approval != Approval.NOT_PRESENTED
+        val description = if (needsDescription) describeSafely(tool, args) else null
+        val refusedByDescribe = needsDescription && description == null
+        val approvalRequest = description?.let { ApprovalRequest(it, tool.spec.risk, args) }
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
         } else if (approval == Approval.NOT_PRESENTED) {
             ToolOutcome.Rejected(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
         } else if (refusedByDescribe) {
             ToolOutcome.Failed("the tool could not describe its action, so it was not run")
-        } else if (!approve(tool, args, approval, description, onApprovalResolved)) {
+        } else if (!approve(tool, approval, requireConfirmation, approvalRequest, onApprovalResolved)) {
             ToolOutcome.Rejected("user declined")
         } else {
             deniedCapability(tool)?.let { ToolOutcome.Failed(tool.deniedMessage(it)) } ?: execute(tool, args)
@@ -178,9 +176,9 @@ public class ToolPipeline(
 
     private suspend fun approve(
         tool: Tool,
-        args: JsonObject,
         approval: Approval,
-        description: CallDescription?,
+        requireConfirmation: Boolean,
+        request: ApprovalRequest?,
         onApprovalResolved: suspend () -> Unit,
     ): Boolean =
         when {
@@ -192,12 +190,12 @@ public class ToolPipeline(
                 false
             }
 
-            tool.spec.risk == Risk.SAFE -> {
+            tool.spec.risk == Risk.SAFE && !requireConfirmation -> {
                 true
             }
 
             else -> {
-                val approved = userInteraction.confirm(ApprovalRequest(checkNotNull(description), tool.spec.risk, args))
+                val approved = userInteraction.confirm(checkNotNull(request))
                 onApprovalResolved()
                 approved
             }

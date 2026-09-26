@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -92,6 +93,72 @@ class AgentLoopTest {
             assertEquals(2, gateway.requests.size)
             val secondRequestHistory = gateway.requests[1].history
             assertTrue(secondRequestHistory.any { it is HistoryItem.ToolOutput && it.output == "noon" })
+        }
+
+    @Test
+    fun `a repeated SAFE call with identical arguments asks before execution`() =
+        runTest {
+            interaction.approvalResult = false
+            val arguments = buildJsonObject {}
+            val firstCall = ToolCall(CallId("call-1"), "find_files", arguments)
+            val repeatedCall = ToolCall(CallId("call-2"), "find_files", arguments)
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(firstCall), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(repeatedCall), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry = ToolRegistry(setOf(fakeTool("find_files") { ToolResult.Success("found") }))
+
+            val events = loop(registry).run(emptyList(), "find files").toList()
+
+            val expectedApproval =
+                ApprovalRequest(CallDescription("find_files", "calling find_files"), Risk.SAFE, arguments)
+            assertTrue(events.contains(AgentEvent.ApprovalRequested(expectedApproval)))
+            assertEquals(listOf(expectedApproval), interaction.approvalRequests)
+            assertEquals(listOf("find_files"), executedCalls)
+            assertEquals(
+                listOf(ToolOutcome.Success("found"), ToolOutcome.Rejected("user declined")),
+                events.filterIsInstance<AgentEvent.ToolCallFinished>().map { it.outcome },
+            )
+        }
+
+    @Test
+    fun `a different argument object does not ask for repeat confirmation`() =
+        runTest {
+            interaction.approvalResult = false
+            val firstCall = ToolCall(CallId("call-1"), "find_files", buildJsonObject { put("query", "first") })
+            val secondCall = ToolCall(CallId("call-2"), "find_files", buildJsonObject { put("query", "second") })
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(firstCall), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(secondCall), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry = ToolRegistry(setOf(fakeTool("find_files") { ToolResult.Success("found") }))
+
+            val events = loop(registry).run(emptyList(), "find files").toList()
+
+            assertTrue(events.none { it is AgentEvent.ApprovalRequested })
+            assertTrue(interaction.approvalRequests.isEmpty())
+            assertEquals(listOf("find_files", "find_files"), executedCalls)
+        }
+
+    @Test
+    fun `a matching call in an earlier turn does not require repeat confirmation`() =
+        runTest {
+            val arguments = buildJsonObject {}
+            val previousCallId = CallId("previous-call")
+            val history =
+                listOf(
+                    HistoryItem.UserMessage(ItemId("previous-question"), "earlier request"),
+                    HistoryItem.ToolCallItem(ItemId("previous-call-item"), previousCallId, "find_files", arguments),
+                    HistoryItem.ToolOutput(ItemId("previous-output"), previousCallId, "found"),
+                )
+            val call = ToolCall(CallId("current-call"), "find_files", arguments)
+            gateway.responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry = ToolRegistry(setOf(fakeTool("find_files") { ToolResult.Success("found") }))
+
+            val events = loop(registry).run(history, "find again").toList()
+
+            assertTrue(events.none { it is AgentEvent.ApprovalRequested })
+            assertTrue(interaction.approvalRequests.isEmpty())
+            assertEquals(listOf("find_files"), executedCalls)
         }
 
     @Test
