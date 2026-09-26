@@ -2,6 +2,7 @@ package com.example.phoneagent.ui.designsystem.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.tools.CallDescription
@@ -9,6 +10,7 @@ import com.example.phoneagent.ui.designsystem.theme.AppTheme
 import kotlinx.serialization.json.buildJsonObject
 
 @PreviewLightDark
+@PreviewFontScale
 @Composable
 private fun FilesFoundToolCallPreview() {
     AppTheme(useDynamicColor = false) {
@@ -27,14 +29,14 @@ private fun FilesFoundToolCallPreview() {
                     FileHit(
                         name = "Договор.pdf",
                         uri = "content://media/external/file/1",
-                        size = null,
-                        mime = null,
+                        size = 1_258_291L,
+                        mime = "application/pdf",
                     ),
                     FileHit(
                         name = "scan.jpg",
                         uri = "content://media/external/file/2",
-                        size = null,
-                        mime = null,
+                        size = 842_137L,
+                        mime = "image/jpeg",
                     ),
                 ),
         )

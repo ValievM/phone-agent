@@ -213,8 +213,6 @@ public class ToolPipeline(
         }
 
     private companion object {
-        private fun Byte.isUtf8ContinuationByte(): Boolean = (toInt() and UTF8_CONTINUATION_BYTE_MASK) == UTF8_CONTINUATION_BYTE_PATTERN
-
         private fun missingRequiredFields(
             schema: JsonObject,
             args: JsonObject,
