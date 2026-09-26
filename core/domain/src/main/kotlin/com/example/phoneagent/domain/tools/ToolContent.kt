@@ -5,6 +5,10 @@ public sealed interface ToolContent {
     public data class FilesFound(
         public val files: List<ToolFile>,
     ) : ToolContent
+
+    public data class HandedOff(
+        public val target: String,
+    ) : ToolContent
 }
 
 /** File metadata that a client can render or use for an explicitly confirmed open action. */

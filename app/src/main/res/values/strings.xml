@@ -90,6 +90,8 @@
     <string name="sign_out">Выйти</string>
     <string name="tool_call_status_awaiting">Нужно подтверждение</string>
     <string name="tool_call_status_running">Выполняется</string>
+    <string name="tool_call_status_handed_off">Отправлено в «%1$s»</string>
+    <string name="tool_call_status_not_shown">Не показано: не удалось описать действие</string>
     <string name="tool_call_status_rejected">Отклонено</string>
     <string name="tool_call_status_cancelled">Прервано</string>
     <string name="tool_call_arguments">Аргументы</string>
@@ -112,7 +114,13 @@
     <string name="preview_tool_call_title">Будильник</string>
     <string name="preview_tool_call_summary">07:30 · «Работа»</string>
     <string name="preview_tool_call_details">Сработает один раз, сегодня</string>
-    <string name="preview_tool_call_result">Будильник поставлен на 07:30</string>
+    <string name="preview_tool_call_result">12:30</string>
+    <string name="preview_tool_call_time_title">Текущее время</string>
+    <string name="preview_tool_call_time_summary">Местное время на телефоне</string>
+    <string name="preview_tool_call_time_details">24-часовой формат</string>
+    <string name="preview_file_search_title">Поиск файлов</string>
+    <string name="preview_file_search_summary">Документы</string>
+    <string name="preview_file_search_details">Один найденный файл</string>
     <string name="preview_tool_call_reason">Приложение «Часы» не найдено</string>
     <string name="files_found_heading">Найденные файлы</string>
     <string name="file_search_completed">Найдено файлов: %1$d</string>

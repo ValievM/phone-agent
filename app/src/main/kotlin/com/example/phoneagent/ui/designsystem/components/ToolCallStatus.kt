@@ -19,6 +19,12 @@ sealed interface ToolCallStatus {
         val count: Int,
     ) : ToolCallStatus
 
+    data class HandedOff(
+        val target: String,
+    ) : ToolCallStatus
+
+    data object NotShown : ToolCallStatus
+
     data class Failed(
         val reason: String,
     ) : ToolCallStatus

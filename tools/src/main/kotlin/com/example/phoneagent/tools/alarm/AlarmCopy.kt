@@ -10,6 +10,7 @@ internal object AlarmCopy {
     const val CARD_SUMMARY_INVALID_ARGS: String = "С неверными параметрами"
     const val RESULT_INVALID_ARGS: String = "Неверные параметры будильника"
     const val RESULT_SUCCESS: String = "Запрос на будильник отправлен"
+    const val TARGET_APP: String = "Часы"
     const val RESULT_NO_CLOCK_APP: String = "Не найдено приложение «Часы»"
     const val RESULT_FAILED: String = "Не удалось отправить запрос на будильник"
     const val VALIDATION_HOUR_RANGE: String = "Час должен быть от 0 до 23"

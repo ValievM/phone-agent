@@ -82,6 +82,27 @@ class ToolPipelineTest {
         }
 
     @Test
+    fun `a not presented approval is not shown and never runs the tool`() =
+        runTest {
+            var executed = false
+            val tool =
+                fakeTool("set_alarm", risk = Risk.CONFIRM) {
+                    executed = true
+                    ToolResult.Success("ok")
+                }
+            val interaction = FakeUserInteraction()
+            val pipeline = pipeline(registry = ToolRegistry(setOf(tool)), interaction = interaction)
+
+            val outcome = pipeline.run("set_alarm", buildJsonObject {}, approval = Approval.NOT_PRESENTED)
+
+            val reason = "not shown to user: one action description could not be built; no calls in the batch were run"
+            assertEquals(ToolOutcome.NotShown(reason), outcome)
+            assertEquals("Not shown: $reason", outcome.toOutputText())
+            assertTrue(!executed)
+            assertTrue(interaction.approvalRequests.isEmpty())
+        }
+
+    @Test
     fun `a CONFIRM tool executes after the user approves`() =
         runTest {
             val interaction = FakeUserInteraction().apply { approvalResult = true }

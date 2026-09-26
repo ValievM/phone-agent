@@ -17,14 +17,19 @@ internal fun ToolOutcome.toFileHits(): List<FileHit> =
 internal fun ToolOutcome.toCardStatus(fileHitCount: Int): ToolCallStatus =
     when (this) {
         is ToolOutcome.Success -> {
-            when (content) {
+            when (val resultContent = content) {
                 is ToolContent.FilesFound -> ToolCallStatus.FilesFound(fileHitCount)
+                is ToolContent.HandedOff -> ToolCallStatus.HandedOff(resultContent.target)
                 null -> ToolCallStatus.Done(text)
             }
         }
 
         is ToolOutcome.Rejected -> {
             ToolCallStatus.Rejected
+        }
+
+        is ToolOutcome.NotShown -> {
+            ToolCallStatus.NotShown
         }
 
         is ToolOutcome.Failed -> {

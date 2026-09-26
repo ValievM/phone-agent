@@ -52,6 +52,7 @@ class ToolOutcome {
   <<sealed>>
   Success
   Rejected
+  NotShown
   Failed
 }
 class ToolResult {
@@ -161,7 +162,7 @@ RedactingAppLogger ..> LogRedaction
 | `AgentError` | Плоская sealed-иерархия ошибок без текстов (тексты в UI) |
 | `ToolPipeline` | Единственный путь вызова: поиск, проверка `required`, подтверждение по `Risk`, `withTimeout` 5 с, обрезка вывода 4 КБ, лог |
 | `ToolRegistry` | `Set<Tool>` в карту по имени; дубли имён = `require`-ошибка |
-| `Tool`, `ToolSpec`, `Risk`, `CallDescription`, `ToolContext`, `ToolResult`, `ToolOutcome` | Контракт инструмента; `ToolResult` = что вернул инструмент, `ToolOutcome` = итог конвейера (`Rejected` = отказ пользователя) |
+| `Tool`, `ToolSpec`, `Risk`, `CallDescription`, `ToolContext`, `ToolResult`, `ToolOutcome` | Контракт инструмента; `ToolResult` = что вернул инструмент, `ToolOutcome` = итог конвейера (`Rejected` = отказ пользователя, `NotShown` = подтверждение не показывали) |
 | `ModelGateway`, `ModelRequest`, `ModelEvent`, `Usage` | Порт модели: история и спецификации на входе, `Flow<ModelEvent>` на выходе, ошибки как `Failed` |
 | `ModelCatalog` | Список моделей: `Available` или `Unavailable` |
 | `ConversationRepository` | Одна история: `load`, `replace` (перезапись целиком), `observe` |

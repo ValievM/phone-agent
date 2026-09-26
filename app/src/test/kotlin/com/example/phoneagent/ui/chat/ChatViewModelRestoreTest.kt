@@ -58,6 +58,9 @@ class ChatViewModelRestoreTest {
 
             override fun describe(args: JsonObject) = CallDescription("Поставить будильник", "На 05:00")
 
+            override fun restoreContent(outputText: String): ToolContent? =
+                if (outputText == "Запрос на будильник отправлен") ToolContent.HandedOff("Часы") else null
+
             override suspend fun execute(
                 args: JsonObject,
                 context: ToolContext,
@@ -96,6 +99,7 @@ class ChatViewModelRestoreTest {
             HistoryItem.ToolOutput(ItemId("o1"), CallId("c1"), "Запрос на будильник отправлен"),
             HistoryItem.AssistantMessage(ItemId("a1"), "Поставил будильник на 5:00."),
         )
+
 
     private fun viewModelOver(
         items: List<HistoryItem>,
@@ -170,7 +174,7 @@ class ChatViewModelRestoreTest {
                 viewModel.state.value.messages[1]
                     .toolCall
             assertEquals(CallDescription("Поставить будильник", "На 05:00"), card?.description)
-            assertEquals(ToolCallStatus.Done("Запрос на будильник отправлен"), card?.status)
+            assertEquals(ToolCallStatus.HandedOff("Часы"), card?.status)
         }
 
     @Test

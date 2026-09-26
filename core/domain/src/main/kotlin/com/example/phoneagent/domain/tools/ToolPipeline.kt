@@ -159,7 +159,7 @@ public class ToolPipeline(
         return if (missing.isNotEmpty()) {
             ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
         } else if (approval == Approval.NOT_PRESENTED) {
-            ToolOutcome.Rejected(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
+            ToolOutcome.NotShown(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
         } else if (refusedByDescribe) {
             ToolOutcome.Failed("the tool could not describe its action, so it was not run")
         } else if (!approve(tool, args, approval, description, onApprovalResolved)) {
@@ -240,6 +240,7 @@ public class ToolPipeline(
             when (this) {
                 is ToolOutcome.Success -> "success"
                 is ToolOutcome.Rejected -> "rejected"
+                is ToolOutcome.NotShown -> "not_shown"
                 is ToolOutcome.Failed -> "failed"
             }
     }

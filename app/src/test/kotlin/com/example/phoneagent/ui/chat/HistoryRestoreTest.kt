@@ -73,6 +73,17 @@ class HistoryRestoreTest {
     }
 
     @Test
+    fun `a saved not shown call comes back as not shown`() {
+        val card =
+            listOf(call("t1", "c1"), output("c1", "Not shown: не удалось описать действие"))
+                .toChatMessages(describe)
+                .single()
+                .card()
+
+        assertEquals(ToolCallStatus.NotShown, card.status)
+    }
+
+    @Test
     fun `a call without a result comes back as interrupted`() {
         val card = listOf(call("t1", "c1")).toChatMessages(describe).single().card()
 

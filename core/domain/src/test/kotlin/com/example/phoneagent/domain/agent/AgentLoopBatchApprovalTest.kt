@@ -123,8 +123,8 @@ class AgentLoopBatchApprovalTest {
             assertEquals(2, outputs.size)
             assertEquals(
                 listOf(
-                    "Rejected: not shown to user: one action description could not be built; no calls in the batch were run",
-                    "Rejected: not shown to user: one action description could not be built; no calls in the batch were run",
+                    "Not shown: not shown to user: one action description could not be built; no calls in the batch were run",
+                    "Not shown: not shown to user: one action description could not be built; no calls in the batch were run",
                 ),
                 outputs.map { it.output },
             )

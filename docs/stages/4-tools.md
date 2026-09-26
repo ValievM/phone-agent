@@ -7,7 +7,7 @@
 - [x] 4.1 `ToolRegistry`: имя, описание, JSON-схема, `Risk` (уровень подтверждения); неизвестный инструмент → ошибка без выполнения.
 - [x] 4.2 Валидация аргументов; unit-тесты (`hour=25`, пустой `query`, слишком длинный `text`).
 - [x] 4.3 `AgentLoop`: вызов инструмента → `function_call_output` с тем же `call_id` → следующий шаг; лимит 5 шагов; unit-тесты с фейковым `ModelGateway`.
-- [ ] 4.4 Шторка подтверждения (`ModalBottomSheet`, «назад» = отклонить) и `ToolCallCard` со всеми состояниями (ожидает, выполняется, готово, ошибка, отклонено, прервано) по [design/components.md](../design/components.md). Тексты берутся из `Tool.describe`.
+- [ ] 4.4 Шторка подтверждения (`ModalBottomSheet`, «назад» = отклонить) и `ToolCallCard` со всеми состояниями (ожидает, выполняется, готово, найдены файлы, отправлено в приложение, не показано, ошибка, отклонено, прервано) по [design/components.md](../design/components.md). Тексты берутся из `Tool.describe`.
 - [x] 4.5 `set_alarm`: манифест (`SET_ALARM`, `<queries>`), `resolveActivity`, `SKIP_UI` после подтверждения; результат «запрос отправлен».
 - [ ] 4.6 `notify`: канал, `POST_NOTIFICATIONS` на API 33+ с объяснением.
 - [x] 4.7 `find_files`: выбор папки (`OpenDocumentTree`), `takePersistableUriPermission`, обход в ширину через `ContentResolver.query` + `DocumentsContract`, лимиты (глубина ≤ 6, ≤ 5000 узлов, 5 с, ≤ 20 результатов), только метаданные.

@@ -74,25 +74,29 @@ AL-->>VM: ToolCallStarted (card Running)
 AL-->>VM: ApprovalRequested if risk is not SAFE (card AwaitingApproval)
 AL->>Pipe: run(name, args)
 Pipe->>Pipe: find in registry, check required fields
-Pipe->>Br: confirm(ApprovalRequest(tool.describe, risk, args))
-Br->>Br: pending = Approval(request, deferred), await
-Host->>Br: collects pending, shows ApprovalSheet
-alt user approves
-Host->>Br: deferred.complete(true)
-Br-->>Pipe: true
-Pipe->>Tool: withTimeout 5 s: execute(args, ToolContext)
-Tool-->>Pipe: ToolResult.Success
-Pipe-->>AL: ToolOutcome.Success (truncated to 4 KB)
-else user rejects or dismisses the sheet
-Host->>Br: deferred.complete(false)
-Br-->>Pipe: false
-Pipe-->>AL: ToolOutcome.Rejected(user declined)
+alt batch description failed before approval is presented
+  Pipe-->>AL: ToolOutcome.NotShown(reason)
+else approval is presented
+  Pipe->>Br: confirm(ApprovalRequest(tool.describe, risk, args))
+  Br->>Br: pending = Approval(request, deferred), await
+  Host->>Br: collects pending, shows ApprovalSheet
+  alt user approves
+    Host->>Br: deferred.complete(true)
+    Br-->>Pipe: true
+    Pipe->>Tool: withTimeout 5 s: execute(args, ToolContext)
+    Tool-->>Pipe: ToolResult.Success
+    Pipe-->>AL: ToolOutcome.Success (truncated to 4 KB)
+  else user rejects or dismisses the sheet
+    Host->>Br: deferred.complete(false)
+    Br-->>Pipe: false
+    Pipe-->>AL: ToolOutcome.Rejected(user declined)
+  end
 end
 AL-->>VM: ToolCallFinished (card status)
 Note over AL: ToolCallItem and ToolOutput go to newItems, model gets the output
 ```
 
-Для `SAFE`-инструментов ветки подтверждения нет. `NotifyTool` и `SearchFilesTool` внутри `execute` зовут `bridge.ensure(capability)`: `InteractionHost` запускает системный запрос разрешения, ответ приходит через `deferred`. Текст подтверждения строится из `Tool.describe`, не из ответа модели. Неизвестный инструмент и ошибка аргументов дают `ToolOutcome.Failed`; модель получает `Failed: ...`.
+Для `SAFE` подтверждение не требуется. В `execute` `NotifyTool`/`SearchFilesTool` вызывают `bridge.ensure(capability)`: `InteractionHost` показывает системный запрос, ответ приходит через `deferred`. Текст вопроса — из `Tool.describe`, не модели. Ошибка описания одиночного `CONFIRM`/`SENSITIVE` даёт `Failed`; пакетного — `NotShown` всем вызовам без исполнения. Неизвестный инструмент/ошибки аргументов дают `ToolOutcome.Failed`.
 
 Гонки и хрупкие места:
 - `ToolPipeline.kt:85`, `NotifyTool.kt:59`, `SearchFilesTool.kt:78`: диалог разрешения внутри `withTimeout(5 с)` (наблюдение 1 в [обзоре](map-overview.md)).

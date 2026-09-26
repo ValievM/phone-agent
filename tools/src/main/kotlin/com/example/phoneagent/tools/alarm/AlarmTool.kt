@@ -2,6 +2,7 @@ package com.example.phoneagent.tools.alarm
 
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
@@ -57,6 +58,9 @@ internal class AlarmTool
             context: ToolContext,
         ): ToolResult = decodeArgs(args)?.let { executeAlarm(it) } ?: ToolResult.Failed(AlarmCopy.RESULT_INVALID_ARGS)
 
+        override fun restoreContent(outputText: String): ToolContent? =
+            if (outputText == AlarmCopy.RESULT_SUCCESS) ToolContent.HandedOff(AlarmCopy.TARGET_APP) else null
+
         private val launchLock = Mutex()
         private var lastLaunch: TimeMark? = null
 
@@ -80,7 +84,8 @@ internal class AlarmTool
                 val result = intentLauncher.launch(AlarmIntentFactory.create(alarmArgs))
                 lastLaunch = timeSource.markNow()
                 when (result) {
-                    AlarmLaunchResult.Started -> ToolResult.Success(AlarmCopy.RESULT_SUCCESS)
+                    AlarmLaunchResult.Started ->
+                        ToolResult.Success(AlarmCopy.RESULT_SUCCESS, ToolContent.HandedOff(AlarmCopy.TARGET_APP))
                     AlarmLaunchResult.NoClockApp -> ToolResult.Failed(AlarmCopy.RESULT_NO_CLOCK_APP)
                     AlarmLaunchResult.Failed -> ToolResult.Failed(AlarmCopy.RESULT_FAILED)
                 }

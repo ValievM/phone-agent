@@ -35,7 +35,7 @@ private val conversation =
                     "4",
                     ChatRole.TOOL,
                     "",
-                    ToolCallMessage(ToolCallStatus.Done("Запрос на будильник отправлен"), alarmDescription, alarmArguments),
+                    ToolCallMessage(ToolCallStatus.HandedOff("Часы"), alarmDescription, alarmArguments),
                 ),
             ),
         turn = TurnState.Running(ItemId("question-1")),

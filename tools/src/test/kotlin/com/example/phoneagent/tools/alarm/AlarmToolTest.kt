@@ -2,6 +2,7 @@ package com.example.phoneagent.tools.alarm
 
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import kotlinx.coroutines.test.TestScope
@@ -55,6 +56,34 @@ class AlarmToolTest {
 
             assertEquals(listOf(0L), port.launchTimesMillis)
             assertTrue(result is ToolResult.Success)
+        }
+
+    @Test
+    fun `a started alarm returns a handoff with the existing model output`() =
+        runTest {
+            val tool = AlarmTool(RecordingPort(this), spacing = 1_000.milliseconds, timeSource = TestTimeSource())
+
+            val result = tool.execute(alarmArgs(minute = 30), context) as ToolResult.Success
+
+            assertEquals(AlarmCopy.RESULT_SUCCESS, result.text)
+            assertEquals(ToolContent.HandedOff(AlarmCopy.TARGET_APP), result.content)
+        }
+
+    @Test
+    fun `old success output restores its handoff but other output does not`() =
+        runTest {
+            val tool = AlarmTool(RecordingPort(this), spacing = 1_000.milliseconds, timeSource = TestTimeSource())
+
+            assertEquals(ToolContent.HandedOff(AlarmCopy.TARGET_APP), tool.restoreContent(AlarmCopy.RESULT_SUCCESS))
+            assertEquals(null, tool.restoreContent("not an alarm result"))
+        }
+
+    @Test
+    fun `a refused launch is reported as a failure`() =
+        runTest {
+            val tool = AlarmTool(RecordingPort(this, AlarmLaunchResult.Failed), spacing = 1_000.milliseconds, timeSource = TestTimeSource())
+
+            assertEquals(ToolResult.Failed(AlarmCopy.RESULT_FAILED), tool.execute(alarmArgs(minute = 30), context))
         }
 
     @Test

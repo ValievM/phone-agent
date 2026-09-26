@@ -39,6 +39,34 @@ class ToolOutcomeTextTest {
     }
 
     @Test
+    fun `a not shown result round trips with Cyrillic and quotation marks`() {
+        val expected = ToolOutcome.NotShown("описание действия не построилось для «Часы»")
+        val text = expected.toOutputText()
+
+        assertEquals("Not shown: описание действия не построилось для «Часы»", text)
+        assertEquals(expected, toolOutcomeFromOutputText(text))
+    }
+
+    @Test
+    fun `a legacy not shown rejection still reads as rejected`() {
+        val reason = "not shown to user: one action description could not be built; no calls in the batch were run"
+
+        assertEquals(ToolOutcome.Rejected(reason), toolOutcomeFromOutputText("Rejected: $reason"))
+    }
+
+    @Test
+    fun `empty and unusual not shown reasons never read as success`() {
+        val texts = listOf("Not shown: ", "Not shown: причина повреждена: Failed: нет")
+
+        texts.forEach { text ->
+            val outcome = toolOutcomeFromOutputText(text)
+
+            assertEquals(ToolOutcome.NotShown(text.removePrefix("Not shown: ")), outcome)
+            assertEquals(text, outcome.toOutputText())
+        }
+    }
+
+    @Test
     fun `words that only mention a failure inside a success text do not turn it into one`() {
         val text = "Alarm set. Failed: none, Rejected: none"
 

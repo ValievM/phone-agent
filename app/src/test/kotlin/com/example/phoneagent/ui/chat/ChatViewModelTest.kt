@@ -395,6 +395,37 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `a live alarm handoff is shown as sent to the clock app`() =
+        runTest(dispatcher.scheduler) {
+            interaction.approvalResult = true
+            val call = ToolCall(CallId("call-1"), "set_alarm", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("set_alarm", risk = Risk.CONFIRM) {
+                            ToolResult.Success("Запрос на будильник отправлен", ToolContent.HandedOff("Часы"))
+                        },
+                    ),
+                )
+            val viewModel = createChatViewModel(agentLoop(gateway, registry))
+
+            viewModel.onEvent(ChatUiEvent.Submit("поставь будильник"))
+            advanceUntilIdle()
+
+            val status =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+                    ?.status
+            assertEquals(ToolCallStatus.HandedOff("Часы"), status)
+        }
+
+
+    @Test
     fun `structured file content renders without knowing the tool name`() =
         runTest(dispatcher.scheduler) {
             val call = ToolCall(CallId("call-1"), "files_plugin", buildJsonObject {})

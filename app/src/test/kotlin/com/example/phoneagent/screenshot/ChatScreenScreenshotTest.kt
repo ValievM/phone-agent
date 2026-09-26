@@ -63,7 +63,7 @@ class ChatScreenScreenshotTest {
                             ChatRole.TOOL,
                             "",
                             ToolCallMessage(
-                                ToolCallStatus.Done("Будильник поставлен на 07:30"),
+                                ToolCallStatus.HandedOff("Часы"),
                                 alarmDescription,
                                 alarmArguments,
                             ),

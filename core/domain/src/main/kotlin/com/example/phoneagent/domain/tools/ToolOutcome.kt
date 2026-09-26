@@ -11,33 +11,40 @@ public sealed interface ToolOutcome {
         public val reason: String,
     ) : ToolOutcome
 
+    public data class NotShown(
+        public val reason: String,
+    ) : ToolOutcome
+
     public data class Failed(
         public val reason: String,
     ) : ToolOutcome
 }
 
 private const val REJECTED_LABEL = "Rejected: "
+private const val NOT_SHOWN_LABEL = "Not shown: "
 private const val FAILED_LABEL = "Failed: "
 
 /**
- * The text a finished call leaves in the saved history: the model reads it on the next turn. A success is
- * its own text; a rejection and a failure carry a label so the model (and the chat) can tell them apart.
+ * Text saved in history and sent to the model on the next turn. Success keeps its own text; other outcomes use a
+ * prefix so the chat can restore their status from that same saved value.
  */
 public fun ToolOutcome.toOutputText(): String =
     when (this) {
         is ToolOutcome.Success -> text
         is ToolOutcome.Rejected -> REJECTED_LABEL + reason
+        is ToolOutcome.NotShown -> NOT_SHOWN_LABEL + reason
         is ToolOutcome.Failed -> FAILED_LABEL + reason
     }
 
 /**
  * Reads a saved result back, so the chat can draw the card of a call again after the app is reopened.
- * Only the label at the very start counts. A success text that itself begins with one of the labels would
- * read back as a failure: that can only change how an old card looks, never what the model is told.
+ * Only a label at the very start counts. A success text that itself begins with one of the labels can restore as a
+ * non-success card, but the saved text sent to the model remains unchanged.
  */
 public fun toolOutcomeFromOutputText(text: String): ToolOutcome =
     when {
         text.startsWith(REJECTED_LABEL) -> ToolOutcome.Rejected(text.removePrefix(REJECTED_LABEL))
+        text.startsWith(NOT_SHOWN_LABEL) -> ToolOutcome.NotShown(text.removePrefix(NOT_SHOWN_LABEL))
         text.startsWith(FAILED_LABEL) -> ToolOutcome.Failed(text.removePrefix(FAILED_LABEL))
         else -> ToolOutcome.Success(text)
     }

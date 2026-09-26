@@ -40,9 +40,7 @@
 
 Чат и ход агента. Инструменты, вход, сборка, CI и логи — в [manual-verification-tools-build.md](manual-verification-tools-build.md).
 
-- [ ] Шторка подтверждения (`ApprovalSheet`, `ModalBottomSheet`) и все состояния
-  `ToolCallCard` — ожидает, выполняется, готово, ошибка, отклонено, прервано — визуально и
-  через TalkBack; закрытие жестом «назад» = отклонение (этап 4.4).
+- [ ] `ApprovalSheet`/`ModalBottomSheet` и девять состояний `ToolCallCard` (ожидает, выполняется, готово, файлы найдены, отправлено, не показано, ошибка, отклонено, прервано) — визуально и TalkBack; «назад» = отказ (этап 4.4).
 - [ ] `SensitiveApprovalSheet` на телефоне: полный текст, темы, кнопки, TalkBack, «Назад» = отказ;
   нужен тестовый вызов, SMS/звонков в MVP нет (Codex, 2026-09-25).
 - [ ] История чата в Room (`ui/chat/ChatViewModel.kt`, `storage/`) — **настоящий** перезапуск

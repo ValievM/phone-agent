@@ -85,12 +85,27 @@ class ChatViewModelBatchApprovalTest {
             assertEquals(List(3) { ToolCallStatus.Rejected }, toolStatuses(viewModel))
         }
 
+    @Test
+    fun `a live batch with an unavailable description is shown as not shown`() =
+        runTest(dispatcher.scheduler) {
+            val viewModel = viewModelWith(FakeUserInteraction(), brokenDescription = true)
+            advanceUntilIdle()
+
+            viewModel.onEvent(ChatUiEvent.Submit("три будильника"))
+            advanceUntilIdle()
+
+            assertEquals(List(3) { ToolCallStatus.NotShown }, toolStatuses(viewModel))
+        }
+
     private fun toolStatuses(viewModel: ChatViewModel) =
         viewModel.state.value.messages
             .filter { it.role == ChatRole.TOOL }
             .map { it.toolCall?.status }
 
-    private fun viewModelWith(interaction: UserInteraction): ChatViewModel {
+    private fun viewModelWith(
+        interaction: UserInteraction,
+        brokenDescription: Boolean = false,
+    ): ChatViewModel {
         val calls = (1..3).map { ToolCall(CallId("call-$it"), "set_alarm", buildJsonObject {}) }
         val gateway =
             FakeModelGateway().apply {
@@ -101,7 +116,12 @@ class ChatViewModelBatchApprovalTest {
             object : Tool {
                 override val spec = ToolSpec("set_alarm", "sets an alarm", buildJsonObject {}, Risk.CONFIRM)
 
-                override fun describe(args: JsonObject) = CallDescription("set_alarm", "calling set_alarm")
+                override fun describe(args: JsonObject): CallDescription =
+                    if (brokenDescription) {
+                        error("description unavailable")
+                    } else {
+                        CallDescription("set_alarm", "calling set_alarm")
+                    }
 
                 override suspend fun execute(
                     args: JsonObject,
