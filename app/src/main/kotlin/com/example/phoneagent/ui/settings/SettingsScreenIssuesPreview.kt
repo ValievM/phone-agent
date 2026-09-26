@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.PreviewFontScale
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 
 @PreviewLightDark
@@ -14,6 +15,7 @@ private fun SettingsModelCatalogUnavailablePreview() =
     SettingsPreviewFrame(ReadyState.copy(availableModels = emptyList(), isLoadingModels = false, modelCatalogUnavailable = true))
 
 @PreviewLightDark
+@PreviewFontScale
 @Composable
 private fun SettingsFolderNotSelectedPreview() = SettingsPreviewFrame(ReadyState.copy(searchFolderSelected = false))
 

@@ -66,6 +66,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     aboutEntry: SettingsAboutEntry,
     modifier: Modifier = Modifier,
+    selectedFolderName: String? = null,
 ) {
     var showClearHistoryConfirmation by rememberSaveable { mutableStateOf(false) }
     var showSignOutConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -102,7 +103,7 @@ fun SettingsScreen(
             item { AccountSection(state, onSignOut = { showSignOutConfirmation = true }) }
             item { AppearanceSection(state, onEvent) }
             item { ModelSection(state, onEvent) }
-            item { SearchFolderSection(state, onChooseFolder) }
+            item { SearchFolderSection(state, selectedFolderName, onChooseFolder) }
             item { HistorySection(state) { showClearHistoryConfirmation = true } }
             item { AboutAppRow(aboutEntry) }
             if (state.settingsUnavailable) item { StatusMessage(stringResource(R.string.settings_unavailable), Modifier.contentColumn()) }
@@ -236,25 +237,33 @@ private fun ModelMenuItem(
 @Composable
 private fun SearchFolderSection(
     state: SettingsUiState,
+    selectedFolderName: String?,
     onChooseFolder: () -> Unit,
 ) {
     SettingsSection(title = stringResource(R.string.settings_search_folder_title)) {
-        val status =
-            if (state.searchFolderSelected) {
-                R.string.settings_search_folder_selected
-            } else {
-                R.string.settings_search_folder_not_selected
-            }
+        if (state.searchFolderSelected) {
+            val folderName = selectedFolderName
+            val folderLabel =
+                if (folderName.isNullOrBlank()) {
+                    stringResource(R.string.settings_search_folder_selected_fallback)
+                } else {
+                    stringResource(R.string.settings_search_folder_selected_name, folderName)
+                }
+            Text(folderLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.settings_search_folder_selected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text(stringResource(R.string.settings_search_folder_not_selected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         val action =
             if (state.searchFolderSelected) {
                 R.string.settings_search_folder_change
             } else {
                 R.string.settings_search_folder_choose
             }
-        Text(stringResource(status), color = MaterialTheme.colorScheme.onSurfaceVariant)
         PrimaryButton(onClick = onChooseFolder, enabled = state.canEditSettings) {
             Text(stringResource(action))
         }
+        Text(stringResource(R.string.settings_search_folder_downloads_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.folderPermissionUnavailable) {
             Text(
                 stringResource(R.string.settings_search_folder_permission_error),
