@@ -52,3 +52,6 @@ hs_err_pid*
 
 # Kotlin Gradle plugin session data (any module)
 .kotlin/
+
+# Prompts handed to agents by the owner (generated, not versioned; source of truth: docs/tooling/swarm*.md)
+.prompts/
