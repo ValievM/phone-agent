@@ -9,9 +9,12 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.phoneagent.R
@@ -120,5 +123,44 @@ class AppearanceSectionOldAndroidUiTest {
 
         composeRule.onNodeWithText(context.getString(R.string.settings_system_colors_title)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.settings_theme_dark)).assertIsDisplayed()
+    }
+}
+
+/** Settings navigation entry coverage; the existing appearance tests above remain unchanged. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
+class AboutSettingsEntryUiTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    @Test
+    fun `settings exposes an about app entry with version and callback`() {
+        var aboutOpened = false
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.setContent {
+            AppTheme(useDynamicColor = false) {
+                SettingsScreen(
+                    state = SettingsUiState(isLoading = false),
+                    onEvent = {},
+                    onChooseFolder = {},
+                    onBack = {},
+                    aboutEntry =
+                        SettingsAboutEntry(
+                            versionName = "1.2.3",
+                            onOpen = { aboutOpened = true },
+                        ),
+                )
+            }
+        }
+
+        val title = context.getString(R.string.settings_about_title)
+        val versionText = context.getString(R.string.settings_about_version, "1.2.3")
+        val list = composeRule.onNodeWithTag(SETTINGS_CONTENT_LIST_TAG)
+        list.performScrollToNode(hasText(title))
+        composeRule.onNodeWithText(title).assertIsDisplayed()
+        list.performScrollToNode(hasText(versionText))
+        composeRule.onNodeWithText(versionText).performClick()
+        assertEquals(true, aboutOpened)
     }
 }

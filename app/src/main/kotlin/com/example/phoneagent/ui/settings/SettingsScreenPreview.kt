@@ -11,7 +11,13 @@ internal val PreviewModels = listOf("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-so
 @Composable
 internal fun SettingsPreviewFrame(state: SettingsUiState) {
     AppTheme(useDynamicColor = false) {
-        SettingsScreen(state = state, onEvent = {}, onChooseFolder = {}, onBack = {})
+        SettingsScreen(
+            state = state,
+            onEvent = {},
+            onChooseFolder = {},
+            onBack = {},
+            aboutEntry = SettingsAboutEntry(versionName = "0.1.0", onOpen = {}),
+        )
     }
 }
 

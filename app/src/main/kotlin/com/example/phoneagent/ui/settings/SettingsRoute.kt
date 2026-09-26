@@ -6,19 +6,29 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.phoneagent.R
+import com.example.phoneagent.ui.readAppVersionName
 
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val unavailableVersionLabel = stringResource(R.string.about_version_unavailable)
+    val appVersionName =
+        remember(context.packageManager, context.packageName, unavailableVersionLabel) {
+            readAppVersionName(context.packageManager, context.packageName, unavailableVersionLabel)
+        }
     val folderPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
             if (uri != null) {
@@ -37,6 +47,7 @@ fun SettingsRoute(
         onEvent = viewModel::onEvent,
         onChooseFolder = { folderPicker.launch(null) },
         onBack = onBack,
+        aboutEntry = SettingsAboutEntry(versionName = appVersionName, onOpen = onOpenAbout),
         modifier = modifier,
     )
 }

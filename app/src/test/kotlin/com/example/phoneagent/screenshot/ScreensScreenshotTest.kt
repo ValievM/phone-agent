@@ -11,6 +11,7 @@ import com.example.phoneagent.ui.login.LoginScreen
 import com.example.phoneagent.ui.login.LoginUiState
 import com.example.phoneagent.ui.root.ThemeState
 import com.example.phoneagent.ui.root.ThemedRoot
+import com.example.phoneagent.ui.settings.SettingsAboutEntry
 import com.example.phoneagent.ui.settings.SettingsScreen
 import com.example.phoneagent.ui.settings.SettingsUiState
 import com.example.phoneagent.ui.settings.ThemeMode
@@ -58,7 +59,13 @@ class ScreensScreenshotTest {
         name: String,
         state: SettingsUiState,
     ) = composeRule.snapshot("settings_$name", allVariants, fillScreen = true) {
-        SettingsScreen(state = state, onEvent = {}, onChooseFolder = {}, onBack = {})
+        SettingsScreen(
+            state = state,
+            onEvent = {},
+            onChooseFolder = {},
+            onBack = {},
+            aboutEntry = SettingsAboutEntry(versionName = "0.1.0", onOpen = {}),
+        )
     }
 
     private val loaded =

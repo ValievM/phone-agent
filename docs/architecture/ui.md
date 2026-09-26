@@ -8,7 +8,7 @@
   ```
   ui/
   ├─ designsystem/   theme/ (цвета, типографика, формы, токены), components/ (Composer, ToolCallCard, AssistantMarkdown…), icons/ (AppIcons)
-  ├─ chat/ login/ settings/     экраны: Route, Screen, ViewModel, UiState, UiEvent
+  ├─ chat/ login/ about/ settings/     экраны: Route, Screen, ViewModel, UiState, UiEvent
   └─ navigation/     ключи Navigation 3 и корневой NavDisplay
   ```
   `designsystem` не знает про экраны; экраны берут из него компоненты и тему. Когда второму модулю понадобится дизайн-система, она выделяется в `:core:designsystem`.

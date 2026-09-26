@@ -45,6 +45,7 @@ class SettingsSignOutUiTest {
                 onEvent = { event -> events.add(event) },
                 onChooseFolder = {},
                 onBack = {},
+                aboutEntry = SettingsAboutEntry(versionName = "0.1.0", onOpen = {}),
             )
         }
     }

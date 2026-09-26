@@ -80,7 +80,7 @@ flowchart TD
 - `PhoneAgentApplication` (`@HiltAndroidApp`): ставит `crashLoggingHandler` с `AppLogger`.
 - `MainActivity` (`@AndroidEntryPoint`): `AppTheme { LoginRoute(authenticatedContent = AppNavigation); InteractionHost(bridge) }`.
 - `LoginRoute` → `LoginViewModel` → `AuthCoordinator.restore()` в `init`; пока не `isSignedIn`, показывает `LoginScreen`.
-- `AppNavigation`: Navigation 3, `AppDestination.Chat` и `Settings`, стек в `remember`. `ChatRoute` → `ChatViewModel`; `SettingsRoute` → `SettingsViewModel` и выбор папки (`OpenDocumentTree`).
+- `AppNavigation`: Navigation 3 и стек `AppDestination` в `remember`; `ChatRoute` → `ChatViewModel`, `SettingsRoute` → `SettingsViewModel`, `AboutRoute` → экран версии и лицензий.
 
 ## Автоматические правила (Konsist)
 
