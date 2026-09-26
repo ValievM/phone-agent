@@ -92,7 +92,7 @@ flowchart TD
 
 Подсказки, не приговор. «Проверено» = видно в коде; «гипотеза» = вывод по коду.
 
-1. `ToolPipeline.kt:85`, `NotifyTool.kt:59`, `SearchFilesTool.kt:78`, `AgentModule.kt:50`: `withTimeout(5 с)` охватывает `tool.execute`, а инструменты внутри вызывают `UserInteraction.ensure()` (системный диалог разрешения). Ответ дольше 5 с даёт `Failed("timed out…")`, ответ на диалог теряется. Проверено чтением, на устройстве не воспроизводилось.
+1. Устранено в #46: `ToolPipeline` запрашивает разрешения по `requiredCapabilities` до таймаута исполнения; `find_files`/`search_files` получили бюджет 30 с вместо прежних 5 с. Таймаут возвращает стабильную причину, закрытие запроса — `Denied`.
 2. `FindFilesTool.kt:73,87`, `SafDocumentNode.kt:24`, `ChatViewModel.kt:150`: блокирующий обход SAF без `withContext(IO)`, а цикл агента собирается в `viewModelScope` (Main.immediate): до 5 с на главном потоке, `withTimeout` блокирующий код не прерывает. `SearchFilesTool.kt:93` уходит на IO. `DispatcherProvider` в main не используется, `Dispatchers.IO` зашит в 7 местах (против patterns.md). Проверено.
 3. `ChatViewModel.kt` (308 строк): ход агента, синхронизация истории с Room (`pendingOwnEmissions`), retry, маппинг событий, статусы карточек. `:143` берёт `RandomIdGenerator` мимо порта `IdGenerator`. Порог recipes.md (~300 строк) превышен. Проверено.
 4. Решено: `SearchFilesTool` отдаёт и восстанавливает `ToolContent`; UI его отображает без имени инструмента и разбора JSON. Текст истории и Room не изменены.

@@ -249,6 +249,11 @@ class ToolCallCardStatusUiTest {
                 role = StatusColorRole.Error,
             ),
             StatusCase(
+                status = ToolCallStatus.Failed("tool execution timed out"),
+                label = "Инструмент не успел выполниться",
+                role = StatusColorRole.Error,
+            ),
+            StatusCase(
                 status = ToolCallStatus.Rejected,
                 label = context.getString(R.string.tool_call_status_rejected),
                 role = StatusColorRole.Neutral,

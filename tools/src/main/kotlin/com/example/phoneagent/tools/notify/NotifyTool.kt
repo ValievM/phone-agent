@@ -1,8 +1,6 @@
 package com.example.phoneagent.tools.notify
 
 import com.example.phoneagent.domain.interaction.Capability
-import com.example.phoneagent.domain.interaction.CapabilityResult
-import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
@@ -22,7 +20,6 @@ import javax.inject.Inject
 internal class NotifyTool
     @Inject
     constructor(
-        private val userInteraction: UserInteraction,
         private val notifier: Notifier,
     ) : Tool {
         override val spec: ToolSpec =
@@ -52,23 +49,15 @@ internal class NotifyTool
             return showNotification(notifyArgs)
         }
 
-        private suspend fun showNotification(args: NotifyArgs): ToolResult =
+        private fun showNotification(args: NotifyArgs): ToolResult =
             when (val validation = validateNotifyArgs(args)) {
                 is NotifyValidationResult.Invalid -> {
                     ToolResult.Failed(NotifyCopy.validationError(validation.error))
                 }
 
                 NotifyValidationResult.Valid -> {
-                    when (userInteraction.ensure(Capability.NOTIFICATIONS)) {
-                        CapabilityResult.Available -> {
-                            notifier.notify(args.title, args.message)
-                            ToolResult.Success(NotifyCopy.NOTIFICATION_SHOWN)
-                        }
-
-                        CapabilityResult.Denied -> {
-                            ToolResult.Failed(NotifyCopy.PERMISSION_DENIED)
-                        }
-                    }
+                    notifier.notify(args.title, args.message)
+                    ToolResult.Success(NotifyCopy.NOTIFICATION_SHOWN)
                 }
             }
     }

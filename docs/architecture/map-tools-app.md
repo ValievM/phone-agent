@@ -50,10 +50,10 @@ AndroidMediaStoreSearch ..|> MediaStoreSearch
 
 | Инструмент | `Risk` | Логика без Android | Android-обёртка | Заметки |
 |---|---|---|---|---|
-| `AlarmTool` `set_alarm` | `CONFIRM` | `AlarmIntentFactory`, `validateAlarmArgs` | `AlarmIntentLauncher`: `startActivity(SET_ALARM)` с `NEW_TASK` из application context | Запрос уходит в приложение «Часы», факт создания будильника не проверяется |
-| `NotifyTool` `notify` | `SAFE` | `validateNotifyArgs` (заголовок до 100, текст до 500) | `AndroidNotifier`: канал `phone_agent_notifications`, `NOTIFICATION_ID=1` | Сам зовёт `UserInteraction.ensure(NOTIFICATIONS)`; новое уведомление заменяет прежнее |
-| `FindFilesTool` `find_files` | `SAFE` | `SafTreeWalker`: обход в ширину (глубина 6, 5000 узлов, 5 с, 20 совпадений), `FindFilesArgs` | `RealSelectedFolder` (папка из `AppSettings.searchFolderUri`), `SafDocumentNode`, `SafDocuments` | Возвращает имена и относительные пути; нет папки = `Failed` |
-| `SearchFilesTool` `search_files` | `SAFE` | `SearchFilesPolicy`: дедуп по имени и размеру, 20 записей, JSON до 3500 байт; `SearchFilesArgs` | `AndroidMediaStoreSearch`: `Files` и `Downloads`, `LIKE` по `DISPLAY_NAME` | Сам зовёт `ensure(FILES)`; отдаёт `content://` URI и метаданные (ADR 0003) |
+| `AlarmTool` `set_alarm` | `CONFIRM` | `AlarmIntentFactory`, `validateAlarmArgs` | `AlarmIntentLauncher`: `startActivity(SET_ALARM)` с `NEW_TASK` из application context | Запрос уходит в приложение «Часы», таймаут выполнения 5 с; факт создания будильника не проверяется |
+| `NotifyTool` `notify` | `SAFE` | `validateNotifyArgs` (заголовок до 100, текст до 500) | `AndroidNotifier`: канал `phone_agent_notifications`, `NOTIFICATION_ID=1` | Право проверяет `ToolPipeline`; новое уведомление заменяет прежнее |
+| `FindFilesTool` `find_files` | `SAFE` | `SafTreeWalker`: обход в ширину (глубина 6, 5000 узлов, 30 с, 20 совпадений), `FindFilesArgs` | `RealSelectedFolder` (папка из `AppSettings.searchFolderUri`), `SafDocumentNode`, `SafDocuments` | Возвращает имена и относительные пути; нет папки = `Failed` |
+| `SearchFilesTool` `search_files` | `SAFE` | `SearchFilesPolicy`: дедуп по имени и размеру, 20 записей, JSON до 3500 байт; `SearchFilesArgs` | `AndroidMediaStoreSearch`: `Files` и `Downloads`, `LIKE` по `DISPLAY_NAME` | Право проверяет `ToolPipeline`; бюджет исполнения 30 с; отдаёт `content://` URI и метаданные (ADR 0003) |
 
 Общее: каждый инструмент строит схему вручную, декодирует аргументы `kotlinx.serialization`, `describe()` даёт `CallDescription` для карточки и шторки. Русские тексты лежат в `*Copy.kt` (не в `strings.xml`). Регистрация: `@Binds @IntoSet` в `AlarmBindings`, `NotifyBindings`, `FilesBindings` (все `internal`).
 

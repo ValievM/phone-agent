@@ -103,6 +103,7 @@
     <string name="tool_call_status_not_shown">Не показано: не удалось описать действие</string>
     <string name="tool_call_status_rejected">Отклонено</string>
     <string name="tool_call_status_cancelled">Прервано</string>
+    <string name="tool_call_status_timeout">Инструмент не успел выполниться</string>
     <string name="tool_call_arguments">Аргументы</string>
     <string name="tool_call_toggle_arguments">Показать или скрыть аргументы вызова</string>
     <string name="approval_sheet_title">Разрешить действие?</string>

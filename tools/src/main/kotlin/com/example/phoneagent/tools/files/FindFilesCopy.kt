@@ -22,7 +22,7 @@ internal object FindFilesCopy {
     const val NO_MATCHES: String = "No files matching the query were found in the selected folder."
     const val LIMIT_DEPTH: String = "Search stopped early: depth limit of 6 reached."
     const val LIMIT_NODES: String = "Search stopped early: scan limit of 5000 nodes reached."
-    const val LIMIT_TIME: String = "Search stopped early: 5-second time limit reached."
+    const val LIMIT_TIME: String = "Search stopped early: 30-second time limit reached."
     const val LIMIT_RESULTS: String = "Result list capped at 20 matches; more may exist."
 
     fun cardSummaryWithQuery(query: String): String = "Найти файлы по запросу «$query» в выбранной папке"

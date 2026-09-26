@@ -96,10 +96,9 @@ AL-->>VM: ToolCallFinished (card status)
 Note over AL: ToolCallItem and ToolOutput go to newItems, model gets the output
 ```
 
-Для `SAFE` подтверждение не требуется. В `execute` `NotifyTool`/`SearchFilesTool` вызывают `bridge.ensure(capability)`: `InteractionHost` показывает системный запрос, ответ приходит через `deferred`. Текст вопроса — из `Tool.describe`, не модели. Ошибка описания одиночного `CONFIRM`/`SENSITIVE` даёт `Failed`; пакетного — `NotShown` всем вызовам без исполнения. Неизвестный инструмент/ошибки аргументов дают `ToolOutcome.Failed`.
+Для `SAFE` подтверждение не требуется. `ToolPipeline` запрашивает `ToolSpec.requiredCapabilities` через `bridge.ensure(capability)` до таймаута исполнения; `InteractionHost` показывает системный запрос. Текст вопроса для подтверждений — из `Tool.describe`, не модели. Ошибка описания одиночного `CONFIRM`/`SENSITIVE` даёт `Failed`; пакетного — `NotShown` всем вызовам без исполнения. Неизвестный инструмент/ошибки аргументов дают `ToolOutcome.Failed`.
 
 Гонки и хрупкие места:
-- `ToolPipeline.kt:85`, `NotifyTool.kt:59`, `SearchFilesTool.kt:78`: диалог разрешения внутри `withTimeout(5 с)` (наблюдение 1 в [обзоре](map-overview.md)).
 - `UserInteractionBridge.kt:50,60`: один слот; второй параллельный вопрос затрёт первый. Сейчас вызовы идут по одному.
 - `AgentLoop.kt:96-98`: `ApprovalRequested` уходит до `run()`; при `Failed` по аргументам окна не будет, карточка останется в `AwaitingApproval` до `ToolCallFinished`. Гипотеза, косметика.
 - `ChatViewModel.kt:56-58`: `ApprovalRequested` без id привязан к последнему стартовавшему вызову; верно при последовательных вызовах.
