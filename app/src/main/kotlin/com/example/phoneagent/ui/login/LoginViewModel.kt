@@ -22,7 +22,7 @@ class LoginViewModel
         val state: StateFlow<LoginUiState> =
             coordinator.state
                 .map(::toUiState)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LoginUiState(isLoading = true))
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LoginUiState(isRestoring = true))
 
         init {
             viewModelScope.launch { coordinator.restore() }
@@ -51,7 +51,7 @@ class LoginViewModel
         private fun toUiState(status: AppAuthStatus): LoginUiState =
             when (status) {
                 AppAuthStatus.Restoring -> {
-                    LoginUiState(isLoading = true)
+                    LoginUiState(isRestoring = true)
                 }
 
                 is AppAuthStatus.SignedOut -> {

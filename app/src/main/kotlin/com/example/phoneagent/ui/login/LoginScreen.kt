@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -67,42 +68,50 @@ fun LoginRoute(
     // (persisted to disk across process death). It only needs to survive recompositions.
     var apiKey by remember { mutableStateOf("") }
 
-    if (state.isSignedIn) {
-        authenticatedContent(viewModel::signOut)
-    } else {
-        LoginScreen(
-            state = state,
-            form = LoginFormState(showApiKey, apiKey),
-            onEvent = { event ->
-                when (event) {
-                    is LoginUiEvent.ApiKeyChanged -> {
-                        apiKey = event.value
-                    }
+    when {
+        state.isRestoring -> {
+            RestoringScreen(modifier)
+        }
 
-                    LoginUiEvent.ShowApiKey -> {
-                        showApiKey = true
-                    }
+        state.isSignedIn -> {
+            authenticatedContent(viewModel::signOut)
+        }
 
-                    LoginUiEvent.BrowserSignIn -> {
-                        viewModel.signInWithBrowser()
-                    }
+        else -> {
+            LoginScreen(
+                state = state,
+                form = LoginFormState(showApiKey, apiKey),
+                onEvent = { event ->
+                    when (event) {
+                        is LoginUiEvent.ApiKeyChanged -> {
+                            apiKey = event.value
+                        }
 
-                    LoginUiEvent.ApiKeySignIn -> {
-                        viewModel.signInWithApiKey(apiKey)
-                        apiKey = ""
-                    }
+                        LoginUiEvent.ShowApiKey -> {
+                            showApiKey = true
+                        }
 
-                    LoginUiEvent.DeviceCodeSignIn -> {
-                        viewModel.signInWithDeviceCode()
-                    }
+                        LoginUiEvent.BrowserSignIn -> {
+                            viewModel.signInWithBrowser()
+                        }
 
-                    LoginUiEvent.OpenDevicePage -> {
-                        viewModel.openDeviceVerificationPage()
+                        LoginUiEvent.ApiKeySignIn -> {
+                            viewModel.signInWithApiKey(apiKey)
+                            apiKey = ""
+                        }
+
+                        LoginUiEvent.DeviceCodeSignIn -> {
+                            viewModel.signInWithDeviceCode()
+                        }
+
+                        LoginUiEvent.OpenDevicePage -> {
+                            viewModel.openDeviceVerificationPage()
+                        }
                     }
-                }
-            },
-            modifier = modifier,
-        )
+                },
+                modifier = modifier,
+            )
+        }
     }
 }
 
@@ -113,6 +122,10 @@ fun LoginScreen(
     onEvent: (LoginUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (state.isRestoring) {
+        RestoringScreen(modifier)
+        return
+    }
     Scaffold(modifier = modifier) { contentPadding ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(contentPadding).imePadding()) {
             val viewport = maxHeight
@@ -145,6 +158,28 @@ fun LoginScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RestoringScreen(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.large, Alignment.CenterVertically),
+        ) {
+            Icon(
+                painter = painterResource(AppIcons.brandMark),
+                contentDescription = null,
+                modifier = Modifier.size(BRAND_MARK_SIZE),
+                tint = AppTheme.extendedColors.brandMark,
+            )
+            CircularProgressIndicator(modifier = Modifier.testTag("auth-restoring-indicator"))
         }
     }
 }
