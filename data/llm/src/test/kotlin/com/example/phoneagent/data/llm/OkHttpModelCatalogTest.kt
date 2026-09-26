@@ -28,8 +28,17 @@ class OkHttpModelCatalogTest {
             MockWebServer().use { server ->
                 server.start()
                 server.enqueue(MockResponse.Builder().code(503).build())
+                val records = FakeAppLogger()
 
-                assertEquals(ModelCatalogResult.Unavailable, catalog(server).load())
+                assertEquals(
+                    ModelCatalogResult.Unavailable,
+                    catalog(server, RedactingAppLogger(records)).load(),
+                )
+
+                val event = records.events.single()
+                assertEquals(LogLevel.WARN, event.level)
+                assertEquals("load model catalog failed", event.message)
+                assertEquals("503", event.fields["http"])
             }
         }
 
@@ -104,7 +113,8 @@ class OkHttpModelCatalogTest {
                         ).build(),
                 )
 
-                val catalog = catalog(server)
+                val records = FakeAppLogger()
+                val catalog = catalog(server, RedactingAppLogger(records))
 
                 assertEquals(
                     ModelCatalogResult.Available(listOf("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol")),
@@ -114,6 +124,16 @@ class OkHttpModelCatalogTest {
                 assertEquals("/api/models", request.url.encodedPath)
                 assertEquals("test-version", request.url.queryParameter("client_version"))
                 assertEquals("Bearer test-token", request.headers["Authorization"])
+
+                val event = records.events.single()
+                assertEquals(LogLevel.INFO, event.level)
+                assertEquals("ModelCatalog", event.tag)
+                assertEquals("model catalog loaded", event.message)
+                assertEquals("3", event.fields["count"])
+                assertEquals("200", event.fields["http"])
+                assertFalse(event.toString().contains("gpt-5.6-luna"))
+                assertFalse(event.toString().contains("gpt-5.6-terra"))
+                assertFalse(event.toString().contains("gpt-5.6-sol"))
             }
         }
 
