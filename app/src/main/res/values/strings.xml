@@ -156,6 +156,8 @@
     <string name="license_name_apache_2_0">Apache 2.0</string>
     <string name="license_name_ofl_1_1">SIL Open Font License 1.1</string>
     <string name="license_name_bsd_3_clause">BSD-3-Clause</string>
+    <string name="license_name_mit">MIT</string>
+    <string name="license_name_boost_1_0">Boost Software License 1.0</string>
     <string name="about_license_text_title">Текст лицензии %1$s</string>
     <string name="about_show_license">Показать текст %1$s</string>
     <string name="about_hide_license">Скрыть текст %1$s</string>

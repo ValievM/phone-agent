@@ -172,19 +172,42 @@ private fun LicenseEntriesSection(
 private fun LicenseEntryContent(entry: LicenseEntry) {
     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.compact)) {
         Text(entry.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("about-entry-${entry.name}"))
-        Text(
-            stringResource(R.string.about_rights_holder, entry.holder),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        LicenseAttributionContent(
+            holder = entry.holder,
+            license = entry.license,
+            testTag = "about-license-${entry.name}-0",
         )
-        val licenseName = stringResource(LicenseTextResources.nameResourceIds.getValue(entry.license))
-        Text(
-            stringResource(R.string.about_license_name, licenseName),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.testTag("about-license-${entry.name}"),
-        )
+        entry.additionalNotices.forEachIndexed { index, notice ->
+            LicenseAttributionContent(
+                holder = notice.holder,
+                license = notice.license,
+                testTag = "about-license-${entry.name}-${index + 1}",
+            )
+        }
         Text(
             stringResource(R.string.about_project_source, entry.source),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun LicenseAttributionContent(
+    holder: String,
+    license: LicenseKind,
+    testTag: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.compact)) {
+        Text(
+            stringResource(R.string.about_rights_holder, holder),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("$testTag-holder"),
+        )
+        val licenseName = stringResource(LicenseTextResources.nameResourceIds.getValue(license))
+        Text(
+            stringResource(R.string.about_license_name, licenseName),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(testTag),
         )
     }
 }

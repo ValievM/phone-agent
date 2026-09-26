@@ -15,7 +15,7 @@
 | `interaction` | 1 | `UserInteractionBridge`, `PendingInteraction` |
 | `logging` | 2 | `AndroidLogcatLogger`, `crashLoggingHandler` |
 | `di` | 5 | 11 Hilt-модулей ([обзор](map-overview.md)) |
-| `ui.chat`, `ui.designsystem`, `ui.login`, `ui.settings`, `ui.interaction`, `ui.navigation` | 11, 28, 4, 6, 1, 1 | экраны, компоненты, `InteractionHost`, `AppNavigation` |
+| `ui.chat`, `ui.designsystem`, `ui.login`, `ui.about`, `ui.settings`, `ui.interaction`, `ui.navigation` | 11, 28, 4, 5, 6, 1, 1 | экраны, компоненты, `InteractionHost`, `AppNavigation` |
 
 Хранилища разложены по двум пакетам: настройки в `data.storage`, история в `storage`. Мост диалогов тоже в двух: `interaction` (логика) и `ui.interaction` (Compose).
 

@@ -85,18 +85,25 @@ class AboutScreenUiTest {
     }
 
     @Test
-    fun `every catalog entry is shown with its exact license name`() {
+    fun `every catalog attribution shows its exact license and holder`() {
         show()
         val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
 
         LicenseCatalog.entries.forEach { entry ->
             list.performScrollToNode(hasText(entry.name))
             composeRule.onNodeWithTag("about-entry-${entry.name}").assertIsDisplayed()
-            val licenseName = string(LicenseTextResources.nameResourceIds.getValue(entry.license))
-            val licenseNode = composeRule.onNodeWithTag("about-license-${entry.name}")
-            licenseNode.performScrollTo()
-            licenseNode.assert(hasText(string(R.string.about_license_name, licenseName)))
-            licenseNode.assertIsDisplayed()
+            (listOf(LicenseNotice(entry.holder, entry.license)) + entry.additionalNotices)
+                .forEachIndexed { index, notice ->
+                    val licenseName = string(LicenseTextResources.nameResourceIds.getValue(notice.license))
+                    val licenseNode = composeRule.onNodeWithTag("about-license-${entry.name}-$index")
+                    licenseNode.performScrollTo()
+                    licenseNode.assert(hasText(string(R.string.about_license_name, licenseName)))
+                    licenseNode.assertIsDisplayed()
+                    composeRule
+                        .onNodeWithTag("about-license-${entry.name}-$index-holder")
+                        .assert(hasText(string(R.string.about_rights_holder, notice.holder)))
+                        .assertIsDisplayed()
+                }
         }
     }
 
@@ -139,6 +146,59 @@ class AboutScreenUiTest {
         hideToggle.performClick()
         composeRule.onNodeWithText(textMarker, substring = true).assertDoesNotExist()
         composeRule.onNodeWithText(endMarker, substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `MIT notice expands to its copyright and permission terms`() {
+        var expanded by mutableStateOf(emptySet<LicenseKind>())
+        composeRule.setContent {
+            AppTheme(useDynamicColor = false) {
+                AboutScreen(
+                    versionName = "1.2.3",
+                    licenseTexts = licenseTexts,
+                    expandedLicenseKinds = expanded,
+                    onToggleLicense = { kind ->
+                        expanded = if (kind in expanded) expanded - kind else expanded + kind
+                    },
+                    onBack = {},
+                )
+            }
+        }
+        val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
+        val licenseName = string(R.string.license_name_mit)
+        val title = string(R.string.about_license_text_title, licenseName)
+        list.performScrollToNode(hasText(title))
+        composeRule.onNodeWithText(string(R.string.about_show_license, licenseName)).performClick()
+
+        composeRule.onNodeWithText("Copyright (c) 2021 Erik Hellman", substring = true).assertExists()
+        composeRule.onNodeWithText("THE SOFTWARE IS PROVIDED \"AS IS\"", substring = true).assertExists()
+    }
+
+    @Test
+    fun `Boost text section expands to the source copyright and disclaimer`() {
+        var expanded by mutableStateOf(emptySet<LicenseKind>())
+        composeRule.setContent {
+            AppTheme(useDynamicColor = false) {
+                AboutScreen(
+                    versionName = "1.2.3",
+                    licenseTexts = licenseTexts,
+                    expandedLicenseKinds = expanded,
+                    onToggleLicense = { kind ->
+                        expanded = if (kind in expanded) expanded - kind else expanded + kind
+                    },
+                    onBack = {},
+                )
+            }
+        }
+        val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
+        val licenseName = string(R.string.license_name_boost_1_0)
+        val title = string(R.string.about_license_text_title, licenseName)
+        list.performScrollToNode(hasText(title))
+        composeRule.onNodeWithText(string(R.string.about_show_license, licenseName)).performClick()
+
+        composeRule.onNodeWithText("Boost Software License - Version 1.0", substring = true).assertExists()
+        composeRule.onNodeWithText("Permission is hereby granted", substring = true).assertExists()
+        composeRule.onNodeWithText("DEALINGS IN THE SOFTWARE.", substring = true).assertExists()
     }
 
     @OptIn(ExperimentalTestApi::class)

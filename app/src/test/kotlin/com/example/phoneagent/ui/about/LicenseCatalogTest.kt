@@ -20,7 +20,9 @@ class LicenseCatalogTest {
                 "OkHttp и Okio" to LicenseKind.APACHE_2_0,
                 "Kotlin: стандартная библиотека, корутины, сериализация и неизменяемые коллекции" to LicenseKind.APACHE_2_0,
                 "Markdown renderer и подсветка кода" to LicenseKind.APACHE_2_0,
-                "Java-аннотации (JSR-305, JSpecify и JetBrains)" to LicenseKind.APACHE_2_0,
+                "JSR-305" to LicenseKind.APACHE_2_0,
+                "JSpecify" to LicenseKind.APACHE_2_0,
+                "Аннотации JetBrains" to LicenseKind.APACHE_2_0,
                 "Protocol Buffers (внутри DataStore)" to LicenseKind.BSD_3_CLAUSE,
             )
 
@@ -36,10 +38,47 @@ class LicenseCatalogTest {
     }
 
     @Test
+    fun `markdown renderer includes MIT attribution for composer`() {
+        val markdownEntry = LicenseCatalog.entries.single { it.name == "Markdown renderer и подсветка кода" }
+
+        assertTrue("MIT license kind must be available", LicenseKind.MIT in LicenseKind.entries)
+        assertEquals(listOf(LicenseNotice("Erik Hellman", LicenseKind.MIT)), markdownEntry.additionalNotices)
+    }
+
+    @Test
+    fun `Kotlin stdlib exposes nested Boost and BSD notices`() {
+        val kotlinEntry =
+            LicenseCatalog.entries.single {
+                it.name == "Kotlin: стандартная библиотека, корутины, сериализация и неизменяемые коллекции"
+            }
+
+        assertEquals(
+            listOf(
+                "Eric Ford and Hubert Holin" to "BOOST_1_0",
+                "Stephen Colebourne; Michael Nascimento Santos" to "BSD_3_CLAUSE",
+            ),
+            kotlinEntry.additionalNotices.map { it.holder to it.license.name },
+        )
+    }
+
+    @Test
+    fun `Java annotation entries name verified rights holders`() {
+        val jspecifyEntry = LicenseCatalog.entries.single { it.name == "JSpecify" }
+        val jetBrainsEntry = LicenseCatalog.entries.single { it.name == "Аннотации JetBrains" }
+
+        assertEquals("Google LLC; Oracle America, Inc.; SpotBugs Team", jspecifyEntry.holder)
+        assertEquals("JetBrains s.r.o.", jetBrainsEntry.holder)
+    }
+
+    @Test
     fun `every catalog license kind has one bundled text mapping`() {
-        val catalogKinds = LicenseCatalog.entries.map { it.license }.toSet()
+        val catalogKinds =
+            LicenseCatalog.entries
+                .flatMap { entry -> listOf(entry.license) + entry.additionalNotices.map { it.license } }
+                .toSet()
 
         assertEquals(LicenseKind.entries.toSet(), catalogKinds)
         assertEquals(LicenseKind.entries.toSet(), LicenseTextResources.textResourceIds.keys)
+        assertTrue(LicenseKind.entries.any { it.name == "BOOST_1_0" })
     }
 }

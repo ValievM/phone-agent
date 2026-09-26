@@ -5,16 +5,24 @@ enum class LicenseKind {
     APACHE_2_0,
     OFL_1_1,
     BSD_3_CLAUSE,
+    MIT,
+    BOOST_1_0,
 }
+
+data class LicenseNotice(
+    val holder: String,
+    val license: LicenseKind,
+)
 
 data class LicenseEntry(
     val name: String,
     val holder: String,
     val license: LicenseKind,
     val source: String,
+    val additionalNotices: List<LicenseNotice> = emptyList(),
 )
 
-/** License notices grouped by project families; all release POMs were audited individually. */
+/** Release licenses are grouped by project family; nested licenses remain separate notices. */
 object LicenseCatalog {
     val fonts =
         listOf(
@@ -49,7 +57,7 @@ object LicenseCatalog {
             LicenseEntry("Dagger и Hilt", "Google, Inc.", LicenseKind.APACHE_2_0, "https://github.com/google/dagger"),
             LicenseEntry(
                 "API внедрения зависимостей (JSR-330 и Jakarta Inject)",
-                "Eclipse Foundation; правообладатель javax.inject не указан в POM",
+                "Eclipse Foundation; The JSR-330 Expert Group",
                 LicenseKind.APACHE_2_0,
                 "http://code.google.com/p/atinject/; https://github.com/eclipse-ee4j/injection-api",
             ),
@@ -69,8 +77,17 @@ object LicenseCatalog {
                 "Kotlin: стандартная библиотека, корутины, сериализация и неизменяемые коллекции",
                 "Kotlin Team; JetBrains Team",
                 LicenseKind.APACHE_2_0,
-                "https://kotlinlang.org/; https://github.com/Kotlin/kotlinx.coroutines; " +
-                    "https://github.com/Kotlin/kotlinx.serialization; https://github.com/Kotlin/kotlinx.collections.immutable",
+                "https://kotlinlang.org/; https://github.com/JetBrains/kotlin; " +
+                    "https://github.com/Kotlin/kotlinx.coroutines; https://github.com/Kotlin/kotlinx.serialization; " +
+                    "https://github.com/Kotlin/kotlinx.collections.immutable",
+                additionalNotices =
+                    listOf(
+                        LicenseNotice("Eric Ford and Hubert Holin", LicenseKind.BOOST_1_0),
+                        LicenseNotice(
+                            "Stephen Colebourne; Michael Nascimento Santos",
+                            LicenseKind.BSD_3_CLAUSE,
+                        ),
+                    ),
             ),
             LicenseEntry(
                 "Markdown renderer и подсветка кода",
@@ -78,12 +95,25 @@ object LicenseCatalog {
                 LicenseKind.APACHE_2_0,
                 "https://github.com/mikepenz/multiplatform-markdown-renderer; " +
                     "https://github.com/JetBrains/markdown; https://github.com/SnipMeDev/Highlights",
+                additionalNotices = listOf(LicenseNotice("Erik Hellman", LicenseKind.MIT)),
             ),
             LicenseEntry(
-                "Java-аннотации (JSR-305, JSpecify и JetBrains)",
+                "JSR-305",
                 "Правообладатель не указан в POM",
                 LicenseKind.APACHE_2_0,
-                "http://findbugs.sourceforge.net/; http://jspecify.org/; https://github.com/JetBrains/java-annotations",
+                "http://findbugs.sourceforge.net/",
+            ),
+            LicenseEntry(
+                "JSpecify",
+                "Google LLC; Oracle America, Inc.; SpotBugs Team",
+                LicenseKind.APACHE_2_0,
+                "https://github.com/jspecify/jspecify",
+            ),
+            LicenseEntry(
+                "Аннотации JetBrains",
+                "JetBrains s.r.o.",
+                LicenseKind.APACHE_2_0,
+                "https://github.com/JetBrains/java-annotations",
             ),
             LicenseEntry(
                 "Protocol Buffers (внутри DataStore)",

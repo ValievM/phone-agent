@@ -9,6 +9,8 @@ internal object LicenseTextResources {
             LicenseKind.APACHE_2_0 to R.raw.license_apache_2_0,
             LicenseKind.OFL_1_1 to R.raw.license_ofl_1_1,
             LicenseKind.BSD_3_CLAUSE to R.raw.license_bsd_3_clause,
+            LicenseKind.MIT to R.raw.license_mit,
+            LicenseKind.BOOST_1_0 to R.raw.license_boost_1_0,
         )
 
     val nameResourceIds =
@@ -16,6 +18,8 @@ internal object LicenseTextResources {
             LicenseKind.APACHE_2_0 to R.string.license_name_apache_2_0,
             LicenseKind.OFL_1_1 to R.string.license_name_ofl_1_1,
             LicenseKind.BSD_3_CLAUSE to R.string.license_name_bsd_3_clause,
+            LicenseKind.MIT to R.string.license_name_mit,
+            LicenseKind.BOOST_1_0 to R.string.license_name_boost_1_0,
         )
 
     fun readAll(resources: Resources): Map<LicenseKind, String> =
