@@ -190,7 +190,28 @@ class ToolPipelineTest {
 
             val outcome = pipeline.run("find_files", buildJsonObject {})
 
-            assertEquals(ToolOutcome.Failed("timed out after 10ms"), outcome)
+            assertEquals(ToolOutcome.Failed("tool execution timed out"), outcome)
+        }
+
+    @Test
+    fun `a tool without a per-tool override uses the five second default and logs its budget`() =
+        runTest {
+            val logger = FakeAppLogger()
+            val tool = fakeTool("set_alarm") { awaitCancellation() }
+            val pipeline =
+                ToolPipeline(
+                    registry = ToolRegistry(setOf(tool)),
+                    userInteraction = FakeUserInteraction(),
+                    clock = FakeClock(),
+                    logger = logger,
+                )
+
+            val outcome = pipeline.run("set_alarm", buildJsonObject {})
+
+            assertEquals(ToolOutcome.Failed("tool execution timed out"), outcome)
+            val event = logger.events.single { it.message == "tool timed out" }
+            assertEquals("TimeoutCancellationException", event.fields["exceptionType"])
+            assertEquals("5000", event.fields["timeoutMillis"])
         }
 
     @Test

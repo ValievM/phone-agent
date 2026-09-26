@@ -1,15 +1,19 @@
 package com.example.phoneagent.interaction
 
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.interaction.Capability
+import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,6 +45,38 @@ class UserInteractionBridgeTest {
             bridge.resolvePendingAsDeclined()
 
             assertFalse(answer.await())
+            assertNull(bridge.pending.value)
+        }
+
+    @Test
+    fun `closing a permission request resolves as denied`() =
+        runTest {
+            val answer = async { bridge.ensure(Capability.NOTIFICATIONS) }
+            advanceUntilIdle()
+            assertTrue(bridge.pending.value is PendingInteraction.Permission)
+
+            bridge.resolvePendingAsDeclined()
+
+            assertEquals(CapabilityResult.Denied, withTimeout(1_000) { answer.await() })
+            assertNull(bridge.pending.value)
+        }
+
+    @Test
+    fun `permission can be requested again after denial`() =
+        runTest {
+            val first = async { bridge.ensure(Capability.NOTIFICATIONS) }
+            advanceUntilIdle()
+            val firstRequest = bridge.pending.value as PendingInteraction.Permission
+            firstRequest.deferred.complete(CapabilityResult.Denied)
+            assertEquals(CapabilityResult.Denied, first.await())
+
+            val second = async { bridge.ensure(Capability.NOTIFICATIONS) }
+            advanceUntilIdle()
+            val secondRequest = bridge.pending.value as PendingInteraction.Permission
+            assertNotSame(firstRequest, secondRequest)
+            secondRequest.deferred.complete(CapabilityResult.Available)
+
+            assertEquals(CapabilityResult.Available, second.await())
             assertNull(bridge.pending.value)
         }
 

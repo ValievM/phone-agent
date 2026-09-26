@@ -1,6 +1,7 @@
 package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.platform.Clock
+import com.example.phoneagent.domain.tools.DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS
 
 /** Which hard limit stopped the walk early; only the ones actually observed are reported. */
 internal enum class WalkLimit {
@@ -26,7 +27,7 @@ internal data class WalkLimits(
     /** Nodes deeper than this are not visited; the root itself is depth 0. */
     val maxDepth: Int = 6,
     val maxNodes: Int = 5_000,
-    val timeoutMillis: Long = 5_000,
+    val timeoutMillis: Long = DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS,
     val maxResults: Int = 20,
 )
 

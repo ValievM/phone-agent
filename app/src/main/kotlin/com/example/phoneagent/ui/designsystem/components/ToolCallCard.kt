@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.TOOL_EXECUTION_TIMEOUT_REASON
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppCodeTextStyle
 import com.example.phoneagent.ui.designsystem.theme.AppMotion
@@ -279,15 +280,45 @@ internal fun ToolCallStatus.look(): StatusLook {
 @Composable
 private fun ToolCallStatus.label(): String =
     when (this) {
-        ToolCallStatus.AwaitingApproval -> stringResource(R.string.tool_call_status_awaiting)
-        ToolCallStatus.Running -> stringResource(R.string.tool_call_status_running)
-        is ToolCallStatus.Done -> summary
-        is ToolCallStatus.FilesFound -> stringResource(R.string.file_search_completed, count)
-        is ToolCallStatus.HandedOff -> stringResource(R.string.tool_call_status_handed_off, sanitizeHandoffTarget(target))
-        ToolCallStatus.NotShown -> stringResource(R.string.tool_call_status_not_shown)
-        is ToolCallStatus.Failed -> reason
-        ToolCallStatus.Rejected -> stringResource(R.string.tool_call_status_rejected)
-        ToolCallStatus.Cancelled -> stringResource(R.string.tool_call_status_cancelled)
+        ToolCallStatus.AwaitingApproval -> {
+            stringResource(R.string.tool_call_status_awaiting)
+        }
+
+        ToolCallStatus.Running -> {
+            stringResource(R.string.tool_call_status_running)
+        }
+
+        is ToolCallStatus.Done -> {
+            summary
+        }
+
+        is ToolCallStatus.FilesFound -> {
+            stringResource(R.string.file_search_completed, count)
+        }
+
+        is ToolCallStatus.HandedOff -> {
+            stringResource(R.string.tool_call_status_handed_off, sanitizeHandoffTarget(target))
+        }
+
+        ToolCallStatus.NotShown -> {
+            stringResource(R.string.tool_call_status_not_shown)
+        }
+
+        is ToolCallStatus.Failed -> {
+            if (reason == TOOL_EXECUTION_TIMEOUT_REASON) {
+                stringResource(R.string.tool_call_status_timeout)
+            } else {
+                reason
+            }
+        }
+
+        ToolCallStatus.Rejected -> {
+            stringResource(R.string.tool_call_status_rejected)
+        }
+
+        ToolCallStatus.Cancelled -> {
+            stringResource(R.string.tool_call_status_cancelled)
+        }
     }
 
 private fun sanitizeHandoffTarget(target: String): String {

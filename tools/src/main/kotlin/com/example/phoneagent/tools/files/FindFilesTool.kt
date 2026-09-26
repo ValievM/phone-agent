@@ -56,6 +56,7 @@ internal class FindFilesTool
                         put("required", JsonArray(listOf(JsonPrimitive("query"))))
                     },
                 risk = Risk.SAFE,
+                executionTimeoutMillis = FileSearchTimeouts.EXECUTION_TIMEOUT_MILLIS,
             )
 
         override fun describe(args: JsonObject): CallDescription {
@@ -96,7 +97,11 @@ internal class FindFilesTool
             try {
                 val result =
                     withContext(dispatchers.io) {
-                        SafTreeWalker(context.clock).search(root, query)
+                        SafTreeWalker(context.clock).search(
+                            root,
+                            query,
+                            limits = WalkLimits(timeoutMillis = context.executionTimeoutMillis),
+                        )
                     }
                 ToolResult.Success(result.toModelText())
             } catch (cancellation: CancellationException) {
