@@ -8,7 +8,7 @@
 - **«вливай»**: слить проверенную ветку в `main`.
 - **«пушь»**: отправить `main` на GitHub (перед этим проверю коммиты на секреты).
 - **«ставь»**: собрать release из `main` и поставить на телефон поверх, вход сохранится ([#11](https://github.com/ValievM/phone-agent/issues/11)).
-- **«промпты»**: выдать свежие промпты. Готовые универсальные лежат в [swarm.md](docs/tooling/swarm.md): рой для GPT (сам берёт задачи из issues) и очередь для GLM.
+- **«промпты»**: выдать свежие промпты. Готовые универсальные лежат в [swarm.md](docs/tooling/swarm.md): рой для GPT-1 и GPT-2 (сами берут задачи из issues) и очередь для GLM.
 - **«нравится»** или **«не нравится»** про вид «Стыка»: при «нравится» запишу эталоны скриншотов ([#17](https://github.com/ValievM/phone-agent/issues/17)).
 
 ## Решения (ответь одним словом в issue или мне в чате)
@@ -26,10 +26,13 @@
 - [#13](https://github.com/ValievM/phone-agent/issues/13) Релизная подпись и APK 0.1.0: keystore создаёшь ты, пароли только у тебя
 
 ## Кто чем занят
-| Кто | В работе | Готово к выдаче |
+| Кто (зона) | В работе | Готово к выдаче |
 |---|---|---|
-| GPT (рой) | [#1](https://github.com/ValievM/phone-agent/issues/1) T13: осталось 2 мелкие правки, тесты разрешены | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении», записки [#35](https://github.com/ValievM/phone-agent/issues/35) (безопасный «Повторить») и [#36](https://github.com/ValievM/phone-agent/issues/36) (статус «передано»); проверяет сдачи GLM |
-| GLM (очередь) | очередь пуста, всё сдано и влито | [#32](https://github.com/ValievM/phone-agent/issues/32) технический долг (Claude распишет точно) |
-| Claude | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры 6.1 и 6.2 (нужен телефон), [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток |
+| GPT-1 (логика) | [#1](https://github.com/ValievM/phone-agent/issues/1) T13: осталось 2 мелкие правки, тесты разрешены | [#35](https://github.com/ValievM/phone-agent/issues/35) записка «безопасный «Повторить»» |
+| GPT-2 (интерфейс) | | [#15](https://github.com/ValievM/phone-agent/issues/15) экран «О приложении», [#36](https://github.com/ValievM/phone-agent/issues/36) записка «статус «передано»» |
+| GLM (тесты, доки) | | [#37](https://github.com/ValievM/phone-agent/issues/37) техдолг, [#38](https://github.com/ValievM/phone-agent/issues/38) правило `ArchitectureTest`; [#32](https://github.com/ValievM/phone-agent/issues/32) парковка |
+| Claude (интеграция, релиз) | ревью сдач, слияния | [#9](https://github.com/ValievM/phone-agent/issues/9) T15, [#12](https://github.com/ValievM/phone-agent/issues/12) замеры (нужен телефон), [#16](https://github.com/ValievM/phone-agent/issues/16) приёмка, [#30](https://github.com/ValievM/phone-agent/issues/30) чистка веток, [#31](https://github.com/ValievM/phone-agent/issues/31) CI |
+
+Кто кого проверяет и как: [swarm.md](docs/tooling/swarm.md).
 
 `[x]` в `docs/manual-verification*.md` ставишь только ты.
