@@ -14,10 +14,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+
+// Icon size uses its own dimension token, not a spacing token (same as StatusMessage/ToolCallCard);
+// the value matches the previous spacing.large, so the layout is unchanged.
+private val WarningIconSize = 24.dp
 
 /** A single sensitive action: its complete, tool-authored description is visible before approval. */
 @Composable
@@ -78,7 +83,7 @@ private fun SensitiveWarning() {
                 painter = painterResource(AppIcons.warning),
                 contentDescription = null,
                 tint = colors.onWarningContainer,
-                modifier = Modifier.padding(top = AppTheme.spacing.extraSmall).size(AppTheme.spacing.large),
+                modifier = Modifier.padding(top = AppTheme.spacing.extraSmall).size(WarningIconSize),
             )
             Text(
                 text = stringResource(R.string.sensitive_approval_warning),
