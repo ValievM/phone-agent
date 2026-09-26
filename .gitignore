@@ -31,8 +31,9 @@ spike/.venv/
 __pycache__/
 
 
-# Roborazzi reference screenshots: not committed until the design is approved (docs/design/qa.md)
-app/src/test/screenshots/
+# Roborazzi references: only About baselines are approved (docs/design/qa.md)
+app/src/test/screenshots/*
+!app/src/test/screenshots/about_screen*.png
 
 # Local state of agents and editors (each person and tool keeps its own; nothing here belongs to the project)
 .claude/

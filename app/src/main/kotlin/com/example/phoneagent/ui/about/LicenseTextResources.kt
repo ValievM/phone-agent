@@ -22,6 +22,15 @@ internal object LicenseTextResources {
             LicenseKind.BOOST_1_0 to R.string.license_name_boost_1_0,
         )
 
+    val badgeNameResourceIds =
+        mapOf(
+            LicenseKind.APACHE_2_0 to R.string.about_license_badge_apache_2_0,
+            LicenseKind.OFL_1_1 to R.string.about_license_badge_ofl_1_1,
+            LicenseKind.BSD_3_CLAUSE to R.string.about_license_badge_bsd_3_clause,
+            LicenseKind.MIT to R.string.about_license_badge_mit,
+            LicenseKind.BOOST_1_0 to R.string.about_license_badge_boost_1_0,
+        )
+
     fun readAll(resources: Resources): Map<LicenseKind, String> =
         textResourceIds.mapValues { (_, resourceId) ->
             resources.openRawResource(resourceId).bufferedReader().use { it.readText() }

@@ -10,6 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.phoneagent.R
+import com.example.phoneagent.ui.designsystem.components.LinkConfirmationSheet
+import com.example.phoneagent.ui.designsystem.components.LinkDecision
+import com.example.phoneagent.ui.designsystem.components.evaluateLink
+import com.example.phoneagent.ui.openLink
 import com.example.phoneagent.ui.readAppVersionName
 
 @Composable
@@ -24,6 +28,7 @@ fun AboutRoute(
             readAppVersionName(context.packageManager, context.packageName, unavailableVersionLabel)
         }
     val licenseTexts = remember(context.resources) { LicenseTextResources.readAll(context.resources) }
+    var pendingLink by remember { mutableStateOf<LinkDecision?>(null) }
     var expandedLicenseNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val expandedLicenseKinds = LicenseKind.entries.filter { it.name in expandedLicenseNames }.toSet()
 
@@ -39,7 +44,19 @@ fun AboutRoute(
                     expandedLicenseNames + kind.name
                 }
         },
+        onOpenProject = { url -> pendingLink = evaluateLink(url) },
         onBack = onBack,
         modifier = modifier,
     )
+
+    pendingLink?.let { decision ->
+        LinkConfirmationSheet(
+            decision = decision,
+            onOpen = { confirmedUrl ->
+                pendingLink = null
+                openLink(context, confirmedUrl)
+            },
+            onDismiss = { pendingLink = null },
+        )
+    }
 }

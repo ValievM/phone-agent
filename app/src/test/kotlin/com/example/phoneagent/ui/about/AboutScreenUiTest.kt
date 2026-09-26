@@ -1,10 +1,14 @@
 package com.example.phoneagent.ui.about
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -16,6 +20,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -59,19 +64,34 @@ class AboutScreenUiTest {
                     licenseTexts = licenseTexts,
                     expandedLicenseKinds = expandedLicenseKinds,
                     onToggleLicense = {},
+                    onOpenProject = {},
                     onBack = onBack,
                 )
             }
         }
     }
 
+    private fun showRoute(context: Context) {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalContext provides context) {
+                AppTheme(useDynamicColor = false) {
+                    AboutRoute(onBack = {})
+                }
+            }
+        }
+    }
+
     @Test
-    fun `screen shows app name version and local data notice`() {
+    fun `screen shows app identity and grouped open-source sections`() {
         show(versionName = "9.8.7")
 
         composeRule.onNodeWithText(string(R.string.app_name)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.about_version, "9.8.7")).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.about_summary)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.about_local_data)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.about_section_fonts)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.about_section_icons)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.about_section_libraries)).assertIsDisplayed()
     }
 
     @Test
@@ -85,25 +105,38 @@ class AboutScreenUiTest {
     }
 
     @Test
-    fun `every catalog attribution shows its exact license and holder`() {
+    fun `catalog entries show compact license badges and complete holder names`() {
         show()
         val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
 
         LicenseCatalog.entries.forEach { entry ->
             list.performScrollToNode(hasText(entry.name))
-            composeRule.onNodeWithTag("about-entry-${entry.name}").assertIsDisplayed()
-            (listOf(LicenseNotice(entry.holder, entry.license)) + entry.additionalNotices)
-                .forEachIndexed { index, notice ->
-                    val licenseName = string(LicenseTextResources.nameResourceIds.getValue(notice.license))
-                    val licenseNode = composeRule.onNodeWithTag("about-license-${entry.name}-$index")
-                    licenseNode.performScrollTo()
-                    licenseNode.assert(hasText(string(R.string.about_license_name, licenseName)))
-                    licenseNode.assertIsDisplayed()
-                    composeRule
-                        .onNodeWithTag("about-license-${entry.name}-$index-holder")
-                        .assert(hasText(string(R.string.about_rights_holder, notice.holder)))
-                        .assertIsDisplayed()
-                }
+            composeRule
+                .onNodeWithTag("about-entry-${entry.name}")
+                .assert(hasText(entry.name))
+                .assertIsDisplayed()
+            composeRule
+                .onNodeWithTag("about-license-badge-${entry.name}-0")
+                .assert(hasText(string(LicenseTextResources.badgeNameResourceIds.getValue(entry.license))))
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule
+                .onNodeWithTag("about-entry-${entry.name}-holder-0")
+                .assert(hasText(string(R.string.about_rights_holder, entry.holder)))
+                .performScrollTo()
+                .assertIsDisplayed()
+            entry.additionalNotices.forEachIndexed { index, notice ->
+                composeRule
+                    .onNodeWithTag("about-license-badge-${entry.name}-${index + 1}")
+                    .assert(hasText(string(LicenseTextResources.badgeNameResourceIds.getValue(notice.license))))
+                    .performScrollTo()
+                    .assertIsDisplayed()
+                composeRule
+                    .onNodeWithTag("about-entry-${entry.name}-holder-${index + 1}")
+                    .assert(hasText(string(R.string.about_rights_holder, notice.holder)))
+                    .performScrollTo()
+                    .assertIsDisplayed()
+            }
         }
     }
 
@@ -119,6 +152,7 @@ class AboutScreenUiTest {
                     onToggleLicense = { kind ->
                         expanded = if (kind in expanded) expanded - kind else expanded + kind
                     },
+                    onOpenProject = {},
                     onBack = {},
                 )
             }
@@ -132,6 +166,7 @@ class AboutScreenUiTest {
         val endMarker = "limitations under the License."
         list.performScrollToNode(hasText(title))
         val toggle = composeRule.onNodeWithText(showLabel)
+        toggle.performScrollTo()
 
         toggle.assertIsDisplayed()
         assertEquals(string(R.string.about_collapsed_state), toggle.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
@@ -160,6 +195,7 @@ class AboutScreenUiTest {
                     onToggleLicense = { kind ->
                         expanded = if (kind in expanded) expanded - kind else expanded + kind
                     },
+                    onOpenProject = {},
                     onBack = {},
                 )
             }
@@ -186,6 +222,7 @@ class AboutScreenUiTest {
                     onToggleLicense = { kind ->
                         expanded = if (kind in expanded) expanded - kind else expanded + kind
                     },
+                    onOpenProject = {},
                     onBack = {},
                 )
             }
@@ -201,6 +238,37 @@ class AboutScreenUiTest {
         composeRule.onNodeWithText("DEALINGS IN THE SOFTWARE.", substring = true).assertExists()
     }
 
+    @Test
+    fun `project link requires domain confirmation and cancel leaves browser unopened`() {
+        val recordingContext = RecordingContext(ApplicationProvider.getApplicationContext())
+        showRoute(recordingContext)
+        val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
+        list.performScrollToNode(hasText("Inter"))
+
+        composeRule.onNodeWithText("https://github.com/rsms/inter", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Проект Inter").performClick()
+        composeRule.onNodeWithText("github.com").assertIsDisplayed()
+        assertTrue("the project link must not open before approval", recordingContext.startedActivities.isEmpty())
+
+        composeRule.onNodeWithText(string(R.string.link_cancel_action)).performClick()
+
+        assertTrue("cancel must leave the browser unopened", recordingContext.startedActivities.isEmpty())
+    }
+
+    @Test
+    fun `confirming a project link launches the confirmed HTTPS URL`() {
+        val recordingContext = RecordingContext(ApplicationProvider.getApplicationContext())
+        showRoute(recordingContext)
+        composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG).performScrollToNode(hasText("Inter"))
+
+        composeRule.onNodeWithContentDescription("Проект Inter").performClick()
+        composeRule.onNodeWithText(string(R.string.link_open_action)).performClick()
+
+        assertEquals(1, recordingContext.startedActivities.size)
+        assertEquals(Intent.ACTION_VIEW, recordingContext.startedActivities.single().action)
+        assertEquals(Uri.parse("https://github.com/rsms/inter"), recordingContext.startedActivities.single().data)
+    }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun `expanded license survives saved state restoration`() {
@@ -214,7 +282,7 @@ class AboutScreenUiTest {
         val licenseName = string(R.string.license_name_apache_2_0)
         val title = string(R.string.about_license_text_title, licenseName)
         list.performScrollToNode(hasText(title))
-        composeRule.onNodeWithText(string(R.string.about_show_license, licenseName)).performClick()
+        composeRule.onNodeWithText(string(R.string.about_show_license, licenseName)).performScrollTo().performClick()
         composeRule.onNodeWithText("Version 2.0, January 2004", substring = true).assertExists()
         composeRule.onNodeWithText("limitations under the License.", substring = true).assertExists()
 
@@ -223,6 +291,16 @@ class AboutScreenUiTest {
         composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG).performScrollToNode(hasText(title))
         composeRule.onNodeWithText("Version 2.0, January 2004", substring = true).assertExists()
         composeRule.onNodeWithText("limitations under the License.", substring = true).assertExists()
+    }
+}
+
+private class RecordingContext(
+    base: Context,
+) : ContextWrapper(base) {
+    val startedActivities = mutableListOf<Intent>()
+
+    override fun startActivity(intent: Intent) {
+        startedActivities += intent
     }
 }
 
@@ -237,7 +315,8 @@ class AboutScreenNarrowLargeFontUiTest {
     private val licenseTexts by lazy { LicenseTextResources.readAll(context.resources) }
 
     @Test
-    fun `320dp at 200 percent keeps header and first section visible and reaches the final entry`() {
+    fun `320dp at 200 percent wraps holder and license text within the viewport`() {
+        var expanded by mutableStateOf(emptySet<LicenseKind>())
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
@@ -245,20 +324,47 @@ class AboutScreenNarrowLargeFontUiTest {
                     AboutScreen(
                         versionName = "1.2.3",
                         licenseTexts = licenseTexts,
-                        expandedLicenseKinds = emptySet(),
-                        onToggleLicense = {},
+                        expandedLicenseKinds = expanded,
+                        onToggleLicense = { kind -> expanded = if (kind in expanded) expanded - kind else expanded + kind },
+                        onOpenProject = {},
                         onBack = {},
                     )
                 }
             }
         }
 
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val density = root.width / 320f
         composeRule.onNodeWithText(context.getString(R.string.about_title)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.go_back)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.about_section_application)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.app_name)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.about_summary)).assertIsDisplayed()
+
+        val list = composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG)
+        val longestHolderEntry = LicenseCatalog.entries.maxBy { it.holder.length }
+        list.performScrollToNode(hasText(longestHolderEntry.name))
+        val holderNode = composeRule.onNodeWithText(context.getString(R.string.about_rights_holder, longestHolderEntry.holder))
+        holderNode.performScrollTo()
+        val holderBounds = holderNode.fetchSemanticsNode().boundsInRoot
+        assertTrue("the longest holder must wrap instead of being ellipsized", holderBounds.height / density > 64f)
+        assertTrue("holder begins outside the viewport: $holderBounds", holderBounds.left >= root.left)
+        assertTrue("holder exceeds the viewport: $holderBounds", holderBounds.right <= root.right)
+
+        val licenseName = context.getString(R.string.license_name_apache_2_0)
+        list.performScrollToNode(hasText(context.getString(R.string.about_license_text_title, licenseName)))
+        composeRule
+            .onNodeWithText(context.getString(R.string.about_show_license, licenseName))
+            .performScrollTo()
+            .performClick()
+        val licenseText = composeRule.onNodeWithText("limitations under the License.", substring = true)
+        licenseText.performScrollTo()
+        val licenseBounds = licenseText.fetchSemanticsNode().boundsInRoot
+        assertTrue("license text begins outside the viewport: $licenseBounds", licenseBounds.left >= root.left)
+        assertTrue("license text exceeds the viewport: $licenseBounds", licenseBounds.right <= root.right)
+
         val lastEntry = LicenseCatalog.entries.last()
-        composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG).performScrollToNode(hasText(lastEntry.name))
-        composeRule.onNodeWithTag("about-entry-${lastEntry.name}").assertIsDisplayed()
+        list.performScrollToNode(hasText(lastEntry.name))
+        composeRule.onNodeWithText(lastEntry.name).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.about_title)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.go_back)).assertIsDisplayed()
     }
@@ -282,6 +388,7 @@ class AboutScreenWideUiTest {
                     licenseTexts = LicenseTextResources.readAll(context.resources),
                     expandedLicenseKinds = emptySet(),
                     onToggleLicense = {},
+                    onOpenProject = {},
                     onBack = {},
                 )
             }
