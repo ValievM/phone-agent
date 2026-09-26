@@ -3,6 +3,7 @@ package com.example.phoneagent.tools.notify
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -23,7 +24,8 @@ internal class AndroidNotifier
             message: String,
         ) {
             createChannelIfNeeded()
-            val notification =
+            val notificationId = notificationIds.nextId()
+            val builder =
                 NotificationCompat
                     .Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_stat_brand)
@@ -32,8 +34,19 @@ internal class AndroidNotifier
                     .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setAutoCancel(true)
-                    .build()
-            NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, notification)
+            val launchIntent =
+                applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
+            if (launchIntent != null) {
+                builder.setContentIntent(
+                    PendingIntent.getActivity(
+                        applicationContext,
+                        notificationId,
+                        launchIntent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
+            }
+            NotificationManagerCompat.from(applicationContext).notify(notificationId, builder.build())
         }
 
         // minSdk is already 26 (O); no version gate needed to create a notification channel.
@@ -49,4 +62,4 @@ internal class AndroidNotifier
     }
 
 private const val NOTIFICATION_CHANNEL_ID: String = "phone_agent_notifications"
-private const val NOTIFICATION_ID: Int = 1
+private val notificationIds = NotificationIds()
