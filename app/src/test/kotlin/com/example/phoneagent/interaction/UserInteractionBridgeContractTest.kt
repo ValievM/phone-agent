@@ -1,6 +1,7 @@
 package com.example.phoneagent.interaction
 
 import com.example.phoneagent.domain.contracts.UserInteractionContract
+import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import kotlinx.coroutines.launch
 
@@ -30,7 +31,7 @@ class UserInteractionBridgeContractTest : UserInteractionContract() {
                     }
 
                     is PendingInteraction.Permission -> {
-                        Unit
+                        if (!pending.deferred.isCompleted) watcher.armedCapabilities.removeFirstOrNull()?.let(pending.deferred::complete)
                     }
                 }
             }
@@ -55,9 +56,19 @@ class UserInteractionBridgeContractTest : UserInteractionContract() {
         }
     }
 
+    override fun offerCapability(result: CapabilityResult) {
+        val current = harness.bridge.pending.value
+        if (current is PendingInteraction.Permission && !current.deferred.isCompleted) {
+            current.deferred.complete(result)
+        } else {
+            harness.armedCapabilities += result
+        }
+    }
+
     private class BridgeHarness {
         val bridge = UserInteractionBridge()
         val armed = ArrayDeque<Boolean>()
         val armedBatch = ArrayDeque<Boolean>()
+        val armedCapabilities = ArrayDeque<CapabilityResult>()
     }
 }

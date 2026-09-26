@@ -4,6 +4,7 @@ package com.example.phoneagent.domain.tools
 public sealed interface ToolOutcome {
     public data class Success(
         public val text: String,
+        public val content: ToolContent? = null,
     ) : ToolOutcome
 
     public data class Rejected(

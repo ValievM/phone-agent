@@ -14,11 +14,14 @@ import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolFile
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
+import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,6 +64,31 @@ class ChatViewModelRestoreTest {
             ): ToolResult = ToolResult.Success("unused")
         }
 
+    private val savedSearchOutput =
+        listOf(
+            """{"items":[{"name":"Договор.pdf","uri":"content://media/external/file/1","path":""",
+            """"Документы/Договор.pdf","size":1200,"dateModified":42,"mimeType":"application/pdf"}],"truncated":false}""",
+        ).joinToString("")
+
+    private val filesTool =
+        object : Tool {
+            override val spec = ToolSpec("file_catalog", "returns file metadata", buildJsonObject {}, Risk.SAFE)
+
+            override fun describe(args: JsonObject) = CallDescription("Файлы", "Результаты")
+
+            override fun restoreContent(outputText: String): ToolContent? =
+                if (outputText == savedSearchOutput) {
+                    ToolContent.FilesFound(listOf(ToolFile("Договор.pdf", "content://media/external/file/1", 1200L, "application/pdf")))
+                } else {
+                    null
+                }
+
+            override suspend fun execute(
+                args: JsonObject,
+                context: ToolContext,
+            ): ToolResult = ToolResult.Success("unused")
+        }
+
     private val saved =
         listOf(
             HistoryItem.UserMessage(ItemId("u1"), "поставь будильник на 5 утра"),
@@ -69,7 +97,10 @@ class ChatViewModelRestoreTest {
             HistoryItem.AssistantMessage(ItemId("a1"), "Поставил будильник на 5:00."),
         )
 
-    private fun viewModelOver(items: List<HistoryItem>): ChatViewModel {
+    private fun viewModelOver(
+        items: List<HistoryItem>,
+        tools: Set<Tool> = setOf(alarmTool),
+    ): ChatViewModel {
         val repository =
             object : ConversationRepository {
                 private val flow = MutableStateFlow(items)
@@ -85,11 +116,11 @@ class ChatViewModelRestoreTest {
         val loop =
             AgentLoop(
                 modelGateway = FakeModelGateway(),
-                toolPipeline = ToolPipeline(ToolRegistry(setOf(alarmTool)), FakeUserInteraction(), FakeClock(), FakeAppLogger()),
+                toolPipeline = ToolPipeline(ToolRegistry(tools), FakeUserInteraction(), FakeClock(), FakeAppLogger()),
                 contextWindowPolicy = ContextWindowPolicy { it },
                 idGenerator = FakeIdGenerator(),
             )
-        return ChatViewModel(loop, repository)
+        return ChatViewModel(loop, repository, logger = FakeAppLogger())
     }
 
     @Test
@@ -104,6 +135,28 @@ class ChatViewModelRestoreTest {
                 viewModel.state.value.messages
                     .map { it.role },
             )
+        }
+
+    @Test
+    fun `a registered tool restores its structured file content from old history`() =
+        runTest(dispatcher.scheduler) {
+            val history =
+                listOf(
+                    HistoryItem.ToolCallItem(ItemId("t-files"), CallId("c-files"), "file_catalog", buildJsonObject {}),
+                    HistoryItem.ToolOutput(ItemId("o-files"), CallId("c-files"), savedSearchOutput),
+                )
+            val viewModel = viewModelOver(history, setOf(filesTool))
+
+            advanceUntilIdle()
+
+            val card =
+                requireNotNull(
+                    viewModel.state.value.messages
+                        .single()
+                        .toolCall,
+                )
+            assertEquals(ToolCallStatus.FilesFound(1), card.status)
+            assertEquals(listOf(FileHit("Договор.pdf", "content://media/external/file/1", 1200L, "application/pdf")), card.fileHits)
         }
 
     @Test

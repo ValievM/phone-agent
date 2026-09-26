@@ -1,5 +1,7 @@
 package com.example.phoneagent.tools.files
 
+import com.example.phoneagent.domain.tools.ToolContent
+import com.example.phoneagent.domain.tools.ToolFile
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,6 +37,11 @@ internal data class SearchFilesResult(
     val partialAccess: Boolean = false,
 )
 
+internal data class SearchFilesOutput(
+    val text: String,
+    val content: ToolContent.FilesFound,
+)
+
 internal object SearchFilesPolicy {
     fun process(
         records: List<SearchFileMetadata>,
@@ -66,8 +73,9 @@ internal object SearchFilesPolicy {
         )
     }
 
-    fun toJson(result: SearchFilesResult): String {
+    fun toOutput(result: SearchFilesResult): SearchFilesOutput {
         val items = mutableListOf<kotlinx.serialization.json.JsonObject>()
+        val files = mutableListOf<ToolFile>()
         var truncated = result.truncated
         for (item in result.items) {
             val candidate = item.toJsonObject()
@@ -78,8 +86,12 @@ internal object SearchFilesPolicy {
                 break
             }
             items += candidate
+            SearchFilesContentCodec.toToolFile(item)?.let(files::add)
         }
-        return serialize(items, truncated || items.size < result.items.size, partialAccess = result.partialAccess)
+        return SearchFilesOutput(
+            text = serialize(items, truncated || items.size < result.items.size, partialAccess = result.partialAccess),
+            content = ToolContent.FilesFound(files),
+        )
     }
 
     private fun serialize(

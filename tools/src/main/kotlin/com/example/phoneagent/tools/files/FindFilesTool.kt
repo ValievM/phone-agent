@@ -2,6 +2,7 @@ package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
@@ -103,11 +104,18 @@ internal class FindFilesTool
                 throw cancellation
             } catch (expected: Exception) {
                 // Fixed reason on purpose: the exception may embed paths/URIs.
+                context.logger.warn(
+                    TAG,
+                    "find files failed",
+                    fields = mapOf("exceptionType" to expected::class.java.simpleName),
+                    throwable = expected,
+                )
                 ToolResult.Failed(FindFilesCopy.fileSystemQueryFailed())
             }
 
         private companion object {
             const val NAME = "find_files"
+            const val TAG = "FindFilesTool"
         }
     }
 

@@ -272,4 +272,44 @@ class ArchitectureTest {
         }
         return -1
     }
+
+    @Test
+    fun `unit tests do not use real sockets, sleeps or blocking waits`() {
+        // 2026-09-25 a test with a real ServerSocket, Thread.sleep and a latch without a timeout
+        // hung for over 80 minutes holding the whole machine's Gradle. AGENTS.md forbids real
+        // network and time in tests; this rule makes it automatic. androidTest directories are
+        // not scanned (instrumented tests may use sockets, e.g. LoopbackCallbackReceiverTest).
+        val testFiles =
+            Konsist
+                .scopeFromProject()
+                .files
+                .filter { "/src/test/" in it.path || "/src/testFixtures/" in it.path }
+                .filterNot { it.path.endsWith("/architecture/ArchitectureTest.kt") }
+        val violations =
+            testFiles.mapNotNull { file ->
+                val reason =
+                    when {
+                        "Thread.sleep(" in file.text -> "Thread.sleep("
+
+                        "ServerSocket(" in file.text -> "ServerSocket("
+
+                        file.imports.any { it.name == "java.net.Socket" } -> "import java.net.Socket"
+
+                        file.imports.any { it.name == "kotlinx.coroutines.runBlocking" } -> "import kotlinx.coroutines.runBlocking"
+
+                        file.imports.any {
+                            it.name == "java.util.concurrent.CountDownLatch"
+                        } -> "import java.util.concurrent.CountDownLatch"
+
+                        else -> null
+                    }
+                if (reason != null) "${file.path} ($reason)" else null
+            }
+
+        assertTrue(
+            "реальные сокеты, sleep и ожидания без таймаута в unit-тестах запрещены: " +
+                "используй тестовый диспетчер, виртуальное время и фейки. Найдено: $violations",
+            violations.isEmpty(),
+        )
+    }
 }

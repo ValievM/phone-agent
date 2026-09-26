@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -82,6 +83,25 @@ class ToolPipelineHardeningTest {
 
             assertTrue(interaction.capabilityRequests.isEmpty())
         }
+
+    @Test
+    fun `a broken result restorer is logged without exposing its exception message`() {
+        val logger = FakeAppLogger()
+        val baseTool = tool("restorer") { ToolResult.Success("unused") }
+        val brokenTool =
+            object : Tool by baseTool {
+                override fun restoreContent(outputText: String): ToolContent? = error("private path /storage/private.txt")
+            }
+        val pipeline = ToolPipeline(ToolRegistry(setOf(brokenTool)), FakeUserInteraction(), FakeClock(), logger)
+
+        val content = pipeline.restoreContent("restorer", "saved output")
+
+        assertNull(content)
+        assertEquals("tool content restore failed", logger.events.single().message)
+        assertEquals("IllegalStateException", logger.events.single().fields["error"])
+        assertTrue(logger.events.single().throwable == null)
+        assertTrue(logger.events.none { event -> event.fields.values.any { it.contains("/storage/private.txt") } })
+    }
 
     private fun pipeline(
         tool: Tool,

@@ -16,4 +16,8 @@ class FakeUserInteractionContractTest : UserInteractionContract() {
     override fun offerBatch(approved: Boolean) {
         fake.scriptedBatchApprovals += approved
     }
+
+    override fun offerCapability(result: com.example.phoneagent.domain.interaction.CapabilityResult) {
+        fake.scriptedCapabilities += result
+    }
 }

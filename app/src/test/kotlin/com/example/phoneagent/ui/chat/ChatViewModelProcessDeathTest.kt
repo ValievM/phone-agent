@@ -56,7 +56,7 @@ class ChatViewModelProcessDeathTest {
     fun `the question is saved as soon as it is sent so a killed process cannot lose it`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()
-            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Поставь будильник"))
@@ -81,7 +81,8 @@ class ChatViewModelProcessDeathTest {
     fun `stopped question ids are deterministic and unique per question`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()
-            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository, idGenerator = FakeIdGenerator())
+            val viewModel =
+                ChatViewModel(agentLoop(HangingGateway()), repository, idGenerator = FakeIdGenerator(), logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Первый"))
@@ -105,7 +106,7 @@ class ChatViewModelProcessDeathTest {
         runTest(dispatcher.scheduler) {
             val repository = Repository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Готово"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
@@ -127,7 +128,7 @@ class ChatViewModelProcessDeathTest {
                     ),
                 )
 
-            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             assertEquals(
@@ -149,7 +150,7 @@ class ChatViewModelProcessDeathTest {
             val repository =
                 Repository(listOf(HistoryItem.UserMessage(ItemId("u1"), "Вопрос"), HistoryItem.AssistantMessage(ItemId("a1"), "Ответ")))
 
-            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             assertNull(viewModel.state.value.errorForDisplay())
@@ -172,7 +173,7 @@ class ChatViewModelProcessDeathTest {
                     ),
                 )
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Второй ответ"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Retry)
@@ -197,7 +198,7 @@ class ChatViewModelProcessDeathTest {
     fun `clearing the history from settings also dismisses the interrupted notice`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository(listOf(HistoryItem.UserMessage(ItemId("u1"), "Вопрос")))
-            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             assertEquals(AgentError.Interrupted, viewModel.state.value.errorForDisplay())
 
@@ -216,7 +217,7 @@ class ChatViewModelProcessDeathTest {
     fun `two stopped questions keep distinct ids so the restored feed has unique keys`() =
         runTest(dispatcher.scheduler) {
             val repository = Repository()
-            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Первый"))
@@ -228,7 +229,7 @@ class ChatViewModelProcessDeathTest {
             viewModel.onEvent(ChatUiEvent.Stop)
             advanceUntilIdle()
 
-            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             val messages = restarted.state.value.messages
@@ -242,7 +243,7 @@ class ChatViewModelProcessDeathTest {
         runTest(dispatcher.scheduler) {
             val repository = Repository()
             val gateway = HangingRecordingGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Первый"))
@@ -261,7 +262,7 @@ class ChatViewModelProcessDeathTest {
                 listOf("Первый", "Второй"),
                 repository.load().filterIsInstance<HistoryItem.UserMessage>().map(HistoryItem.UserMessage::text),
             )
-            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             assertEquals(
                 listOf("Первый", "Второй"),
@@ -278,7 +279,7 @@ class ChatViewModelProcessDeathTest {
             // delivered back - like Room does in production.
             val repository = EagerRepository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
             advanceUntilIdle()
@@ -291,7 +292,7 @@ class ChatViewModelProcessDeathTest {
         runTest(dispatcher.scheduler) {
             val repository = Repository()
             val gateway = ThrowThenCompleteGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
@@ -315,7 +316,7 @@ class ChatViewModelProcessDeathTest {
         runTest(dispatcher.scheduler) {
             val repository = FailFirstSaveRepository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
@@ -331,7 +332,7 @@ class ChatViewModelProcessDeathTest {
         runTest(dispatcher.scheduler) {
             val repository = FailLastSaveRepository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Ответ"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
@@ -343,11 +344,11 @@ class ChatViewModelProcessDeathTest {
         }
 
     @Test
-    fun `a final save error remains visible when the model turn also fails`() =
+    fun `a turn error wins over a final save failure`() =
         runTest(dispatcher.scheduler) {
             val repository = FailLastSaveRepository()
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.Failed(AgentError.Timeout)) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))
@@ -355,7 +356,7 @@ class ChatViewModelProcessDeathTest {
 
             assertEquals(HistorySyncState.Failed(StorageOperation.SAVE), viewModel.state.value.historySync)
             assertEquals(
-                AgentError.Unexpected("Failed to save conversation history"),
+                AgentError.Timeout,
                 viewModel.state.value.errorForDisplay(),
             )
             assertTrue(viewModel.state.value.turn is TurnState.FailedRetryable)
@@ -370,7 +371,7 @@ class ChatViewModelProcessDeathTest {
     @Test
     fun `a history save failure is separate from an active turn`() =
         runTest(dispatcher.scheduler) {
-            val viewModel = ChatViewModel(agentLoop(HangingGateway()), AlwaysFailingSaveRepository())
+            val viewModel = ChatViewModel(agentLoop(HangingGateway()), AlwaysFailingSaveRepository(), logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("Привет"))

@@ -2,6 +2,8 @@ package com.example.phoneagent.ui.root
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.phoneagent.domain.platform.AppLogger
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,6 +51,7 @@ class ThemeViewModel
     @Inject
     constructor(
         private val settingsRepository: SettingsRepository,
+        private val logger: AppLogger,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow<ThemeState>(ThemeState.Loading)
         private var subscription: Job? = null
@@ -71,9 +74,19 @@ class ThemeViewModel
                         settingsRepository.observe().collect { settings -> mutableState.value = ThemeState.Ready(settings) }
                     } catch (exception: CancellationException) {
                         throw exception
-                    } catch (_: Exception) {
+                    } catch (exception: Exception) {
+                        logger.warn(
+                            TAG,
+                            "observe theme settings failed",
+                            fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                            throwable = exception,
+                        )
                         mutableState.update { ThemeState.Unavailable(lastKnown = it.settings) }
                     }
                 }
+        }
+
+        private companion object {
+            const val TAG = "ThemeViewModel"
         }
     }

@@ -19,7 +19,9 @@ import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolFile
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
@@ -116,11 +118,12 @@ class ChatViewModelTest {
                         },
                     ),
                     repository,
+                    logger = FakeAppLogger(),
                 )
             firstRun.onEvent(ChatUiEvent.Submit("Earlier question"))
             advanceUntilIdle()
 
-            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val restarted = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             assertEquals(
                 listOf(ChatRole.USER to "Earlier question", ChatRole.ASSISTANT to "Earlier answer"),
@@ -139,7 +142,7 @@ class ChatViewModelTest {
                         HistoryItem.AssistantMessage(ItemId("saved-assistant"), "Earlier answer"),
                     ),
                 )
-            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository)
+            val viewModel = ChatViewModel(agentLoop(FakeModelGateway()), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             repository.replace(emptyList())
@@ -159,7 +162,7 @@ class ChatViewModelTest {
                 )
             val repository = FakeConversationRepository(initialHistory)
             val gateway = HangingModelGateway()
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
@@ -211,7 +214,7 @@ class ChatViewModelTest {
                     }
                 }
             val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.TextDelta("Answer"), ModelEvent.Completed()) }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             runCurrent()
 
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
@@ -260,7 +263,7 @@ class ChatViewModelTest {
                             emit(ModelEvent.Completed())
                         }
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
@@ -304,7 +307,7 @@ class ChatViewModelTest {
                             emit(ModelEvent.Failed(AgentError.Offline))
                         }
                 }
-            val viewModel = ChatViewModel(agentLoop(gateway), repository)
+            val viewModel = ChatViewModel(agentLoop(gateway), repository, logger = FakeAppLogger())
             advanceUntilIdle()
             viewModel.onEvent(ChatUiEvent.Submit("New question"))
             runCurrent()
@@ -393,18 +396,26 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun `search files result is attached as structured file hits`() =
+    fun `structured file content renders without knowing the tool name`() =
         runTest(dispatcher.scheduler) {
-            val result =
-                """{"items":[{"name":"report.pdf",
-                    "uri":"content://media/external/downloads/42","size":1024,"mimeType":"application/pdf"}],
-                    "truncated":false}"""
-            val call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {})
+            val call = ToolCall(CallId("call-1"), "files_plugin", buildJsonObject {})
             val gateway =
                 FakeModelGateway().apply {
                     events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
                 }
-            val registry = ToolRegistry(setOf(fakeTool("search_files") { ToolResult.Success(result) }))
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("files_plugin") {
+                            ToolResult.Success(
+                                "model-facing output",
+                                ToolContent.FilesFound(
+                                    listOf(ToolFile("report.pdf", "content://media/external/downloads/42", 1024L, "application/pdf")),
+                                ),
+                            )
+                        },
+                    ),
+                )
             val viewModel = createChatViewModel(agentLoop(gateway, registry))
 
             viewModel.onEvent(ChatUiEvent.Submit("найди отчет"))
@@ -507,7 +518,8 @@ class ChatViewModelTest {
             idGenerator = FakeIdGenerator(),
         )
 
-    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel = ChatViewModel(agentLoop, FakeConversationRepository(emptyList()))
+    private fun createChatViewModel(agentLoop: AgentLoop): ChatViewModel =
+        ChatViewModel(agentLoop, FakeConversationRepository(emptyList()), logger = FakeAppLogger())
 
     private class FakeConversationRepository(
         initialItems: List<HistoryItem>,

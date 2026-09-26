@@ -48,8 +48,8 @@ python3 scripts/check_docs.py
 - Токены и ключи только в `TokenStore` (DataStore + Keystore): не в логах, репозитории, `SharedPreferences`, тестах, issues. `allowBackup="false"`. `auth.json` с компьютера не копировать. Секреты (`*.jks`, `local.properties`, `spike/auth*.json`) в `.gitignore`, перед коммитом `git diff --staged`.
 - В MVP нет `MANAGE_EXTERNAL_STORAGE`, AccessibilityService, SMS и звонков.
 
-## Serena и Context7
-Только тут, детали в [serena-context7](docs/tooling/serena-context7.md). Serena для символов (не работает: `rg`), Context7 для API библиотек, без ключей в запросе.
+## Context7
+Включён только тут, детали в [context7](docs/tooling/context7.md). Для API библиотек, без ключей в запросе. Навигация по коду: `rg`/`grep`.
 
 ## Результат
 Комментарии и имена в коде на английском, тексты для пользователя русские.

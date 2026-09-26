@@ -84,9 +84,9 @@ flowchart TD
 
 ## Автоматические правила (Konsist)
 
-`app/src/test/kotlin/com/example/phoneagent/architecture/ArchitectureTest.kt` (Konsist) смотрит только `*/src/main/*`, по импортам и тексту файла. 12 правил: нет `GlobalScope`/`runBlocking`/`Thread.sleep`; `android.util.Log` только в `AndroidLogcatLogger`; `core/domain` не импортирует `android*`, `okhttp3`, `dagger`, `data.*`, а `data/llm` не импортирует `android*`, `dagger`, `data.auth`; `ui/` не импортирует `data.*`, `tools.*`; `designsystem` не импортирует `ui.chat`, `ui.navigation`; нет загрузчика картинок; markdown-библиотека только в `AssistantMarkdown`; сообщения логов без интерполяции; `Color(0x` только в theme, нет `Text("...")`; ViewModel не импортирует `Activity`/`Context`/`View`; пакеты `:tools` не импортируют друг друга; реализации `Tool` лежат в `:tools` и названы `*Tool`.
+`app/src/test/kotlin/com/example/phoneagent/architecture/ArchitectureTest.kt` (Konsist) проверяет production-код в `*/src/main/*`; отдельное правило о реальных сокетах, `Thread.sleep` и ожиданиях без таймаута сканирует `src/test` и `src/testFixtures`, но не `androidTest`. Полный актуальный список правил — [testing.md](testing.md).
 
-Не покрыто: жёсткий `Dispatchers.*`, имена инструментов в UI, `RandomIdGenerator` мимо порта.
+Не покрыто: жёсткий `Dispatchers.*`, `RandomIdGenerator` мимо порта.
 
 ## Наблюдения автора (гипотезы для ревью)
 
@@ -95,7 +95,7 @@ flowchart TD
 1. `ToolPipeline.kt:85`, `NotifyTool.kt:59`, `SearchFilesTool.kt:78`, `AgentModule.kt:50`: `withTimeout(5 с)` охватывает `tool.execute`, а инструменты внутри вызывают `UserInteraction.ensure()` (системный диалог разрешения). Ответ дольше 5 с даёт `Failed("timed out…")`, ответ на диалог теряется. Проверено чтением, на устройстве не воспроизводилось.
 2. `FindFilesTool.kt:73,87`, `SafDocumentNode.kt:24`, `ChatViewModel.kt:150`: блокирующий обход SAF без `withContext(IO)`, а цикл агента собирается в `viewModelScope` (Main.immediate): до 5 с на главном потоке, `withTimeout` блокирующий код не прерывает. `SearchFilesTool.kt:93` уходит на IO. `DispatcherProvider` в main не используется, `Dispatchers.IO` зашит в 7 местах (против patterns.md). Проверено.
 3. `ChatViewModel.kt` (308 строк): ход агента, синхронизация истории с Room (`pendingOwnEmissions`), retry, маппинг событий, статусы карточек. `:143` берёт `RandomIdGenerator` мимо порта `IdGenerator`. Порог recipes.md (~300 строк) превышен. Проверено.
-4. `ChatViewModel.kt:292,308`, `FileHitMapper.kt:54`: UI знает имя `search_files` и разбирает JSON его вывода (`SearchFilesPolicy.toJson`); общего типа-контракта между `:tools` и `:app` нет. Противоречит «новый инструмент: UI не менять» (AGENTS.md). Проверено.
+4. Решено: `SearchFilesTool` отдаёт и восстанавливает `ToolContent`; UI его отображает без имени инструмента и разбора JSON. Текст истории и Room не изменены.
 5. `InteractionHost.kt:27-29`, `AndroidManifest.xml:34`, `AppNavigation.kt:20`: пересоздание Activity (поворот, смена темы) при открытой шторке подтверждения = тихий отказ (`resolvePendingAsDeclined`); стек навигации в `remember`, а не в saveable: из Настроек после поворота возврат в Чат. Проверено.
 6. `UserInteractionBridge.kt:50,60`: один слот `MutableStateFlow`; второй параллельный `confirm`/`ensure` затрёт первый, тот повиснет. Сегодня безопасно (инструменты идут по одному), инвариант нигде не закреплён. Гипотеза.
 7. `SessionManager.kt:63,82` против `TokenRefresher.kt:29-38`: `write`/`clear` идут вне `Mutex` рефрешера, refresh «в полёте» может записать токены после `signOut`. `TokenRefresher.kt:38` не сохраняет старый `refreshToken`, если сервер его не вернул (следующий refresh даст `NeedsSignIn`). `SessionManager.kt:102-108`: `SignedOut` (токенов нет) трактуется как `NeedsSignIn`, в отличие от `restore()`. Механизмы проверены, поведение сервера нет.

@@ -30,8 +30,6 @@ spike/auth*.json
 spike/.venv/
 __pycache__/
 
-# Serena
-.serena/cache/
 
 # Roborazzi reference screenshots: not committed until the design is approved (docs/design/qa.md)
 app/src/test/screenshots/
@@ -54,3 +52,6 @@ hs_err_pid*
 
 # Kotlin Gradle plugin session data (any module)
 .kotlin/
+
+# Prompts handed to agents by the owner (generated, not versioned; source of truth: docs/tooling/swarm*.md)
+.prompts/

@@ -5,9 +5,11 @@ import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
@@ -67,6 +69,8 @@ internal class SearchFilesTool
             )
         }
 
+        override fun restoreContent(outputText: String): ToolContent? = SearchFilesContentCodec.restoreContent(outputText)
+
         override suspend fun execute(
             args: JsonObject,
             context: ToolContext,
@@ -103,16 +107,24 @@ internal class SearchFilesTool
                         sourceIncomplete = searched.truncated || budgetReached,
                         partialAccess = searched.inaccessible,
                     )
-                ToolResult.Success(SearchFilesPolicy.toJson(result))
+                val output = SearchFilesPolicy.toOutput(result)
+                ToolResult.Success(output.text, output.content)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (expected: Exception) {
                 // Fixed reason on purpose: the provider exception may embed URIs/paths.
+                context.logger.warn(
+                    TAG,
+                    "search files failed",
+                    fields = mapOf("exceptionType" to expected::class.java.simpleName),
+                    throwable = expected,
+                )
                 ToolResult.Failed(SearchFilesCopy.searchFailed())
             }
         }
 
         private companion object {
+            const val TAG = "SearchFilesTool"
             val json = Json { ignoreUnknownKeys = true }
 
             fun parseAndValidate(args: JsonObject): ParsedSearchArgs =

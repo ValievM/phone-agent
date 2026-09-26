@@ -62,7 +62,7 @@ class ChatViewModelOrderTest {
                     responseQueue.addLast(listOf(ModelEvent.TextDelta("Сейчас полдень"), ModelEvent.Completed()))
                 }
             val registry = ToolRegistry(setOf(clockTool()))
-            val viewModel = ChatViewModel(agentLoop(gateway, registry), InMemoryRepository())
+            val viewModel = ChatViewModel(agentLoop(gateway, registry), InMemoryRepository(), logger = FakeAppLogger())
 
             viewModel.onEvent(ChatUiEvent.Submit("который час"))
             advanceUntilIdle()

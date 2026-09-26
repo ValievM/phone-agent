@@ -37,6 +37,7 @@ public data class ToolContext(
 public sealed interface ToolResult {
     public data class Success(
         public val text: String,
+        public val content: ToolContent? = null,
     ) : ToolResult
 
     public data class Failed(
@@ -56,4 +57,7 @@ public interface Tool {
         args: JsonObject,
         context: ToolContext,
     ): ToolResult
+
+    /** Recreates optional structured content from this tool's existing saved output format. */
+    public fun restoreContent(outputText: String): ToolContent? = null
 }

@@ -10,13 +10,17 @@ import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.conversation.PendingApproval
+import com.example.phoneagent.domain.conversation.RetryPlan
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.conversation.TurnEvent
 import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.domain.conversation.classifyRetry
 import com.example.phoneagent.domain.conversation.transitionTurn
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
+import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
@@ -26,6 +30,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,8 +44,8 @@ class ChatViewModel
     constructor(
         private val agentLoop: AgentLoop,
         private val conversationRepository: ConversationRepository,
-        // Default only keeps the dozens of existing test constructions unchanged; DI always passes
-        // the bound generator (see AgentModule).
+        private val logger: AppLogger,
+        // The default keeps tests focused on the input they exercise; DI always passes the bound generator.
         private val idGenerator: IdGenerator = RandomIdGenerator,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ChatUiState())
@@ -54,8 +59,7 @@ class ChatViewModel
         // concern and is never converted back into HistoryItem.
         private var history: List<HistoryItem> = emptyList()
 
-        // What `history` was before the running turn appended its provisional question; the
-        // finished turn rebuilds history from this, so the question is saved exactly once.
+        // The history snapshot before a turn's new items; terminal events rebuild from it.
         private var historyBeforeTurn: List<HistoryItem> = emptyList()
         private val initialHistoryLoaded = CompletableDeferred<Unit>()
 
@@ -95,11 +99,21 @@ class ChatViewModel
                         // that came from elsewhere (first load, Settings, another writer) is redrawn.
                         if (!isOwnHistoryEmission) {
                             mutableState.update {
-                                it.withLoadedHistory(loadedHistory, isInitialEmission) { call ->
-                                    agentLoop.describe(
-                                        ToolCall(callId = call.callId, name = call.name, arguments = call.arguments, itemId = call.itemId),
-                                    )
-                                }
+                                it.withLoadedHistory(
+                                    loadedHistory,
+                                    isInitialEmission,
+                                    describe = { call ->
+                                        agentLoop.describe(
+                                            ToolCall(
+                                                callId = call.callId,
+                                                name = call.name,
+                                                arguments = call.arguments,
+                                                itemId = call.itemId,
+                                            ),
+                                        )
+                                    },
+                                    restoreContent = agentLoop::restoreToolContent,
+                                )
                             }
                         }
                         initialHistoryLoaded.complete(Unit)
@@ -107,6 +121,12 @@ class ChatViewModel
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Exception) {
+                    logger.warn(
+                        TAG,
+                        "conversation history load failed",
+                        fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                        throwable = exception,
+                    )
                     mutableState.update {
                         it.copy(
                             historySync =
@@ -193,27 +213,57 @@ class ChatViewModel
             runningJob =
                 viewModelScope.launch {
                     initialHistoryLoaded.await()
-                    collectTurn(trimmed, turnToken)
+                    collectTurn(
+                        agentLoop.run(historyBeforeTurn, trimmed) { callIds ->
+                            updateTurn(TurnEvent.ApprovalResolved(callIds))
+                        },
+                        turnToken,
+                    )
                 }
         }
 
-        /**
-         * Redoes the turn that just failed (or was cut short by a closed app): the failed exchange
-         * (the user message and whatever the model managed to produce) is dropped from memory and
-         * screen first, and [submit] saves the question alone, so the text is sent once and a Stop
-         * during the retry cannot bring the failed attempt back.
-         */
+        /** Retries the latest turn, continuing from completed tool outputs or restarting otherwise. */
         private fun retry() {
             val current = mutableState.value
             if (!current.turn.hasRetryAction()) return
             val failedUserIndex = history.indexOfLast { it is HistoryItem.UserMessage }
             val failedUser = history.getOrNull(failedUserIndex) as? HistoryItem.UserMessage ?: return
-            val keptHistory = history.take(failedUserIndex)
-            val keptMessages = current.messages.take(current.messages.indexOfLast { it.role == ChatRole.USER }.coerceAtLeast(0))
 
-            history = keptHistory
-            mutableState.update { it.copy(messages = keptMessages) }
-            submit(failedUser.text, retry = true)
+            when (classifyRetry(history)) {
+                RetryPlan.Restart -> {
+                    val keptHistory = history.take(failedUserIndex)
+                    val keptMessages =
+                        current.messages.take(current.messages.indexOfLast { it.role == ChatRole.USER }.coerceAtLeast(0))
+                    history = keptHistory
+                    mutableState.update { it.copy(messages = keptMessages) }
+                    submit(failedUser.text, retry = true)
+                }
+
+                RetryPlan.Continue -> {
+                    val nextTurn = transitionTurn(current.turn, TurnEvent.Retry(failedUser.itemId))
+
+                    val continuationHistory = history
+                    historyBeforeTurn = continuationHistory
+                    mutableState.update {
+                        it.copy(
+                            turn = nextTurn,
+                            historySync = if (it.historySync is HistorySyncState.Failed) HistorySyncState.Ready else it.historySync,
+                        )
+                    }
+                    val turnToken = Any()
+                    currentTurn = turnToken
+                    runningJob =
+                        viewModelScope.launch {
+                            initialHistoryLoaded.await()
+                            collectTurn(
+                                agentLoop.continueTurn(continuationHistory) { callIds ->
+                                    updateTurn(TurnEvent.ApprovalResolved(callIds))
+                                },
+                                turnToken,
+                            )
+                        }
+                }
+            }
         }
 
         private suspend fun persist(items: List<HistoryItem>) {
@@ -233,7 +283,13 @@ class ChatViewModel
             } catch (exception: CancellationException) {
                 pendingOwnEmissions.remove(items)
                 throw exception
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "conversation history save failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
                 pendingOwnEmissions.remove(items)
                 saveFailed = true
                 mutableState.update { it.copy(historySync = HistorySyncState.Failed(StorageOperation.SAVE)) }
@@ -241,38 +297,41 @@ class ChatViewModel
         }
 
         private suspend fun collectTurn(
-            text: String,
+            events: Flow<AgentEvent>,
             turnToken: Any,
         ) {
             try {
                 var assistantMessageId: String? = null
-                agentLoop
-                    .run(historyBeforeTurn, text) { callIds ->
-                        updateTurn(TurnEvent.ApprovalResolved(callIds))
-                    }.collect { event ->
-                        assistantMessageId = agentEventHandler.handle(event, assistantMessageId)
-                        when (event) {
-                            is AgentEvent.TurnCompleted -> {
-                                persist(history)
-                                updateTurn(TurnEvent.Completed)
-                            }
+                events.collect { event ->
+                    assistantMessageId = agentEventHandler.handle(event, assistantMessageId)
+                    when (event) {
+                        is AgentEvent.TurnCompleted -> {
+                            persist(history)
+                            updateTurn(TurnEvent.Completed)
+                        }
 
-                            is AgentEvent.TurnFailed -> {
-                                clearPriorSaveFailure()
-                                updateTurn(TurnEvent.Failed(event.error, event.error.toPresentation()?.retryable == true))
-                                persist(history)
-                            }
+                        is AgentEvent.TurnFailed -> {
+                            clearPriorSaveFailure()
+                            updateTurn(TurnEvent.Failed(event.error, event.error.toPresentation()?.retryable == true))
+                            persist(history)
+                        }
 
-                            else -> {
-                                Unit
-                            }
+                        else -> {
+                            Unit
                         }
                     }
+                }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                logger.warn(
+                    TAG,
+                    "agent turn failed",
+                    fields = mapOf("exceptionType" to exception::class.java.simpleName),
+                    throwable = exception,
+                )
                 // A bug in the loop, a gateway or a tool must not take the app down: keep the
-                // question in history and offer a retry of the whole turn.
+                // question in history and offer a retry.
                 if (currentTurn === turnToken) {
                     clearPriorSaveFailure()
                     updateTurn(TurnEvent.Failed(AgentError.Unexpected("turn failed (${exception::class.simpleName})"), retryable = true))
@@ -404,34 +463,14 @@ class ChatViewModel
         private fun finishToolCall(event: AgentEvent.ToolCallFinished) {
             val id = toolMessageIdByCallId.remove(event.call.callId) ?: return
             approvalRequestByCallId.remove(event.call.callId)
-            val fileHits = event.toFileHits()
-            val status = event.outcome.toCardStatus(event.call.name, fileHits.size)
+            val fileHits = event.outcome.toFileHits()
+            val status = event.outcome.toCardStatus(fileHits.size)
             mutableState.update { it.withToolCallStatus(id, status, fileHits) }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()
-    }
 
-internal fun ToolOutcome.toCardStatus(
-    toolName: String,
-    fileHitCount: Int,
-): ToolCallStatus =
-    when (this) {
-        is ToolOutcome.Success -> {
-            if (toolName == SEARCH_FILES_TOOL_NAME) {
-                ToolCallStatus.FilesFound(fileHitCount)
-            } else {
-                ToolCallStatus.Done(text)
-            }
-        }
-
-        is ToolOutcome.Rejected -> {
-            ToolCallStatus.Rejected
-        }
-
-        is ToolOutcome.Failed -> {
-            ToolCallStatus.Failed(reason)
+        private companion object {
+            const val TAG = "ChatViewModel"
         }
     }
-
-private const val SEARCH_FILES_TOOL_NAME = "search_files"

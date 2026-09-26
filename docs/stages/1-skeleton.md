@@ -13,7 +13,7 @@
 - [x] 1.7 Манифест: только `INTERNET`; `android:allowBackup="false"`.
 - [x] 1.8 Sanity-тесты: один в `:core:domain`, один на `ChatViewModel` с фейком.
 - [x] 1.9 `.gitignore` проверен, коммиты по Conventional Commits.
-- [x] 1.10 Serena видит Kotlin: `get_symbols_overview` на `MainActivity.kt` возвращает символы. Если нет, в `AGENTS.md` записано, что Kotlin LS не работает и используется обычный поиск.
+- [x] 1.10 (Serena удалена 2026-09-26) Serena видит Kotlin: `get_symbols_overview` на `MainActivity.kt` возвращает символы. Если нет, в `AGENTS.md` записано, что Kotlin LS не работает и используется обычный поиск.
 - [x] 1.11 Скелет дизайн-системы `ui/designsystem` по документам [design/](../design/overview.md): `AppTheme` (светлая/тёмная, динамические цвета + запасная палитра из Theme Builder, переключатель), типографика с вшитыми шрифтами (выбраны Roboto Flex или Inter + JetBrains Mono, кириллица проверена), формы, токены `spacing`, `AppExtendedColors`, `AppIcons` с первыми иконками (vector drawable из Material Symbols Rounded).
 - [x] 1.12 Подключены `compose-rules` (ktlint или detekt), `enableEdgeToEdge()`, Navigation 3 с ключами `Chat` и заглушкой настроек, `core-splashscreen`, заглушки иконки приложения (adaptive + monochrome).
 - [x] 1.13 Превью темы и компонентов-заглушек проходят Design QA из [design/qa.md](../design/qa.md) (в объёме этапа).

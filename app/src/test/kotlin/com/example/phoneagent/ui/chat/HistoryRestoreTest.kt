@@ -4,6 +4,8 @@ import com.example.phoneagent.domain.conversation.CallId
 import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.ToolContent
+import com.example.phoneagent.domain.tools.ToolFile
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.serialization.json.JsonObject
@@ -99,12 +101,22 @@ class HistoryRestoreTest {
     }
 
     @Test
-    fun `a file search comes back with the files it found`() {
+    fun `restored structured file content comes back as count and chips`() {
         val json =
             """{"items":[{"name":"Договор.pdf","uri":"content://media/external/file/1","size":1200,"mimeType":"application/pdf"},""" +
                 """{"name":"scan.jpg","uri":"content://media/external/file/2"}]}"""
 
-        val card = listOf(call("t1", "c1", "search_files"), output("c1", json)).toChatMessages(describe).single().card()
+        val card =
+            listOf(call("t1", "c1", "file_catalog"), output("c1", json))
+                .toChatMessages(describe) { _, _ ->
+                    ToolContent.FilesFound(
+                        listOf(
+                            ToolFile("Договор.pdf", "content://media/external/file/1", 1200L, "application/pdf"),
+                            ToolFile("scan.jpg", "content://media/external/file/2", null, null),
+                        ),
+                    )
+                }.single()
+                .card()
 
         assertEquals(ToolCallStatus.FilesFound(2), card.status)
         assertEquals(

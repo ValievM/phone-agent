@@ -1,6 +1,8 @@
 package com.example.phoneagent.domain.contracts
 
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.interaction.Capability
+import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
@@ -8,6 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +30,9 @@ public abstract class UserInteractionContract {
 
     /** Offer the answer for the next batch confirmation. */
     protected abstract fun offerBatch(approved: Boolean)
+
+    /** Offer the result for the next capability request. */
+    protected abstract fun offerCapability(result: CapabilityResult)
 
     /** Runs inside each test's runTest scope; implementations that need background wiring use it. */
     protected open fun kotlinx.coroutines.test.TestScope.setUp(interaction: UserInteraction) {}
@@ -86,6 +92,55 @@ public abstract class UserInteractionContract {
             val declined = async { interaction.confirmBatch(listOf(request("второй"), request("третий"))) }
             advanceUntilIdle()
             assertFalse(declined.await())
+        }
+
+    @Test
+    public fun `capability answers arrive at their own calls, one at a time, in order`() =
+        runTest {
+            offerCapability(CapabilityResult.Denied)
+            offerCapability(CapabilityResult.Available)
+            val interaction = subject()
+            setUp(interaction)
+
+            val notifications = async { interaction.ensure(Capability.NOTIFICATIONS) }
+            advanceUntilIdle()
+            val files = async { interaction.ensure(Capability.FILES) }
+            advanceUntilIdle()
+
+            assertEquals(CapabilityResult.Denied, notifications.await())
+            assertEquals(CapabilityResult.Available, files.await())
+        }
+
+    @Test
+    public fun `a denied capability is a value, not an exception`() =
+        runTest {
+            offerCapability(CapabilityResult.Denied)
+            val interaction = subject()
+            setUp(interaction)
+
+            assertEquals(CapabilityResult.Denied, interaction.ensure(Capability.NOTIFICATIONS))
+        }
+
+    @Test
+    public fun `cancelling a waiting capability caller does not disturb the next one`() =
+        runTest {
+            offerCapability(CapabilityResult.Available)
+            val interaction = subject()
+            setUp(interaction)
+
+            val first = async { interaction.ensure(Capability.NOTIFICATIONS) }
+            advanceUntilIdle()
+            val second = async { interaction.ensure(Capability.FILES) }
+            advanceUntilIdle()
+            second.cancel()
+            advanceUntilIdle()
+
+            assertTrue(first.await() == CapabilityResult.Available)
+
+            offerCapability(CapabilityResult.Denied)
+            val third = async { interaction.ensure(Capability.FILES) }
+            advanceUntilIdle()
+            assertEquals(CapabilityResult.Denied, third.await())
         }
 
     private fun request(title: String): ApprovalRequest = ApprovalRequest(CallDescription(title, title), Risk.CONFIRM, buildJsonObject {})

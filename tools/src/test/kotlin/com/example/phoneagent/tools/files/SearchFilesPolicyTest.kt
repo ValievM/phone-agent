@@ -80,9 +80,17 @@ class SearchFilesPolicyTest {
 
     @Test
     fun `serializes valid escaped JSON with the UI file hit contract`() {
-        val result = SearchFilesPolicy.process(listOf(hit(name = "quote \" and slash \\")))
+        val result =
+            SearchFilesPolicy.process(
+                listOf(
+                    hit(
+                        name = "quote \" and slash \\",
+                        uri = "content://provider/quote \" and slash \\",
+                    ),
+                ),
+            )
 
-        val root = Json.parseToJsonElement(SearchFilesPolicy.toJson(result)).jsonObject
+        val root = Json.parseToJsonElement(SearchFilesPolicy.toOutput(result).text).jsonObject
         val item =
             root
                 .getValue("items")
@@ -97,7 +105,7 @@ class SearchFilesPolicyTest {
                 .toBoolean(),
         )
         assertEquals("quote \" and slash \\", item.getValue("name").jsonPrimitive.content)
-        assertEquals("content://different", item.getValue("uri").jsonPrimitive.content)
+        assertEquals("content://provider/quote \" and slash \\", item.getValue("uri").jsonPrimitive.content)
         assertEquals("folder/quote.pdf", item.getValue("path").jsonPrimitive.content)
         assertEquals("12", item.getValue("size").jsonPrimitive.content)
         assertEquals("123", item.getValue("dateModified").jsonPrimitive.content)
@@ -121,7 +129,7 @@ class SearchFilesPolicyTest {
     fun `partial access is reported separately from truncation`() {
         val result = SearchFilesPolicy.process(listOf(hit(name = "seen")), partialAccess = true)
 
-        val json = Json.parseToJsonElement(SearchFilesPolicy.toJson(result)).jsonObject
+        val json = Json.parseToJsonElement(SearchFilesPolicy.toOutput(result).text).jsonObject
         assertEquals("true", json.getValue("partialAccess").toString())
         assertEquals("false", json.getValue("truncated").toString())
     }
@@ -131,7 +139,7 @@ class SearchFilesPolicyTest {
         val result = SearchFilesPolicy.process(listOf(hit(name = "voice-note", dateModified = null, mimeType = null)))
         val item =
             Json
-                .parseToJsonElement(SearchFilesPolicy.toJson(result))
+                .parseToJsonElement(SearchFilesPolicy.toOutput(result).text)
                 .jsonObject
                 .getValue("items")
                 .jsonArray
@@ -155,7 +163,7 @@ class SearchFilesPolicyTest {
                 )
             }
 
-        val json = SearchFilesPolicy.toJson(SearchFilesPolicy.process(records))
+        val json = SearchFilesPolicy.toOutput(SearchFilesPolicy.process(records)).text
         val root = Json.parseToJsonElement(json).jsonObject
 
         assertTrue(json.toByteArray(Charsets.UTF_8).size <= SearchFilesLimits.MAX_OUTPUT_BYTES)
