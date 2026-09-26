@@ -2,6 +2,7 @@ package com.example.phoneagent.ui.login
 
 data class LoginUiState(
     val isSignedIn: Boolean = false,
+    val isRestoring: Boolean = false,
     val isLoading: Boolean = false,
     val sessionExpired: Boolean = false,
     val error: LoginError? = null,
