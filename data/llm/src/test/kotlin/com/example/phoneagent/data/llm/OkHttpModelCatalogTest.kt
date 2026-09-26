@@ -89,20 +89,48 @@ class OkHttpModelCatalogTest {
                     MockResponse
                         .Builder()
                         .code(200)
-                        .body("""{"models":[{"slug":"gpt-5.6-luna"},{"slug":"gpt-5.6-terra"}]}""")
-                        .build(),
+                        .body(
+                            """
+                            {
+                              "catalog_version": "test",
+                              "models": [
+                                {"slug":"gpt-5.6-luna","unknown_model_field":{"enabled":true}},
+                                {"slug":"gpt-5.6-terra","description":"ignored"},
+                                {"slug":"gpt-5.6-sol","capabilities":["chat"]}
+                              ],
+                              "unknown_catalog_field": true
+                            }
+                            """.trimIndent(),
+                        ).build(),
                 )
 
                 val catalog = catalog(server)
 
                 assertEquals(
-                    ModelCatalogResult.Available(listOf("gpt-5.6-luna", "gpt-5.6-terra")),
+                    ModelCatalogResult.Available(listOf("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol")),
                     catalog.load(),
                 )
                 val request = server.takeRequest()
                 assertEquals("/api/models", request.url.encodedPath)
                 assertEquals("test-version", request.url.queryParameter("client_version"))
                 assertEquals("Bearer test-token", request.headers["Authorization"])
+            }
+        }
+
+    @Test
+    fun `returns an empty available model list when catalog is empty`() =
+        runTest {
+            MockWebServer().use { server ->
+                server.start()
+                server.enqueue(
+                    MockResponse
+                        .Builder()
+                        .code(200)
+                        .body("""{"models":[],"unknown_catalog_field":true}""")
+                        .build(),
+                )
+
+                assertEquals(ModelCatalogResult.Available(emptyList()), catalog(server).load())
             }
         }
 

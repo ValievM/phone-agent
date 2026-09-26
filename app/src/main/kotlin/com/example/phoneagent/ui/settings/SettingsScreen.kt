@@ -26,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -186,25 +187,40 @@ private fun ModelSection(
     onEvent: (SettingsUiEvent) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val canChooseModel =
+        state.canEditSettings &&
+            !state.isLoadingModels &&
+            !state.modelCatalogUnavailable &&
+            state.availableModels.size > 1
+    LaunchedEffect(canChooseModel) {
+        if (!canChooseModel) expanded = false
+    }
     SettingsSection(title = stringResource(R.string.settings_model_title)) {
         Text(stringResource(R.string.settings_model_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box {
-            SecondaryButton(
-                onClick = { expanded = true },
-                enabled = state.canEditSettings && !state.isLoadingModels,
-            ) {
-                Text(state.model ?: stringResource(R.string.settings_model_default))
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                ModelMenuItem(R.string.settings_model_default, null, onEvent) { expanded = false }
-                state.availableModels.forEach { model ->
-                    DropdownMenuItem(
-                        text = { Text(model) },
-                        onClick = {
-                            expanded = false
-                            onEvent(SettingsUiEvent.SelectModel(model))
-                        },
-                    )
+        if (!state.isLoadingModels && !state.modelCatalogUnavailable && state.availableModels.size == 1) {
+            Text(stringResource(R.string.settings_model_single_available, state.availableModels.single()))
+        } else {
+            Box {
+                SecondaryButton(
+                    onClick = { expanded = true },
+                    enabled = canChooseModel,
+                ) {
+                    Text(state.model ?: stringResource(R.string.settings_model_default))
+                }
+                DropdownMenu(
+                    expanded = expanded && canChooseModel,
+                    onDismissRequest = { expanded = false },
+                ) {
+                    ModelMenuItem(R.string.settings_model_default, null, onEvent) { expanded = false }
+                    state.availableModels.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model) },
+                            onClick = {
+                                expanded = false
+                                onEvent(SettingsUiEvent.SelectModel(model))
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -215,6 +231,10 @@ private fun ModelSection(
 
             state.modelCatalogUnavailable -> {
                 Text(stringResource(R.string.settings_models_unavailable), color = MaterialTheme.colorScheme.error)
+            }
+
+            state.availableModels.isEmpty() -> {
+                Text(stringResource(R.string.settings_models_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
