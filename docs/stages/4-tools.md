@@ -10,7 +10,7 @@
 - [ ] 4.4 Шторка подтверждения (`ModalBottomSheet`, «назад» = отклонить) и `ToolCallCard` со всеми состояниями (ожидает, выполняется, готово, найдены файлы, отправлено в приложение, не показано, ошибка, отклонено, прервано) по [design/components.md](../design/components.md). Тексты берутся из `Tool.describe`.
 - [x] 4.5 `set_alarm`: манифест (`SET_ALARM`, `<queries>`), `resolveActivity`, `SKIP_UI` после подтверждения; результат «запрос отправлен».
 - [ ] 4.6 `notify`: канал, `POST_NOTIFICATIONS` на API 33+ с объяснением.
-- [x] 4.7 `find_files`: выбор папки (`OpenDocumentTree`), `takePersistableUriPermission`, обход в ширину через `ContentResolver.query` + `DocumentsContract`, лимиты (глубина ≤ 6, ≤ 5000 узлов, 5 с, ≤ 20 результатов), только метаданные.
+- [x] 4.7 `find_files`: выбор папки (`OpenDocumentTree`), `takePersistableUriPermission`, обход в ширину через `ContentResolver.query` + `DocumentsContract`, лимиты (глубина ≤ 6, ≤ 5000 узлов, 30 с, ≤ 20 результатов), только метаданные.
 - [x] 4.8 Системный промпт с правилами про инструменты и недоверенные данные.
 
 **Тест-лист (пишем первым):**

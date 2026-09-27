@@ -9,7 +9,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object SearchFilesLimits {
-    const val TIMEOUT_MILLIS: Long = 5_000
     const val MAX_RESULTS: Int = 20
     const val MAX_OUTPUT_BYTES: Int = 3_500
 }

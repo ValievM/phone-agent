@@ -1,9 +1,16 @@
 package com.example.phoneagent.screenshot
 
 import android.content.Context
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.phoneagent.R
+import com.example.phoneagent.ui.about.ABOUT_CONTENT_LIST_TAG
 import com.example.phoneagent.ui.about.AboutScreen
 import com.example.phoneagent.ui.about.LicenseKind
 import com.example.phoneagent.ui.about.LicenseTextResources
@@ -34,8 +41,7 @@ class AboutScreenScreenshotTest {
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = emptySet(),
-                onToggleLicense = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 
@@ -45,13 +51,21 @@ class AboutScreenScreenshotTest {
             "about_screen_expanded_apache",
             variants = listOf(Variant.Light, Variant.Dark),
             fillScreen = true,
+            beforeCapture = {
+                val title =
+                    context.getString(
+                        R.string.about_license_text_title,
+                        context.getString(R.string.license_name_apache_2_0),
+                    )
+                composeRule.onNodeWithTag(ABOUT_CONTENT_LIST_TAG).performScrollToNode(hasText(title))
+                composeRule.onNodeWithText("Version 2.0, January 2004", substring = true).performScrollTo()
+            },
         ) {
             AboutScreen(
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = setOf(LicenseKind.APACHE_2_0),
-                onToggleLicense = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 }
@@ -77,8 +91,7 @@ class AboutScreenNarrowScreenshotTest {
                 versionName = "1.2.3",
                 licenseTexts = licenseTexts,
                 expandedLicenseKinds = emptySet(),
-                onToggleLicense = {},
-                onBack = {},
+                onEvent = {},
             )
         }
 }

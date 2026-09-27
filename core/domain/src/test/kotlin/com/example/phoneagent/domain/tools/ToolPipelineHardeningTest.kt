@@ -8,8 +8,12 @@ import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
@@ -39,6 +43,43 @@ class ToolPipelineHardeningTest {
         }
 
     @Test
+    fun `cancelling while waiting for a permission request propagates Stop`() =
+        runTest {
+            var requested = false
+            var cancellationObserved = false
+            val permissionWait = CompletableDeferred<Unit>()
+            val interaction =
+                object : UserInteraction {
+                    override suspend fun confirm(request: ApprovalRequest): Boolean = true
+
+                    override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
+
+                    override suspend fun ensure(capability: Capability): CapabilityResult {
+                        requested = true
+                        return try {
+                            permissionWait.await()
+                            CapabilityResult.Available
+                        } finally {
+                            cancellationObserved = true
+                        }
+                    }
+                }
+            val tool = permissionTool(interaction)
+            val call = async { pipeline(tool, interaction).run("notify", buildJsonObject {}) }
+            runCurrent()
+
+            assertTrue(requested)
+            call.cancel()
+            val cancellation = runCatching { withTimeout(1_000) { call.await() } }.exceptionOrNull()
+            val completedPromptly = call.isCompleted
+            if (!cancellationObserved) permissionWait.complete(Unit)
+
+            assertTrue(cancellation is CancellationException)
+            assertTrue("Stop must complete the permission wait promptly", completedPromptly)
+            assertTrue(cancellationObserved)
+        }
+
+    @Test
     fun `a permission dialog the user takes long to answer does not count against the timeout`() =
         runTest {
             val interaction = SlowPermissions(firstAnswerMillis = 10_000)
@@ -47,6 +88,38 @@ class ToolPipelineHardeningTest {
             val outcome = pipeline(tool, interaction = interaction, timeoutMillis = 5_000).run("notify", buildJsonObject {})
 
             assertEquals(ToolOutcome.Success("shown"), outcome)
+        }
+
+    @Test
+    fun `a sixty second confirmation wait does not consume the execution timeout`() =
+        runTest {
+            var confirmationCount = 0
+            val interaction =
+                object : UserInteraction {
+                    override suspend fun confirm(request: ApprovalRequest): Boolean {
+                        confirmationCount += 1
+                        delay(60_000)
+                        return true
+                    }
+
+                    override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
+
+                    override suspend fun ensure(capability: Capability): CapabilityResult = CapabilityResult.Available
+                }
+            val delegate =
+                tool("set_alarm") {
+                    delay(1_000)
+                    ToolResult.Success("set")
+                }
+            val confirmableTool =
+                object : Tool by delegate {
+                    override val spec = delegate.spec.copy(risk = Risk.CONFIRM)
+                }
+
+            val outcome = pipeline(confirmableTool, interaction = interaction, timeoutMillis = 5_000).run("set_alarm", buildJsonObject {})
+
+            assertEquals(ToolOutcome.Success("set"), outcome)
+            assertEquals(1, confirmationCount)
         }
 
     @Test

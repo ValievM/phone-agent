@@ -5,6 +5,8 @@ import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import kotlinx.serialization.json.JsonObject
 
+public const val DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS: Long = 5_000L
+
 public enum class Risk {
     SAFE,
     CONFIRM,
@@ -21,6 +23,8 @@ public data class ToolSpec(
      * time the user spends on the system dialog does not count against it.
      */
     public val requiredCapabilities: Set<Capability> = emptySet(),
+    /** Execution-only budget; null uses the pipeline default. */
+    public val executionTimeoutMillis: Long? = null,
 )
 
 public data class CallDescription(
@@ -32,6 +36,8 @@ public data class CallDescription(
 public data class ToolContext(
     public val clock: Clock,
     public val logger: AppLogger,
+    /** Effective execution budget shared with the tool's internal stopping rule. */
+    public val executionTimeoutMillis: Long = DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS,
 )
 
 public sealed interface ToolResult {

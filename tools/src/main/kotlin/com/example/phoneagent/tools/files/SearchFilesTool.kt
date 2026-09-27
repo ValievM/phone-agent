@@ -1,8 +1,6 @@
 package com.example.phoneagent.tools.files
 
 import com.example.phoneagent.domain.interaction.Capability
-import com.example.phoneagent.domain.interaction.CapabilityResult
-import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.warn
@@ -27,7 +25,6 @@ import javax.inject.Inject
 internal class SearchFilesTool
     @Inject
     constructor(
-        private val userInteraction: UserInteraction,
         private val mediaStoreSearch: MediaStoreSearch,
         private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
     ) : Tool {
@@ -87,6 +84,7 @@ internal class SearchFilesTool
                     },
                 risk = Risk.SAFE,
                 requiredCapabilities = setOf(Capability.FILES),
+                executionTimeoutMillis = FileSearchTimeouts.EXECUTION_TIMEOUT_MILLIS,
             )
 
         override fun deniedMessage(capability: Capability): String = SearchFilesCopy.PERMISSION_DENIED
@@ -115,14 +113,11 @@ internal class SearchFilesTool
             criteria: FileSearchCriteria,
             context: ToolContext,
         ): ToolResult {
-            if (userInteraction.ensure(Capability.FILES) is CapabilityResult.Denied) {
-                return ToolResult.Failed(SearchFilesCopy.PERMISSION_DENIED)
-            }
             val startedAt = context.clock.nowEpochMillis()
             var budgetReached = false
 
             fun shouldContinue(): Boolean {
-                if (context.clock.nowEpochMillis() - startedAt >= SearchFilesLimits.TIMEOUT_MILLIS) {
+                if (context.clock.nowEpochMillis() - startedAt >= context.executionTimeoutMillis) {
                     budgetReached = true
                     return false
                 }

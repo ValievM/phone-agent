@@ -11,15 +11,22 @@ import com.example.phoneagent.domain.platform.LogLevel
 import com.example.phoneagent.domain.platform.RedactingAppLogger
 import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolFile
+import com.example.phoneagent.domain.tools.ToolOutcome
+import com.example.phoneagent.domain.tools.ToolPipeline
+import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -37,10 +44,17 @@ class SearchFilesToolTest {
         runTest {
             val interaction = FakeUserInteraction().apply { capabilityResult = CapabilityResult.Denied }
             val search = RecordingMediaStoreSearch()
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(setOf(tool(search))),
+                    interaction,
+                    FakeClock(),
+                    FakeAppLogger(),
+                )
 
-            val result = tool(interaction, search).execute(args("report"), context())
+            val outcome = pipeline.run("search_files", args("report"))
 
-            assertTrue(result is ToolResult.Failed)
+            assertEquals(ToolOutcome.Failed(SearchFilesCopy.PERMISSION_DENIED), outcome)
             assertEquals(listOf(Capability.FILES), interaction.capabilityRequests)
             assertFalse(search.called)
         }
@@ -59,7 +73,7 @@ class SearchFilesToolTest {
             val records = FakeAppLogger()
             val toolContext = ToolContext(FakeClock(), RedactingAppLogger(records))
 
-            val result = tool(FakeUserInteraction(), search).execute(args("report"), toolContext)
+            val result = tool(search).execute(args("report"), toolContext)
 
             assertTrue(result is ToolResult.Failed)
             assertFalse((result as ToolResult.Failed).reason.contains(secretUri))
@@ -79,8 +93,22 @@ class SearchFilesToolTest {
             val interaction = FakeUserInteraction()
             val hit = SearchFileMetadata("report.pdf", "content://report", "Download/report.pdf", 42, 123, "application/pdf")
             val search = RecordingMediaStoreSearch(records = listOf(hit))
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(
+                        setOf(
+                            SearchFilesTool(
+                                search,
+                                FakeDispatcherProvider(main = UnconfinedTestDispatcher(testScheduler)),
+                            ),
+                        ),
+                    ),
+                    interaction,
+                    FakeClock(),
+                    FakeAppLogger(),
+                )
 
-            val result = tool(interaction, search).execute(args("report"), context()) as ToolResult.Success
+            val result = pipeline.run("search_files", args("report")) as ToolOutcome.Success
             val root = Json.parseToJsonElement(result.text).jsonObject
 
             assertEquals(listOf(Capability.FILES), interaction.capabilityRequests)
@@ -106,7 +134,7 @@ class SearchFilesToolTest {
             val search = RecordingMediaStoreSearch(records = listOf(hit))
 
             val result =
-                tool(FakeUserInteraction(), search)
+                tool(search)
                     .execute(args("за 3 часа математика"), context()) as ToolResult.Success
             val items =
                 Json
@@ -131,7 +159,7 @@ class SearchFilesToolTest {
             val hit = SearchFileMetadata("елка.txt", "content://tree", "Download/tree.txt", 42, 123, "text/plain")
             val search = RecordingMediaStoreSearch(records = listOf(hit))
 
-            val result = tool(FakeUserInteraction(), search).execute(args("ёлка"), context()) as ToolResult.Success
+            val result = tool(search).execute(args("ёлка"), context()) as ToolResult.Success
 
             assertEquals(
                 listOf("елка.txt"),
@@ -157,7 +185,7 @@ class SearchFilesToolTest {
             val search = RecordingMediaStoreSearch(records = listOf(duplicate, duplicate, other))
 
             val result =
-                tool(FakeUserInteraction(), search)
+                tool(search)
                     .execute(args("not-present", alternatives = listOf("шпаргалка", "cheatsheet")), context()) as
                     ToolResult.Success
             val items =
@@ -193,7 +221,7 @@ class SearchFilesToolTest {
             val search = RecordingMediaStoreSearch(records = listOf(pdf, docx))
 
             val result =
-                tool(FakeUserInteraction(), search).execute(args("report", types = listOf("pdf")), context()) as
+                tool(search).execute(args("report", types = listOf("pdf")), context()) as
                     ToolResult.Success
             val items =
                 Json
@@ -213,20 +241,18 @@ class SearchFilesToolTest {
         }
 
     @Test
-    fun `unknown file type fails before requesting permission`() =
+    fun `unknown file type fails without querying`() =
         runTest {
-            val interaction = FakeUserInteraction()
             val search =
                 RecordingMediaStoreSearch(
                     records = listOf(SearchFileMetadata("report.pdf", "content://report", "", 1, 1, null)),
                 )
 
             val result =
-                tool(interaction, search).execute(args("report", types = listOf("executable")), context())
+                tool(search).execute(args("report", types = listOf("executable")), context())
 
             assertTrue(result is ToolResult.Failed)
             assertTrue((result as ToolResult.Failed).reason.contains("types"))
-            assertTrue(interaction.capabilityRequests.isEmpty())
             assertFalse(search.called)
         }
 
@@ -234,7 +260,7 @@ class SearchFilesToolTest {
     fun `empty results report attempted terms without exposing file metadata`() =
         runTest {
             val result =
-                tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+                tool(RecordingMediaStoreSearch())
                     .execute(args("private-query", alternatives = listOf("private-alt")), context()) as
                     ToolResult.Success
             val root = Json.parseToJsonElement(result.text).jsonObject
@@ -254,7 +280,7 @@ class SearchFilesToolTest {
         runTest {
             val hit = SearchFileMetadata("report.pdf", "content://report", "Download/report.pdf", 42, 123, "application/pdf")
             val result =
-                tool(FakeUserInteraction(), RecordingMediaStoreSearch(records = listOf(hit)))
+                tool(RecordingMediaStoreSearch(records = listOf(hit)))
                     .execute(args("report"), context()) as ToolResult.Success
 
             val expectedText =
@@ -279,7 +305,7 @@ class SearchFilesToolTest {
                 """"Документы/Договор.pdf","size":1200,"dateModified":42,"mimeType":"application/pdf"}],"truncated":false}""",
             ).joinToString("")
 
-        val content = tool(FakeUserInteraction(), RecordingMediaStoreSearch()).restoreContent(savedOutput)
+        val content = tool(RecordingMediaStoreSearch()).restoreContent(savedOutput)
 
         assertEquals(
             ToolContent.FilesFound(
@@ -291,7 +317,7 @@ class SearchFilesToolTest {
 
     @Test
     fun `malformed legacy output and unsafe file rows restore without openable hits`() {
-        val searchTool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+        val searchTool = tool(RecordingMediaStoreSearch())
         val savedOutput =
             """{"items":[{"name":"private.txt","uri":"file:///private/private.txt","size":1,"mimeType":"text/plain"},""" +
                 """{"name":"bad-size.txt","uri":"content://media/external/file/2","size":"2"}]}"""
@@ -301,15 +327,13 @@ class SearchFilesToolTest {
     }
 
     @Test
-    fun `malformed arguments fail without requesting permission or querying`() =
+    fun `malformed arguments fail without querying`() =
         runTest {
-            val interaction = FakeUserInteraction()
             val search = RecordingMediaStoreSearch()
 
-            val result = tool(interaction, search).execute(buildJsonObject { put("query", 9) }, context())
+            val result = tool(search).execute(buildJsonObject { put("query", 9) }, context())
 
             assertTrue(result is ToolResult.Failed)
-            assertEquals(emptyList<Capability>(), interaction.capabilityRequests)
             assertFalse(search.called)
         }
 
@@ -317,11 +341,11 @@ class SearchFilesToolTest {
     fun `stops scanning at the five second clock budget and marks results truncated`() =
         runTest {
             val clock = FakeClock()
-            val interaction = FakeUserInteraction()
+            val toolContext = context(clock)
             val search =
                 MediaStoreSearch { _, shouldContinue ->
                     val firstRowAllowed = shouldContinue()
-                    clock.epochMillis += SearchFilesLimits.TIMEOUT_MILLIS
+                    clock.epochMillis += toolContext.executionTimeoutMillis
                     val secondRowAllowed = shouldContinue()
                     MediaStoreQueryResult(
                         records =
@@ -336,7 +360,7 @@ class SearchFilesToolTest {
                     )
                 }
 
-            val result = tool(interaction, search).execute(args("txt"), context(clock)) as ToolResult.Success
+            val result = tool(search).execute(args("txt"), toolContext) as ToolResult.Success
             val root = Json.parseToJsonElement(result.text).jsonObject
 
             assertTrue(
@@ -349,8 +373,90 @@ class SearchFilesToolTest {
         }
 
     @Test
+    fun `search_files respects the thirty second budget rather than stopping after five seconds`() =
+        runTest {
+            val clock = FakeClock()
+            var continuedAtTwentyNineSeconds = false
+            var continuedAtThirtySeconds = true
+            val record = SearchFileMetadata("report.pdf", "content://report", "Download/report.pdf", 42, 123, "application/pdf")
+            val search =
+                MediaStoreSearch { _, shouldContinue ->
+                    shouldContinue()
+                    clock.epochMillis += 29_999
+                    continuedAtTwentyNineSeconds = shouldContinue()
+                    clock.epochMillis += 1
+                    continuedAtThirtySeconds = shouldContinue()
+                    MediaStoreQueryResult(
+                        records = listOf(record),
+                        truncated = !continuedAtThirtySeconds,
+                    )
+                }
+            val interaction = FakeUserInteraction()
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(
+                        setOf(
+                            SearchFilesTool(
+                                search,
+                                FakeDispatcherProvider(main = UnconfinedTestDispatcher(testScheduler)),
+                            ),
+                        ),
+                    ),
+                    interaction,
+                    clock,
+                    FakeAppLogger(),
+                )
+
+            val outcome = pipeline.run("search_files", args("report"))
+            assertTrue("expected a search result, got $outcome", outcome is ToolOutcome.Success)
+            val result = outcome as ToolOutcome.Success
+            val output = Json.parseToJsonElement(result.text).jsonObject
+
+            assertTrue(continuedAtTwentyNineSeconds)
+            assertFalse(continuedAtThirtySeconds)
+            assertTrue(
+                output
+                    .getValue("truncated")
+                    .jsonPrimitive.content
+                    .toBoolean(),
+            )
+        }
+
+    @Test
+    fun `search_files execution can exceed the five second default budget`() =
+        runTest {
+            val interaction = FakeUserInteraction()
+            val delegate =
+                SearchFilesTool(
+                    RecordingMediaStoreSearch(),
+                    FakeDispatcherProvider(main = UnconfinedTestDispatcher(testScheduler)),
+                )
+            val delayedTool =
+                object : Tool by delegate {
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult {
+                        delay(6_000)
+                        return delegate.execute(args, context)
+                    }
+                }
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(setOf(delayedTool)),
+                    interaction,
+                    FakeClock(),
+                    FakeAppLogger(),
+                )
+
+            val outcome = pipeline.run("search_files", args("report"))
+
+            assertTrue("expected a search result, got $outcome", outcome is ToolOutcome.Success)
+        }
+
+    @Test
     fun `declares a safe search tool and russian card`() {
-        val tool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+        val tool = tool(RecordingMediaStoreSearch())
 
         assertEquals("search_files", tool.spec.name)
         assertEquals(Risk.SAFE, tool.spec.risk)
@@ -369,7 +475,7 @@ class SearchFilesToolTest {
 
     @Test
     fun `schema advertises alternatives and closed file types`() {
-        val tool = tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+        val tool = tool(RecordingMediaStoreSearch())
         val properties =
             tool.spec.inputSchema
                 .getValue("properties")
@@ -396,16 +502,14 @@ class SearchFilesToolTest {
     @Test
     fun `more than five alternatives fails without querying`() =
         runTest {
-            val interaction = FakeUserInteraction()
             val search = RecordingMediaStoreSearch()
 
             val result =
-                tool(interaction, search)
+                tool(search)
                     .execute(args("report", alternatives = (1..6).map { "term$it" }), context())
 
             assertTrue(result is ToolResult.Failed)
             assertFalse(search.called)
-            assertTrue(interaction.capabilityRequests.isEmpty())
         }
 
     @Test
@@ -415,7 +519,7 @@ class SearchFilesToolTest {
             val alternatives =
                 (1..5).map { "界".repeat(SearchFilesArgs.MAX_QUERY_LENGTH - 1) + ('a' + it) }
             val result =
-                tool(FakeUserInteraction(), RecordingMediaStoreSearch())
+                tool(RecordingMediaStoreSearch())
                     .execute(args(query, alternatives), context()) as ToolResult.Success
 
             assertTrue(result.text.toByteArray(Charsets.UTF_8).size <= SearchFilesLimits.MAX_OUTPUT_BYTES)
@@ -443,7 +547,7 @@ class SearchFilesToolTest {
                 Executors.newSingleThreadExecutor { r -> Thread(r, "search-test-io") }.asCoroutineDispatcher()
             try {
                 val result =
-                    SearchFilesTool(FakeUserInteraction(), search, FakeDispatcherProvider(main = io, io = io, default = io))
+                    SearchFilesTool(search, FakeDispatcherProvider(main = io, io = io, default = io))
                         .execute(args("report"), context())
 
                 assertTrue(result is ToolResult.Success)
@@ -456,10 +560,7 @@ class SearchFilesToolTest {
             )
         }
 
-    private fun tool(
-        interaction: FakeUserInteraction,
-        search: MediaStoreSearch,
-    ) = SearchFilesTool(interaction, search)
+    private fun tool(search: MediaStoreSearch) = SearchFilesTool(search)
 
     private fun args(
         query: String,

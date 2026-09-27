@@ -50,6 +50,7 @@ import com.example.phoneagent.ui.designsystem.icons.AppIcons
 import com.example.phoneagent.ui.designsystem.layout.contentColumn
 import com.example.phoneagent.ui.designsystem.layout.screenMargin
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
+import com.example.phoneagent.ui.openLink
 
 @Composable
 fun ChatRoute(

@@ -3,18 +3,25 @@ package com.example.phoneagent.tools.files
 import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeDispatcherProvider
+import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.LogLevel
 import com.example.phoneagent.domain.platform.RedactingAppLogger
 import com.example.phoneagent.domain.platform.SanitizedThrowable
 import com.example.phoneagent.domain.tools.Risk
+import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolContext
+import com.example.phoneagent.domain.tools.ToolOutcome
+import com.example.phoneagent.domain.tools.ToolPipeline
+import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -224,6 +231,67 @@ class FindFilesToolTest {
             assertTrue(result.text.contains("private-alt"))
             assertFalse(result.text.contains("private-file.pdf"))
             assertFalse(result.text.contains("root/private-file.pdf"))
+        }
+
+    @Test
+    fun `find_files continues after the default five second walk budget`() =
+        runTest {
+            val root =
+                object : FakeDocumentNode("root", isDirectory = true) {
+                    override fun children(): List<FakeDocumentNode> {
+                        clock.epochMillis += 5_001
+                        return listOf(file("target.txt"))
+                    }
+                }
+            val tool =
+                FindFilesTool(
+                    FakeSelectedFolder(root),
+                    FakeDispatcherProvider(main = UnconfinedTestDispatcher(testScheduler)),
+                )
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(setOf(tool)),
+                    FakeUserInteraction(),
+                    clock,
+                    logger,
+                )
+
+            val outcome = pipeline.run("find_files", args("target"))
+            assertTrue("expected a search result, got $outcome", outcome is ToolOutcome.Success)
+            val result = outcome as ToolOutcome.Success
+
+            assertTrue(result.text.contains("target.txt"))
+        }
+
+    @Test
+    fun `find_files execution can exceed the five second default budget`() =
+        runTest {
+            val delegate =
+                FindFilesTool(
+                    FakeSelectedFolder(dir("root", file("target.txt"))),
+                    FakeDispatcherProvider(main = UnconfinedTestDispatcher(testScheduler)),
+                )
+            val delayedTool =
+                object : Tool by delegate {
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult {
+                        delay(6_000)
+                        return delegate.execute(args, context)
+                    }
+                }
+            val pipeline =
+                ToolPipeline(
+                    ToolRegistry(setOf(delayedTool)),
+                    FakeUserInteraction(),
+                    clock,
+                    logger,
+                )
+
+            val outcome = pipeline.run("find_files", args("target"))
+
+            assertTrue("expected a search result, got $outcome", outcome is ToolOutcome.Success)
         }
 
     @Test

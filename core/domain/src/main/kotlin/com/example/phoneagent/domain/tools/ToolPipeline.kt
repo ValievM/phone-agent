@@ -17,11 +17,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Stable tool-timeout reason; the UI maps this marker to localized copy. */
+public const val TOOL_EXECUTION_TIMEOUT_REASON: String = "tool execution timed out"
+
 /** Result of confirming a call: the pipeline itself, an earlier shared question, or no question shown. */
 public enum class Approval { ASK, GRANTED, DECLINED, NOT_PRESENTED }
 
 private const val TAG = "ToolPipeline"
-private const val DEFAULT_TIMEOUT_MILLIS = 5_000L
 private const val DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024
 private const val DEFAULT_MAX_BATCH_SIZE = 15
 private const val BATCH_DESCRIPTION_UNAVAILABLE_REASON =
@@ -41,7 +43,7 @@ public class ToolPipeline(
     private val userInteraction: UserInteraction,
     private val clock: Clock,
     private val logger: AppLogger,
-    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
+    private val timeoutMillis: Long = DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS,
     private val maxOutputBytes: Int = DEFAULT_MAX_OUTPUT_BYTES,
     private val maxBatchSize: Int = DEFAULT_MAX_BATCH_SIZE,
 ) {
@@ -204,16 +206,33 @@ public class ToolPipeline(
     private suspend fun execute(
         tool: Tool,
         args: JsonObject,
-    ): ToolOutcome =
-        try {
-            withTimeout(timeoutMillis) {
-                when (val result = tool.execute(args, ToolContext(clock, logger))) {
+    ): ToolOutcome {
+        val executionTimeoutMillis = tool.spec.executionTimeoutMillis ?: timeoutMillis
+        return try {
+            withTimeout(executionTimeoutMillis) {
+                when (
+                    val result =
+                        tool.execute(
+                            args,
+                            ToolContext(clock, logger, executionTimeoutMillis),
+                        )
+                ) {
                     is ToolResult.Success -> ToolOutcome.Success(truncateOutput(result.text, maxOutputBytes), result.content)
                     is ToolResult.Failed -> ToolOutcome.Failed(result.reason)
                 }
             }
-        } catch (_: TimeoutCancellationException) {
-            ToolOutcome.Failed("timed out after ${timeoutMillis}ms")
+        } catch (timeout: TimeoutCancellationException) {
+            logger.warn(
+                TAG,
+                "tool timed out",
+                fields =
+                    mapOf(
+                        "name" to tool.spec.name,
+                        "exceptionType" to timeout::class.simpleName.orEmpty(),
+                        "timeoutMillis" to executionTimeoutMillis.toString(),
+                    ),
+            )
+            ToolOutcome.Failed(TOOL_EXECUTION_TIMEOUT_REASON)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: Exception) {
@@ -222,6 +241,7 @@ public class ToolPipeline(
             logger.warn(TAG, "tool threw", fields = mapOf("name" to tool.spec.name), throwable = exception)
             ToolOutcome.Failed("tool failed: ${exception::class.simpleName}")
         }
+    }
 
     private companion object {
         private fun missingRequiredFields(
