@@ -21,9 +21,8 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
-// A streaming SSE response can sit quietly between chunks for longer than OkHttp's ~10s default
-// read timeout, so the model client gets its own, more patient client rather than reusing the
-// short-timeout one AuthNetworkModule provides for plain request/response auth calls.
+// A streaming SSE response can sit quietly between chunks longer than OkHttp's default read timeout.
+// Keep its dedicated client more patient than the shared platform client.
 private const val MODEL_READ_TIMEOUT_SECONDS = 60L
 
 // Not user-configurable yet (see docs/stages/3-model-client.md item 3.7); ~20 turns of headroom.
@@ -32,11 +31,14 @@ private const val CONTEXT_WINDOW_MAX_ITEMS = 40
 @Module
 @InstallIn(SingletonComponent::class)
 internal object ModelModule {
+    // Keep each Hilt binding explicit instead of introducing an artificial dependency bundle.
     @Provides
     @Singleton
+    @Suppress("LongParameterList")
     fun provideModelCatalog(
         profile: BackendProfile,
         credentialsProvider: CredentialsProvider,
+        client: OkHttpClient,
         dispatchers: DispatcherProvider,
         logger: AppLogger,
         @ApplicationContext context: Context,
@@ -44,6 +46,7 @@ internal object ModelModule {
         OkHttpModelCatalog(
             profile = profile,
             credentialsProvider = credentialsProvider,
+            client = client,
             clientVersion =
                 context.packageManager
                     .getPackageInfo(context.packageName, 0)

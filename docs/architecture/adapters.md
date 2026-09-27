@@ -5,12 +5,12 @@
 ## `:data:llm` — клиент модели (anti-corruption layer)
 ```
 ResponsesGateway (public, реализует ModelGateway)
-├─ BackendProfile        только URL и системный промпт; один профиль ChatGptSubscription
+├─ BackendProfile        URL, системный промпт и модель по умолчанию; один профиль ChatGptSubscription
 ├─ request/              сборка запроса из ModelRequest, включая выбор модели (internal)
 ├─ dto/                  DTO формата Responses API (internal, никогда не выходят за модуль)
 └─ sse/                  разбор потока: парсер кадров и маппинг в ModelEvent (internal)
 ```
-- Профиль один: клиент работает только с подпиской. Заголовки (токен, `chatgpt-account-id`, версия клиента) и имя модели подставляет `ResponsesGateway` при сборке запроса. Слота под API-профиль нет — если появится API-вход, профиль и заголовки вернутся в `BackendProfile`.
+- Профиль один: клиент работает только с подпиской. Заголовки (токен, `chatgpt-account-id`, версия клиента) подставляет `ResponsesGateway`; модель по умолчанию задана в `BackendProfile`. Слота под API-профиль нет — если появится API-вход, профиль и заголовки вернутся в `BackendProfile`.
 - OkHttp напрямую, без Retrofit: один эндпоинт и SSE, Retrofit почти ничего не даёт.
 - Ретрай 401 — не OkHttp `Authenticator`, а обычный suspend-цикл в `ResponsesGateway` (не больше двух попыток): после сбоя вызывается `CredentialsProvider.refreshAfterUnauthorized()` и запрос собирается заново. Результат различает `Ready`, `SignedOut` (сессия потеряна: «Сессия завершилась») и `Unavailable` (обновить сейчас нельзя, например нет сети: ошибка сети с «Повторить», токен цел). Причина: `Authenticator` требует `runBlocking` на suspend-обновлении, что правилами запрещено; single-flight обновления токена живёт в `:data:auth`.
 - Если бэкенд поменял формат: правим `dto/` и `sse/` + обновляем записанный образец ответа в тестах. Остальной код не трогаем.

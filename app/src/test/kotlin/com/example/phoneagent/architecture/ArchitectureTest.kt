@@ -215,7 +215,7 @@ class ArchitectureTest {
         // соответствующие классы переведут на DispatcherProvider:
         val baseline =
             setOf(
-                "/app/src/main/kotlin/com/example/phoneagent/di/AuthBindingsModule.kt", // Dispatchers.Main.immediate для scope приложения
+                "/app/src/main/kotlin/com/example/phoneagent/di/PlatformModule.kt", // Dispatchers.Main.immediate для scope приложения
             )
         val violations =
             productionFiles
@@ -228,6 +228,21 @@ class ArchitectureTest {
             "Direct Dispatchers usage outside DispatcherProvider (new code must inject the port): ${violations.map { it.path }}",
             violations.isEmpty(),
         )
+    }
+
+    @Test
+    fun `application coroutine scopes are qualified`() {
+        val scopeParameters =
+            productionFiles.flatMap { file ->
+                file.text
+                    .lineSequence()
+                    .filter { "CoroutineScope" in it && ":" in it && !it.trimStart().startsWith("fun ") }
+                    .map { file.path to it }
+                    .toList()
+            }
+        val violations = scopeParameters.filterNot { (_, line) -> "@ApplicationScope" in line }
+
+        assertTrue("Unqualified application CoroutineScope parameters: $violations", violations.isEmpty())
     }
 
     @Test

@@ -225,7 +225,7 @@ OkHttpApiKeyValidationGateway --> BackendProfile
 | Тип | Ответственность |
 |---|---|
 | `ResponsesGateway` | `channelFlow`: работа в `launch`, `awaitClose` отменяет HTTP-вызов; блокирующее чтение на `Dispatchers.IO`; при 401 один повтор после `refreshAfterUnauthorized`; нет токенов = `SessionExpired`; 403 = `Forbidden`, 429 = `RateLimited`, прочее = `Server(code)`, `IOException` = `Offline`/`Timeout` |
-| `BackendProfile` | Только `baseUrl` и `instructions` (`SYSTEM_PROMPT`); один профиль `ChatGptSubscription` |
+| `BackendProfile` | `baseUrl`, `instructions` (`SYSTEM_PROMPT`), `DEFAULT_MODEL`; один профиль `ChatGptSubscription` |
 | `ResponsesRequestBuilder.kt` | `HistoryItem` → тело запроса: `store=false`, `stream=true`, `reasoning.effort=low`, `parallel_tool_calls=false`, `include reasoning.encrypted_content` |
 | `SseParser`, `ResponsesEventMapper.kt` | Разбор `event:`/`data:`; кадр → `ModelEvent`: текст, `function_call`, `completed`, `error`. Прочее отбрасывается, ошибка разбора = `ProtocolChanged` |
 | `ErrorBodySummary.kt`, `dto/` | Безопасное для лога описание тела ошибки; `internal` DTO |

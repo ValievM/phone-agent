@@ -12,7 +12,7 @@
 | HTTP модели, каталог, ключ, token endpoint, device code, `accept()` loopback | `withContext(Dispatchers.IO)` | `ResponsesGateway.kt:125`, `OkHttpModelCatalog.kt:32`, `OkHttpTokenRefreshGateway.kt:55`, `ChatGptBrowserAuth.kt:101` |
 | MediaStore (`search_files`) | `Dispatchers.IO` | `SearchFilesTool.kt:93` |
 | SAF-обход (`find_files`) | без переключения, то есть Main | `FindFilesTool.kt:87` |
-| `SessionAuthCoordinator.state` | `applicationScope` = Main.immediate | `AuthBindingsModule.kt:98` |
+| `SessionAuthCoordinator.state` | `@ApplicationScope` = Main.immediate | `PlatformModule` |
 | Room, DataStore | собственные исполнители библиотек | `RoomConversationRepository`, `PreferencesSettingsRepository` |
 | Запись лога | поток вызывающего, синхронно | `AndroidLogcatLogger.kt:61-66` |
 

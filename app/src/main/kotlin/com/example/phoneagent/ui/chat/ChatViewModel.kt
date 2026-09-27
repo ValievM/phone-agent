@@ -22,7 +22,6 @@ import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
 import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.ConversationRepository
-import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
@@ -396,7 +395,7 @@ class ChatViewModel
             private fun addToolCallCard(event: AgentEvent.ToolCallStarted): String? {
                 val id = nextId()
                 toolMessageIdByCallId[event.call.callId] = id
-                approvalRequestByCallId[event.call.callId] = ApprovalRequest(event.description, Risk.CONFIRM, event.call.arguments)
+                approvalRequestByCallId[event.call.callId] = ApprovalRequest(event.description, event.risk, event.call.arguments)
                 lastToolCallId = event.call.callId
                 lastToolMessageId = id
                 val card = ToolCallMessage(ToolCallStatus.Running, event.description, event.call.arguments)
@@ -421,7 +420,10 @@ class ChatViewModel
 
             private fun requestSingleApproval(event: AgentEvent.ApprovalRequested) {
                 lastToolMessageId?.let { id -> mutableState.update { it.withToolCallStatus(id, ToolCallStatus.AwaitingApproval) } }
-                lastToolCallId?.let { callId -> updateTurn(TurnEvent.ApprovalRequired(PendingApproval.Single(callId, event.request))) }
+                lastToolCallId?.let { callId ->
+                    approvalRequestByCallId[callId] = event.request
+                    updateTurn(TurnEvent.ApprovalRequired(PendingApproval.Single(callId, event.request)))
+                }
             }
 
             private fun updateHistory(

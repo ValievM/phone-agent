@@ -42,7 +42,7 @@ fun SettingsRoute(
         ) {
             value =
                 state.searchFolderUri?.let { treeUri ->
-                    withContext(dispatcherProvider.io) { readSearchFolderDisplayName(contentResolver, treeUri) }
+                    withContext(dispatcherProvider.io) { readSearchFolderDisplayName(contentResolver, treeUri, viewModel.logger) }
                 }
         }
     val folderPicker =

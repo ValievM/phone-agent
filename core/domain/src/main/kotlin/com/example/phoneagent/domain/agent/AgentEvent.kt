@@ -5,6 +5,7 @@ import com.example.phoneagent.domain.conversation.HistoryItem
 import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
 
 public data class AgentConfig(
@@ -27,6 +28,7 @@ public sealed interface AgentEvent {
     public data class ToolCallStarted(
         public val call: ToolCall,
         public val description: CallDescription,
+        public val risk: Risk = Risk.SAFE,
     ) : AgentEvent
 
     public data class ApprovalRequested(

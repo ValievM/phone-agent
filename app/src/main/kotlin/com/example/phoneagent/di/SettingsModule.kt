@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.phoneagent.data.storage.PreferencesSettingsRepository
 import com.example.phoneagent.domain.storage.SettingsRepository
+import com.example.phoneagent.storage.PreferencesSettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

@@ -10,14 +10,13 @@
 |---|---|---|
 | корень | 2 | `PhoneAgentApplication`, `MainActivity` |
 | `auth` | 2 | `AuthCoordinator`, `AppAuthStatus`, `SessionAuthCoordinator`, `MutableApiKeyAuthProvider`, `ApiKeyAuthFactory` |
-| `data.storage` | 1 | `PreferencesSettingsRepository` (DataStore) |
-| `storage` | 5 | Room: `AppDatabase`, `ConversationDao`, `ConversationEntity`, `HistoryItemEntityMapper`, `RoomConversationRepository` |
+| `storage` | 6 | DataStore settings and Room history: `PreferencesSettingsRepository`, `AppDatabase`, `ConversationDao`, `ConversationEntity`, `HistoryItemEntityMapper`, `RoomConversationRepository` |
 | `interaction` | 1 | `UserInteractionBridge`, `PendingInteraction` |
 | `logging` | 2 | `AndroidLogcatLogger`, `crashLoggingHandler` |
-| `di` | 5 | 11 Hilt-модулей ([обзор](map-overview.md)) |
+| `di` | 6 | 12 Hilt-модулей ([обзор](map-overview.md)) |
 | `ui.chat`, `ui.designsystem`, `ui.login`, `ui.about`, `ui.settings`, `ui.interaction`, `ui.navigation` | 11, 28, 4, 5, 6, 1, 1 | экраны, компоненты, `InteractionHost`, `AppNavigation` |
 
-Хранилища разложены по двум пакетам: настройки в `data.storage`, история в `storage`. Мост диалогов тоже в двух: `interaction` (логика) и `ui.interaction` (Compose).
+Настройки и история находятся в одном пакете `storage`. Мост диалогов тоже в двух: `interaction` (логика) и `ui.interaction` (Compose).
 
 Область ViewModel: экраны берут `hiltViewModel()` внутри `NavEntry`, а артефакта `lifecycle-viewmodel-navigation3` в `app/build.gradle.kts` нет. Значит ViewModel может жить на уровне Activity, а не записи стека: `ChatViewModel` и `SettingsViewModel` не пересоздаются при выходе с экрана, а `ChatViewModel` переживает выход из аккаунта `[проверить]`.
 

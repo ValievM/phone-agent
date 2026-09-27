@@ -284,6 +284,7 @@ class AgentLoopTest {
             val events = loop(registry).run(emptyList(), "set an alarm").toList()
 
             val expectedRequest = ApprovalRequest(CallDescription("set_alarm", "calling set_alarm"), Risk.CONFIRM, buildJsonObject {})
+            assertEquals(Risk.CONFIRM, events.filterIsInstance<AgentEvent.ToolCallStarted>().single().risk)
             assertTrue(events.contains(AgentEvent.ApprovalRequested(expectedRequest)))
             val finished = events.filterIsInstance<AgentEvent.ToolCallFinished>().single()
             assertEquals(ToolOutcome.Rejected("user declined"), finished.outcome)

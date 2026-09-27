@@ -42,7 +42,6 @@ private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val MAX_ATTEMPTS = 2
-private const val DEFAULT_MODEL = "gpt-5.6-luna"
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 /**
@@ -65,7 +64,7 @@ public class ResponsesGateway(
     private val credentialsProvider: CredentialsProvider,
     private val settingsRepository: SettingsRepository,
     private val logger: AppLogger,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient,
     // Test seam: lets a test capture the Call OkHttp created, to assert it gets cancelled when
     // the collecting coroutine is (see docs/stages/3-model-client.md item 3.5).
     private val callFactory: Call.Factory = client,
@@ -103,7 +102,7 @@ public class ResponsesGateway(
         initialCredentials: Credentials,
         activeCall: AtomicReference<Call?>,
     ) {
-        val model = settingsRepository.load().model ?: DEFAULT_MODEL
+        val model = settingsRepository.load().model ?: BackendProfile.DEFAULT_MODEL
         val body = buildResponsesRequestBody(request, profile, model, newSessionId())
         var credentials = initialCredentials
         var failure: AgentError? = null

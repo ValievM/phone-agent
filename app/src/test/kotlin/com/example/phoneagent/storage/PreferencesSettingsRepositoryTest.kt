@@ -1,4 +1,4 @@
-package com.example.phoneagent.data.storage
+package com.example.phoneagent.storage
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.booleanPreferencesKey

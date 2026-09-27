@@ -46,12 +46,13 @@ flowchart LR
 | Hilt-модуль (`app/.../di/`) | Что связывает |
 |---|---|
 | `AgentBindingsModule`, `AgentModule` | `UserInteractionBridge` → `UserInteraction`; `IdGenerator`; `ToolRegistry(Set<Tool>)`; `ToolPipeline` (таймаут по умолчанию 5 с); `AgentLoop` (без scope, новый на каждую инъекцию) |
-| `ModelModule` | `OkHttpModelCatalog` → `ModelCatalog` (свой `OkHttpClient()`); `ResponsesGateway` → `ModelGateway` (свой клиент, read 60 с); `LastNMessagesPolicy(40)` → `ContextWindowPolicy` |
+| `ModelModule` | `OkHttpModelCatalog` → `ModelCatalog` (platform `OkHttpClient`); `ResponsesGateway` → `ModelGateway` (dedicated client, read 60 с); `LastNMessagesPolicy(40)` → `ContextWindowPolicy` |
 | `Settings*Module` (2), `Conversation*Module` (2) | `PreferencesSettingsRepository` → `SettingsRepository` (DataStore `app_settings`); `RoomConversationRepository` → `ConversationRepository`, `AppDatabase` (`phone-agent.db`), `ConversationDao` |
 | `AuthBindingsModule` | `SessionAuthCoordinator` → `AuthCoordinator`; `SessionManager` → `CredentialsProvider` |
-| `AuthNetworkModule` | общий `OkHttpClient()`; `AuthConfig` и `BackendProfile` (обе `ChatGptSubscription`); `TokenRefreshGateway`, `ApiKeyValidationGateway`, `DeviceCodeGateway` |
-| `AuthRuntimeModule` | `CoroutineScope(SupervisorJob + Main.immediate)`; `Clock`; `TokenStore`; `CallbackReceiver`; `BrowserLauncher`; `ChatGptBrowserAuth`; `ChatGptDeviceCodeAuth`; `ApiKeyAuthFactory`; `TokenRefresher` |
-| `SessionAssemblyModule` | `AppLogger` = `RedactingAppLogger(AndroidLogcatLogger)`; `Map<AuthMethod, AuthProvider>` (явный `mapOf`, не `@IntoMap`); `SessionManager` |
+| `AuthNetworkModule` | `AuthConfig` и `BackendProfile` (обе `ChatGptSubscription`); `TokenRefreshGateway`, `ApiKeyValidationGateway`, `DeviceCodeGateway` |
+| `AuthRuntimeModule` | `TokenStore`; `CallbackReceiver`; `BrowserLauncher`; `ChatGptBrowserAuth`; `ChatGptDeviceCodeAuth`; `ApiKeyAuthFactory`; `TokenRefresher` |
+| `PlatformModule` | `AppLogger` = `RedactingAppLogger(AndroidLogcatLogger)`; `Clock`; общий `OkHttpClient`; `@ApplicationScope CoroutineScope(SupervisorJob + Main.immediate)` |
+| `SessionAssemblyModule` | `Map<AuthMethod, AuthProvider>` (явный `mapOf`, не `@IntoMap`); `SessionManager` |
 | `AlarmBindings`, `NotifyBindings`, `FilesBindings` (`:tools`, `internal`) | `@IntoSet Tool` для 4 инструментов; `Notifier`, `MediaStoreSearch`, `SelectedFolder` |
 
 Через `@Inject` без модуля: `UserInteractionBridge`, `SessionAuthCoordinator`, `MutableApiKeyAuthProvider`, инструменты и их обёртки, три `@HiltViewModel`. `AppLogger` и `Clock` объявлены в файле Auth-модулей, хотя нужны всем.
@@ -101,6 +102,6 @@ flowchart TD
 7. `SessionManager.kt:63,82` против `TokenRefresher.kt:29-38`: `write`/`clear` идут вне `Mutex` рефрешера, refresh «в полёте» может записать токены после `signOut`. `TokenRefresher.kt:38` не сохраняет старый `refreshToken`, если сервер его не вернул (следующий refresh даст `NeedsSignIn`). `SessionManager.kt:102-108`: `SignedOut` (токенов нет) трактуется как `NeedsSignIn`, в отличие от `restore()`. Механизмы проверены, поведение сервера нет.
 8. `ConversationDao.kt:25-30`, `ChatViewModel.kt:53,65-69,176-201`, `HistoryItemEntityMapper.kt:107`: каждое сохранение = delete+insert всей таблицы; свои записи узнаются сравнением списков целиком, устаревшие пункты `pendingOwnEmissions` чистятся только по совпадению (если Room склеит эмиссии, возможны остатки, `[проверить]`); при Stop частичный ответ и вызовы не сохраняются; битая строка ломает весь `observe()`. Проверено.
 9. `ChatViewModel.kt:105-110` против `:211-216`: Stop сразу ставит `isRunning=false` и разрешает новый `submit`, а `finally` старой корутины позже снова сбрасывает `isRunning` и чистит `toolMessageIdByCallId`. Окно узкое (Main.immediate). Гипотеза.
-10. `ResponsesGateway.kt:44,186`, `ResponsesRequestBuilder.kt:20,39-44`, `OkHttpModelCatalog.kt:90`, `AuthBindingsModule.kt:68`: константы бэкенда (модель, `ChatGPT-Account-ID`, `reasoning.effort`, `include`) вне `BackendProfile`, хотя AGENTS.md велит держать их там. Профиль один, API-ключ идёт на тот же `chatgpt.com/backend-api/codex` (`OkHttpApiKeyValidationGateway.kt:20`); `[проверить]` по backend-notes, про ключ там нет. Проверено.
+10. `ChatGPT-Account-ID`, `reasoning.effort` и `include` остаются константами за пределами `BackendProfile`; модель по умолчанию перенесена в `BackendProfile` в #56. Оставшиеся константы требуют отдельного решения о границах профиля.
 11. `ResponsesEventMapper.kt:44`, `ResponsesRequestBuilder.kt:44`, `AgentLoop.kt:85`: запрос просит `reasoning.encrypted_content`, а маппер отбрасывает всё, кроме `function_call`; `ModelEvent.OpaqueItem` и `HistoryItem.Opaque` никто не создаёт. Если бэкенд потребует вернуть reasoning на втором шаге, вызов инструмента может упасть `[проверить]` (вопрос открыт в backend-notes.md).
 12. `SessionManager.kt:81-86`: `signOut` чистит только токены; история Room остаётся (возможно, и `ChatViewModel` в памяти, см. [map-app-infra](map-app-infra.md)). Намерение неизвестно. Проверено.

@@ -32,7 +32,7 @@ class SettingsViewModel
         private val settingsRepository: SettingsRepository,
         private val modelCatalog: ModelCatalog,
         private val conversationRepository: ConversationRepository,
-        private val logger: AppLogger,
+        internal val logger: AppLogger,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(SettingsUiState())
         private val settingsMutex = Mutex()

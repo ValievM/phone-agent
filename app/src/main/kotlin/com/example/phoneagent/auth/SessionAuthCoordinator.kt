@@ -9,6 +9,7 @@ import com.example.phoneagent.data.auth.BrowserLauncher
 import com.example.phoneagent.data.auth.ChatGptDeviceCodeAuth
 import com.example.phoneagent.data.auth.DeviceCodePrompt
 import com.example.phoneagent.data.auth.SessionManager
+import com.example.phoneagent.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,7 @@ class SessionAuthCoordinator
         private val apiKeyProvider: MutableApiKeyAuthProvider,
         private val deviceCodeAuth: ChatGptDeviceCodeAuth,
         private val browserLauncher: BrowserLauncher,
-        applicationScope: CoroutineScope,
+        @ApplicationScope applicationScope: CoroutineScope,
     ) : AuthCoordinator {
         override val state: StateFlow<AppAuthStatus> =
             combine(manager.state, manager.reauthenticationFailure, deviceCodeAuth.prompt, ::mapStatus)

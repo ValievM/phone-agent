@@ -129,7 +129,13 @@ public class AgentLoop(
             val approved =
                 toolPipeline.confirmBatch(group) { descriptions ->
                     group.zip(descriptions).forEach { (call, description) ->
-                        emit(AgentEvent.ToolCallStarted(call, description ?: CallDescription(call.name, "")))
+                        emit(
+                            AgentEvent.ToolCallStarted(
+                                call,
+                                description ?: CallDescription(call.name, ""),
+                                toolPipeline.riskOf(call.name) ?: Risk.SAFE,
+                            ),
+                        )
                     }
                     if (descriptions.all { it != null }) {
                         emit(AgentEvent.BatchApprovalRequested(group.map { it.callId }))
@@ -167,9 +173,10 @@ public class AgentLoop(
     ): HistoryItem.ToolOutput {
         if (sharedDecision == null) {
             val description = describe(call)
-            emit(AgentEvent.ToolCallStarted(call, description))
-            toolPipeline.riskOf(call.name)?.takeIf { it != Risk.SAFE || requireConfirmation }?.let { risk ->
-                emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, risk, call.arguments)))
+            val risk = toolPipeline.riskOf(call.name) ?: Risk.SAFE
+            emit(AgentEvent.ToolCallStarted(call, description, risk))
+            risk.takeIf { it != Risk.SAFE || requireConfirmation }?.let { approvalRisk ->
+                emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, approvalRisk, call.arguments)))
             }
         }
         val outcome =

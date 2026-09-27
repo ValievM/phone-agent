@@ -26,7 +26,7 @@ public class OkHttpModelCatalog(
     private val credentialsProvider: CredentialsProvider,
     private val clientVersion: String,
     private val logger: AppLogger,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider,
 ) : ModelCatalog {
     override suspend fun load(): ModelCatalogResult =

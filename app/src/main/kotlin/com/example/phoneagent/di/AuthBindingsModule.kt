@@ -30,17 +30,12 @@ import com.example.phoneagent.domain.auth.CredentialsProvider
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.platform.DispatcherProvider
-import com.example.phoneagent.domain.platform.RedactingAppLogger
-import com.example.phoneagent.logging.AndroidLogcatLogger
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
@@ -58,10 +53,6 @@ internal abstract class AuthBindingsModule {
 @Module
 @InstallIn(SingletonComponent::class)
 internal object AuthNetworkModule {
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient()
-
     @Provides
     fun provideAuthConfig(): AuthConfig = AuthConfig.ChatGptSubscription
 
@@ -97,13 +88,6 @@ internal object AuthNetworkModule {
 @Module
 @InstallIn(SingletonComponent::class)
 internal object AuthRuntimeModule {
-    @Provides
-    @Singleton
-    fun provideApplicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    @Provides
-    fun provideClock(): Clock = Clock(System::currentTimeMillis)
-
     @Provides
     @Singleton
     fun provideTokenStore(
@@ -161,14 +145,6 @@ internal object AuthRuntimeModule {
 @Module
 @InstallIn(SingletonComponent::class)
 internal object SessionAssemblyModule {
-    // AndroidLogcatLogger is never bound as AppLogger directly: RedactingAppLogger must always sit
-    // in front of it so nothing can log a raw token, key or auth code by accident.
-    @Provides
-    @Singleton
-    fun provideAppLogger(
-        @ApplicationContext context: Context,
-    ): AppLogger = RedactingAppLogger(AndroidLogcatLogger(context))
-
     @Provides
     @Singleton
     fun provideAuthProviders(
