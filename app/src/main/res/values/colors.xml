@@ -1,3 +1,6 @@
 <resources>
     <color name="launcher_background">#753E4A</color>
+    <!-- Matches BrandColorSchemes.kt LightColors.background: avoids a plain-gray flash between the
+         splash screen and Compose's first frame. -->
+    <color name="window_background">#FFF8F5</color>
 </resources>

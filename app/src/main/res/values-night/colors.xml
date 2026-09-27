@@ -1,0 +1,8 @@
+<resources>
+    <!-- Matches BrandColorSchemes.kt DarkColors.background: avoids a plain-gray flash between the
+         splash screen and Compose's first frame for users on the system dark theme. Only covers
+         "Системная"/auto in-app theme; an explicit in-app override still gets one native-window
+         frame in the system's tone before Compose repaints, which is the best a native-window
+         resource can do without knowing the in-app choice. -->
+    <color name="window_background">#191315</color>
+</resources>
