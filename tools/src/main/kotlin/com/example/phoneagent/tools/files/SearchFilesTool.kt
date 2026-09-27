@@ -80,7 +80,6 @@ internal class SearchFilesTool
                                 )
                             },
                         )
-                        put("required", JsonArray(listOf(JsonPrimitive("query"))))
                     },
                 risk = Risk.SAFE,
                 requiredCapabilities = setOf(Capability.FILES),

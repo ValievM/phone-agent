@@ -3,16 +3,19 @@ package com.example.phoneagent.tools.files
 /** User-facing card copy and model-facing protocol text for `search_files`. */
 internal object SearchFilesCopy {
     const val SPEC_DESCRIPTION: String =
-        "Search the Android media index for accessible files whose display name contains every " +
-            "query word, ignoring case, ё/e, word order, and separators. If nothing is found, " +
-            "try up to five synonyms, transliterations, or English variants in alternatives. " +
-            "Optional types filter by pdf, doc, image, video, audio, or archive. Return only " +
-            "file metadata; never read file contents. Some downloads may require the user to select a folder."
+        "Search accessible MediaStore files using metadata only: display name, immediate parent folder, and UTC " +
+            "modified date. Match every query word as a case-insensitive substring in any metadata field, " +
+            "ignoring ё/e, word order, and separators. Search short word stems. A query is optional when types " +
+            "are supplied; a lone known extension such as .pdf filters by that file type. If nothing is found, " +
+            "try up to five synonyms, transliterations, or English variants in alternatives. If still empty, " +
+            "search with types alone, then filter the returned metadata by name. Types include pdf, doc, image, " +
+            "video, audio, or archive. Never read file contents. Some downloads may require the user to select a folder."
     const val QUERY_SCHEMA_DESCRIPTION: String =
-        "All words to find in a file name; spaces, _, -, and . are equivalent separators."
+        "Optional search over file name, immediate parent folder, and UTC modified date; omit it for types-only search."
     const val ALTERNATIVES_SCHEMA_DESCRIPTION: String =
         "Up to five synonyms, transliterations, or English variants; any alternative may match."
-    const val TYPES_SCHEMA_DESCRIPTION: String = "Optional file type filters; any listed type may match."
+    const val TYPES_SCHEMA_DESCRIPTION: String =
+        "Optional file type filters; any listed type may match, and types may be used without query."
 
     const val CARD_TITLE: String = "Поиск файлов"
     const val CARD_SUMMARY: String = "Найти совпадения в доступном медиаиндексе"
@@ -23,7 +26,7 @@ internal object SearchFilesCopy {
         )
     const val PERMISSION_DENIED: String = "Media access was not granted; ask the user to allow file search access."
     const val INVALID_ARGUMENTS: String =
-        "Invalid search_files arguments: query must be a string and alternatives/types must be arrays."
+        "Invalid search_files arguments: query must be a string when supplied and alternatives/types must be arrays."
 
     fun cardSummary(query: String): String = "Найти файлы по запросу «$query» в доступном медиаиндексе"
 

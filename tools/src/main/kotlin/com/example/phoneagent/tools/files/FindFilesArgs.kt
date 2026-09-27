@@ -12,7 +12,8 @@ internal data class FindFilesArgs(
 ) {
     fun criteria(): FileSearchCriteria = FileSearchCriteria(query, alternatives, types)
 
-    fun validationError(): SearchFilesValidationError? = criteria().validationError()
+    fun validationError(): SearchFilesValidationError? =
+        if (query.isBlank()) SearchFilesValidationError.EMPTY_QUERY else criteria().validationError()
 
     internal companion object {
         const val MAX_QUERY_LENGTH = FILE_SEARCH_MAX_QUERY_LENGTH

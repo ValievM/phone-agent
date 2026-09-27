@@ -81,7 +81,20 @@ internal class AndroidMediaStoreSearch
                     complete = false
                     break
                 }
-                rows.toMetadata(collection, columns)?.takeIf { criteria.matches(it.name, it.mimeType) }?.let(records::add)
+                rows
+                    .toMetadata(collection, columns)
+                    ?.takeIf { metadata ->
+                        val parentFolder =
+                            metadata.path
+                                .substringBeforeLast('/', missingDelimiterValue = "")
+                                .substringAfterLast('/')
+                        criteria.matches(
+                            name = metadata.name,
+                            mimeType = metadata.mimeType,
+                            parentFolderName = parentFolder,
+                            dateModifiedEpochSeconds = metadata.dateModified,
+                        )
+                    }?.let(records::add)
             }
             return MediaStoreQueryResult(records, truncated = !complete)
         }

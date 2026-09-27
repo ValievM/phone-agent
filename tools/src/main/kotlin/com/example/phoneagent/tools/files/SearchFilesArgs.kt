@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class SearchFilesArgs(
-    val query: String,
+    val query: String = "",
     val alternatives: List<String> = emptyList(),
     val types: List<String> = emptyList(),
 ) {

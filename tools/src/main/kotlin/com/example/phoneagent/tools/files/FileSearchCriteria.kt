@@ -1,5 +1,6 @@
 package com.example.phoneagent.tools.files
 
+import java.time.LocalDate
 import java.util.Locale
 
 internal const val FILE_SEARCH_MAX_QUERY_LENGTH = 200
@@ -16,8 +17,17 @@ internal data class FileSearchCriteria(
     val alternatives: List<String> = emptyList(),
     val types: List<String> = emptyList(),
 ) {
+    private val extensionQueryType: SearchFileType? =
+        query
+            .trim()
+            .takeIf { it.startsWith(".") && it.length > 1 }
+            ?.drop(1)
+            ?.let(SearchFileType::fromExtension)
+
+    private val searchQuery: String = if (extensionQueryType == null) query else ""
+
     private val attempts: List<SearchAttempt> =
-        (listOf(query) + alternatives)
+        (listOf(searchQuery) + alternatives)
             .map { phrase ->
                 SearchAttempt(phrase, normalize(phrase).split(' ').filter(String::isNotEmpty))
             }.filter { it.words.isNotEmpty() }
@@ -25,16 +35,22 @@ internal data class FileSearchCriteria(
 
     private val selectedTypes: Set<SearchFileType> = types.mapNotNull(SearchFileType::from).toSet()
 
-    val attemptedQueries: List<String> = attempts.map(SearchAttempt::phrase)
+    private val hasTypeFilter: Boolean = types.isNotEmpty() || extensionQueryType != null
+
+    val attemptedQueries: List<String> =
+        (
+            (if (extensionQueryType == null) attempts.map(SearchAttempt::phrase) else listOf(query) + attempts.map(SearchAttempt::phrase)) +
+                selectedTypes.map { "type:${it.argument}" }
+        ).distinct()
 
     fun validationError(): SearchFilesValidationError? {
-        val normalizedQuery = normalize(query)
+        val normalizedQuery = normalize(searchQuery)
         return when {
-            query.isBlank() || normalizedQuery.isEmpty() -> {
+            normalizedQuery.isEmpty() && !hasTypeFilter -> {
                 SearchFilesValidationError.EMPTY_QUERY
             }
 
-            query.length > FILE_SEARCH_MAX_QUERY_LENGTH || normalizedQuery.length > FILE_SEARCH_MAX_QUERY_LENGTH -> {
+            searchQuery.length > FILE_SEARCH_MAX_QUERY_LENGTH || normalizedQuery.length > FILE_SEARCH_MAX_QUERY_LENGTH -> {
                 SearchFilesValidationError.QUERY_TOO_LONG
             }
 
@@ -70,10 +86,29 @@ internal data class FileSearchCriteria(
         name: String,
         mimeType: String? = null,
         isDirectory: Boolean = false,
+        parentFolderName: String? = null,
+        dateModifiedEpochSeconds: Long? = null,
     ): Boolean {
-        if (selectedTypes.isNotEmpty() && (isDirectory || selectedTypes.none { it.matches(name, mimeType) })) return false
-        val normalizedName = normalize(name)
-        return attempts.any { attempt -> attempt.words.all { it in normalizedName } }
+        val matchingType =
+            (!hasTypeFilter || !isDirectory) &&
+                (selectedTypes.isEmpty() || selectedTypes.any { it.matches(name, mimeType) }) &&
+                extensionQueryType?.matches(name, mimeType) != false
+        if (!matchingType) return false
+        val normalizedMetadata =
+            normalize(
+                buildString(name.length + parentFolderName.orEmpty().length) {
+                    append(name)
+                    parentFolderName?.takeIf(String::isNotBlank)?.let {
+                        append(' ')
+                        append(it)
+                    }
+                    dateModifiedEpochSeconds?.let {
+                        append(' ')
+                        append(LocalDate.ofEpochDay(Math.floorDiv(it, SECONDS_PER_DAY)))
+                    }
+                },
+            )
+        return attempts.isEmpty() || attempts.any { attempt -> attempt.words.all { it in normalizedMetadata } }
     }
 
     private companion object {
@@ -90,6 +125,8 @@ internal data class FileSearchCriteria(
                 }
                 if (isNotEmpty() && last() == ' ') deleteAt(lastIndex)
             }
+
+        const val SECONDS_PER_DAY = 86_400L
     }
 }
 
@@ -155,5 +192,7 @@ internal enum class SearchFileType(
         val arguments: List<String> = entries.map(SearchFileType::argument)
 
         fun from(argument: String): SearchFileType? = entries.firstOrNull { it.argument == argument }
+
+        fun fromExtension(extension: String): SearchFileType? = entries.firstOrNull { extension.lowercase(Locale.ROOT) in it.extensions }
     }
 }
