@@ -60,6 +60,10 @@ class SessionAuthCoordinator
             prompt: DeviceCodePrompt?,
         ): AppAuthStatus =
             when (authState) {
+                AuthState.Restoring -> {
+                    AppAuthStatus.Restoring
+                }
+
                 AuthState.SignedOut -> {
                     AppAuthStatus.SignedOut(sessionExpired = reauthenticationFailure != null)
                 }

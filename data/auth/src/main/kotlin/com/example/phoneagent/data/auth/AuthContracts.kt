@@ -7,6 +7,9 @@ public enum class AuthMethod {
 }
 
 public sealed interface AuthState {
+    /** Initial value before [restore][SessionManager.restore] has produced its first result. */
+    public data object Restoring : AuthState
+
     public data object SignedOut : AuthState
 
     public data class SigningIn(

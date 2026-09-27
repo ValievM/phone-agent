@@ -17,7 +17,7 @@ public class SessionManager(
     private val tokenRefresher: TokenRefresher,
     private val logger: AppLogger,
 ) : CredentialsProvider {
-    private val mutableState: MutableStateFlow<AuthState> = MutableStateFlow(AuthState.SignedOut)
+    private val mutableState: MutableStateFlow<AuthState> = MutableStateFlow(AuthState.Restoring)
     private val mutableReauthenticationFailure: MutableStateFlow<AuthFailure?> = MutableStateFlow(null)
 
     public val state: StateFlow<AuthState> = mutableState.asStateFlow()

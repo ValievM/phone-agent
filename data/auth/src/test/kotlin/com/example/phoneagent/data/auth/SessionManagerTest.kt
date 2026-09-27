@@ -17,6 +17,26 @@ import java.util.Base64
 
 class SessionManagerTest {
     @Test
+    fun `before restore is called the state is Restoring, not SignedOut`() =
+        runTest {
+            val manager = sessionManager(FakeAuthProvider(AuthMethod.API_KEY, AuthResult.Success(tokens())))
+
+            assertEquals(AuthState.Restoring, manager.state.value)
+        }
+
+    @Test
+    fun `restore with no stored session moves from Restoring straight to SignedOut`() =
+        runTest {
+            val manager = sessionManager(FakeAuthProvider(AuthMethod.API_KEY, AuthResult.Success(tokens())))
+            val states = mutableListOf<AuthState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { manager.state.collect(states::add) }
+
+            manager.restore()
+
+            assertEquals(listOf(AuthState.Restoring, AuthState.SignedOut), states)
+        }
+
+    @Test
     fun `successful sign in transitions through signing in and exposes JWT account identifier`() =
         runTest {
             val tokens = tokens(accountId = "account-1")
@@ -29,7 +49,7 @@ class SessionManagerTest {
 
             assertEquals(
                 listOf(
-                    AuthState.SignedOut,
+                    AuthState.Restoring,
                     AuthState.SigningIn(AuthMethod.CHATGPT_BROWSER),
                     AuthState.SignedIn(AuthMethod.CHATGPT_BROWSER, "account-1"),
                 ),
