@@ -3,15 +3,15 @@ package com.example.phoneagent.tools.files
 /** User-facing card copy and model-facing protocol text for `search_files`. */
 internal object SearchFilesCopy {
     const val SPEC_DESCRIPTION: String =
-        "Search accessible MediaStore files using metadata only: display name, immediate parent folder, and UTC " +
-            "modified date. Match every query word as a case-insensitive substring in any metadata field, " +
+        "Search accessible MediaStore files using metadata only: display name and immediate parent folder. " +
+            "Match every query word as a case-insensitive substring in the file name or parent folder, " +
             "ignoring ё/e, word order, and separators. Search short word stems. A query is optional when types " +
             "are supplied; a lone known extension such as .pdf filters by that file type. If nothing is found, " +
             "try up to five synonyms, transliterations, or English variants in alternatives. If still empty, " +
             "search with types alone, then filter the returned metadata by name. Types include pdf, doc, image, " +
             "video, audio, or archive. Never read file contents. Some downloads may require the user to select a folder."
     const val QUERY_SCHEMA_DESCRIPTION: String =
-        "Optional search over file name, immediate parent folder, and UTC modified date; omit it for types-only search."
+        "Optional search over file name and immediate parent folder; omit it for types-only search."
     const val ALTERNATIVES_SCHEMA_DESCRIPTION: String =
         "Up to five synonyms, transliterations, or English variants; any alternative may match."
     const val TYPES_SCHEMA_DESCRIPTION: String =

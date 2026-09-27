@@ -5,6 +5,11 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
 
+private const val DOCUMENT_ID_INDEX = 0
+private const val DISPLAY_NAME_INDEX = 1
+private const val MIME_TYPE_INDEX = 2
+private const val LAST_MODIFIED_INDEX = 3
+
 /**
  * [DocumentNode] backed by the Storage Access Framework: children come from a
  * ContentResolver.query against the document's child-documents URI. Thin Android wrapper by
@@ -17,8 +22,10 @@ internal class SafDocumentNode(
     private val documentId: String,
     override val name: String,
     override val mimeType: String?,
-    override val isDirectory: Boolean,
+    override val dateModifiedEpochMillis: Long?,
 ) : DocumentNode {
+    override val isDirectory: Boolean = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+
     override fun children(): List<DocumentNode> {
         if (isDirectory) {
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
@@ -31,7 +38,7 @@ internal class SafDocumentNode(
     }
 
     private companion object {
-        // Column order for every projection here: document id, display name, mime type.
+        // Column order for every projection here: document id, display name, mime type, modified time.
         private val CHILD_PROJECTION = documentProjection()
     }
 }
@@ -60,6 +67,7 @@ private fun documentProjection(): Array<String> =
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
         DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
     )
 
 private fun Cursor.readChildren(
@@ -68,9 +76,11 @@ private fun Cursor.readChildren(
 ): List<DocumentNode> =
     buildList {
         while (moveToNext()) {
-            val childId = getString(0)
-            val childName = getString(1)
-            val childMimeType = getString(2)
+            val childId = getString(DOCUMENT_ID_INDEX)
+            val childName = getString(DISPLAY_NAME_INDEX)
+            val childMimeType = getString(MIME_TYPE_INDEX)
+            val modifiedMillis =
+                if (isNull(LAST_MODIFIED_INDEX)) null else getLong(LAST_MODIFIED_INDEX)
             if (childId != null && childName != null) {
                 add(
                     SafDocumentNode(
@@ -79,7 +89,7 @@ private fun Cursor.readChildren(
                         documentId = childId,
                         name = childName,
                         mimeType = childMimeType,
-                        isDirectory = childMimeType == DocumentsContract.Document.MIME_TYPE_DIR,
+                        dateModifiedEpochMillis = modifiedMillis,
                     ),
                 )
             }
@@ -92,14 +102,14 @@ private fun Cursor.readRoot(
     rootId: String,
 ): SafDocumentNode? =
     if (moveToFirst()) {
-        val mimeType = getString(2)
+        val mimeType = getString(MIME_TYPE_INDEX)
         SafDocumentNode(
             resolver = resolver,
             treeUri = treeUri,
             documentId = rootId,
-            name = getString(1) ?: "",
+            name = getString(DISPLAY_NAME_INDEX) ?: "",
             mimeType = mimeType,
-            isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR,
+            dateModifiedEpochMillis = if (isNull(LAST_MODIFIED_INDEX)) null else getLong(LAST_MODIFIED_INDEX),
         )
     } else {
         null

@@ -150,7 +150,7 @@ class SearchFilesMetadataTest {
         }
 
     @Test
-    fun `matches the immediate parent folder and ISO date but not ancestor paths`() =
+    fun `matches immediate parent folder but not date or ancestor paths`() =
         runTest {
             val search =
                 RecordingMetadataSearch(
@@ -168,12 +168,12 @@ class SearchFilesMetadataTest {
                 )
             val tool = tool(search)
 
-            val matching =
-                tool.execute(args("math 2024-01-15"), context()) as
-                    ToolResult.Success
+            val parent = tool.execute(args("math"), context()) as ToolResult.Success
+            val date = tool.execute(args("2024-01-15"), context()) as ToolResult.Success
             val ancestor = tool.execute(args("Telegram"), context()) as ToolResult.Success
 
-            assertEquals(listOf("book.bin"), resultNames(matching.text))
+            assertEquals(listOf("book.bin"), resultNames(parent.text))
+            assertTrue(resultNames(date.text).isEmpty())
             assertTrue(resultNames(ancestor.text).isEmpty())
         }
 
@@ -253,7 +253,6 @@ private class RecordingMetadataSearch(
                     name = metadata.name,
                     mimeType = metadata.mimeType,
                     parentFolderName = parentFolder,
-                    dateModifiedEpochSeconds = metadata.dateModified,
                 )
             }
         return MediaStoreQueryResult(matching, truncated = !shouldContinue())

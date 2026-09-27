@@ -92,7 +92,6 @@ internal class AndroidMediaStoreSearch
                             name = metadata.name,
                             mimeType = metadata.mimeType,
                             parentFolderName = parentFolder,
-                            dateModifiedEpochSeconds = metadata.dateModified,
                         )
                     }?.let(records::add)
             }

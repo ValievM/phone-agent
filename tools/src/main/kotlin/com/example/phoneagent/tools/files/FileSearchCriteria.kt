@@ -1,6 +1,5 @@
 package com.example.phoneagent.tools.files
 
-import java.time.LocalDate
 import java.util.Locale
 
 internal const val FILE_SEARCH_MAX_QUERY_LENGTH = 200
@@ -87,7 +86,6 @@ internal data class FileSearchCriteria(
         mimeType: String? = null,
         isDirectory: Boolean = false,
         parentFolderName: String? = null,
-        dateModifiedEpochSeconds: Long? = null,
     ): Boolean {
         val matchingType =
             (!hasTypeFilter || !isDirectory) &&
@@ -101,10 +99,6 @@ internal data class FileSearchCriteria(
                     parentFolderName?.takeIf(String::isNotBlank)?.let {
                         append(' ')
                         append(it)
-                    }
-                    dateModifiedEpochSeconds?.let {
-                        append(' ')
-                        append(LocalDate.ofEpochDay(Math.floorDiv(it, SECONDS_PER_DAY)))
                     }
                 },
             )
@@ -125,8 +119,6 @@ internal data class FileSearchCriteria(
                 }
                 if (isNotEmpty() && last() == ' ') deleteAt(lastIndex)
             }
-
-        const val SECONDS_PER_DAY = 86_400L
     }
 }
 

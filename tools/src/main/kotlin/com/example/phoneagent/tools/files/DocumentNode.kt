@@ -16,6 +16,10 @@ internal interface DocumentNode {
     val mimeType: String?
         get() = null
 
+    /** Last-modified time in epoch milliseconds, or null when the provider has no value. */
+    val dateModifiedEpochMillis: Long?
+        get() = null
+
     /** Child documents; empty for files and for empty directories. */
     fun children(): List<DocumentNode>
 }

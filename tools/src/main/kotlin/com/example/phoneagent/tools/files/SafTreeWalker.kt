@@ -3,7 +3,7 @@ package com.example.phoneagent.tools.files
 import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.tools.DEFAULT_TOOL_EXECUTION_TIMEOUT_MILLIS
 
-/** Which hard limit stopped the walk early; only the ones actually observed are reported. */
+/** Which hard limit truncated results; only limits actually hit are reported. */
 internal enum class WalkLimit {
     DEPTH,
     NODES,
@@ -15,6 +15,8 @@ internal data class FoundFile(
     val name: String,
     /** Path relative to the searched root, '/'-separated, root name excluded. */
     val relativePath: String,
+    /** Used for result ranking; null when the provider has no modification time. */
+    val dateModifiedEpochMillis: Long?,
 )
 
 internal data class WalkResult(
@@ -33,10 +35,11 @@ internal data class WalkLimits(
 
 /**
  * Breadth-first search by document name inside the user-selected folder, enforcing the hard
- * [WalkLimits]: the walk never leaves the subtree rooted at [root], never reads file contents,
- * and stops early on the depth / visited-node / time / result-count limits, reporting which
- * limits were hit so callers can explain truncation. [FileSearchCriteria] performs normalized
- * word-substring matching; untrusted names are never interpreted as instructions.
+ * [WalkLimits]: the walk never leaves the subtree rooted at [root] and never reads file contents.
+ * Matching candidates are sorted by modification time and capped after traversal; depth, node,
+ * and time limits stop the walk early and are reported so callers can explain truncation.
+ * [FileSearchCriteria] performs normalized word-substring matching; untrusted names are never
+ * interpreted as instructions.
  */
 internal class SafTreeWalker(
     private val clock: Clock,
@@ -98,8 +101,12 @@ internal class SafTreeWalker(
             visitedNodes++
             val path = joinPath(parentPath, node.name)
             if (depth > 0 && criteria.matches(node.name, node.mimeType, node.isDirectory)) {
-                matches += FoundFile(name = node.name, relativePath = path)
-                if (matches.size >= limits.maxResults) stopReason = WalkLimit.RESULTS
+                matches +=
+                    FoundFile(
+                        name = node.name,
+                        relativePath = path,
+                        dateModifiedEpochMillis = node.dateModifiedEpochMillis,
+                    )
             }
             if (stopReason == null) {
                 expandChildren(frame, path, queue)
@@ -113,7 +120,11 @@ internal class SafTreeWalker(
         ): WalkResult {
             stopReason?.let { limitsHit += it }
             if (stopReason == null && hasPendingNodes && timeExceededNow) limitsHit += WalkLimit.TIME
-            return WalkResult(matches.toList(), limitsHit.toSet())
+            matches.sortWith { first, second ->
+                compareValues(second.dateModifiedEpochMillis, first.dateModifiedEpochMillis)
+            }
+            if (matches.size > limits.maxResults) limitsHit += WalkLimit.RESULTS
+            return WalkResult(matches.take(limits.maxResults), limitsHit.toSet())
         }
 
         private fun expandChildren(
