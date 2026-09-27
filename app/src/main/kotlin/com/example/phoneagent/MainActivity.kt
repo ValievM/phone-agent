@@ -14,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.phoneagent.auth.AuthCoordinator
 import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.theme.AppTheme
@@ -36,14 +37,22 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var dispatcherProvider: DispatcherProvider
 
+    @Inject
+    lateinit var authCoordinator: AuthCoordinator
+
     private val themeViewModel: ThemeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Held until the saved theme is known, so the app never flashes in the wrong theme; but never
         // longer than SPLASH_MAX_MILLIS, so a slow read cannot leave the user on the splash forever.
-        val splashDeadline = SystemClock.elapsedRealtime() + SPLASH_MAX_MILLIS
+        val splashDeadlineMillis = SystemClock.elapsedRealtime() + SPLASH_MAX_MILLIS
         installSplashScreen().setKeepOnScreenCondition {
-            themeViewModel.state.value is ThemeState.Loading && SystemClock.elapsedRealtime() < splashDeadline
+            shouldKeepSplashVisible(
+                themeState = themeViewModel.state.value,
+                authStatus = authCoordinator.state.value,
+                nowMillis = SystemClock.elapsedRealtime(),
+                deadlineMillis = splashDeadlineMillis,
+            )
         }
         super.onCreate(savedInstanceState)
         setContent {
