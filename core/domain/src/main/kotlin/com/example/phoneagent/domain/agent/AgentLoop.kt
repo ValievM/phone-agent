@@ -170,7 +170,7 @@ public class AgentLoop(
         sharedDecision: Approval?,
         requireConfirmation: Boolean,
         onApprovalResolved: suspend (List<CallId>) -> Unit,
-    ): HistoryItem.ToolOutput {
+    ): Pair<ToolCall, HistoryItem.ToolOutput> {
         if (sharedDecision == null) {
             val description = describe(call)
             val risk = toolPipeline.riskOf(call.name) ?: Risk.SAFE
@@ -179,6 +179,7 @@ public class AgentLoop(
                 emit(AgentEvent.ApprovalRequested(ApprovalRequest(description, approvalRisk, call.arguments)))
             }
         }
+        var resolvedCall = call
         val outcome =
             toolPipeline.run(
                 name = call.name,
@@ -186,9 +187,10 @@ public class AgentLoop(
                 approval = sharedDecision ?: Approval.ASK,
                 requireConfirmation = requireConfirmation,
                 onApprovalResolved = { onApprovalResolved(listOf(call.callId)) },
+                onArgumentsResolved = { resolvedCall = call.copy(arguments = it) },
             )
-        emit(AgentEvent.ToolCallFinished(call, outcome))
-        return HistoryItem.ToolOutput(idGenerator.newItemId(), call.callId, outcome.toOutputText())
+        emit(AgentEvent.ToolCallFinished(resolvedCall, outcome))
+        return resolvedCall to HistoryItem.ToolOutput(idGenerator.newItemId(), call.callId, outcome.toOutputText())
     }
 
     private fun unknownToolDescription(name: String): CallDescription = CallDescription(title = name, summary = "Unknown tool")
@@ -239,10 +241,11 @@ public class AgentLoop(
                 for (call in completedTurn.toolCalls) {
                     val invocation = ToolInvocation(call.name, call.arguments)
                     val requireConfirmation = invocation in context.completedInvocations
-                    context.newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, call.arguments)
-                    context.newItems +=
+                    val (resolvedCall, output) =
                         runToolCall(call, sharedDecisions[call.callId], requireConfirmation, onApprovalResolved)
-                    context.completedInvocations += invocation
+                    context.newItems += HistoryItem.ToolCallItem(call.itemId, call.callId, call.name, resolvedCall.arguments)
+                    context.newItems += output
+                    context.completedInvocations += ToolInvocation(resolvedCall.name, resolvedCall.arguments)
                 }
                 null
             }

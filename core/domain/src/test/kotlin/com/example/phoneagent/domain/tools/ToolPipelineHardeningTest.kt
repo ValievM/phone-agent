@@ -50,7 +50,9 @@ class ToolPipelineHardeningTest {
             val permissionWait = CompletableDeferred<Unit>()
             val interaction =
                 object : UserInteraction {
-                    override suspend fun confirm(request: ApprovalRequest): Boolean = true
+                    override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult =
+                        com.example.phoneagent.domain.interaction.ConfirmResult
+                            .Approved(request.arguments)
 
                     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
 
@@ -96,10 +98,11 @@ class ToolPipelineHardeningTest {
             var confirmationCount = 0
             val interaction =
                 object : UserInteraction {
-                    override suspend fun confirm(request: ApprovalRequest): Boolean {
+                    override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult {
                         confirmationCount += 1
                         delay(60_000)
-                        return true
+                        return com.example.phoneagent.domain.interaction.ConfirmResult
+                            .Approved(request.arguments)
                     }
 
                     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
@@ -220,7 +223,9 @@ class ToolPipelineHardeningTest {
     ) : UserInteraction {
         private val granted = mutableSetOf<Capability>()
 
-        override suspend fun confirm(request: ApprovalRequest): Boolean = true
+        override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult =
+            com.example.phoneagent.domain.interaction.ConfirmResult
+                .Approved(request.arguments)
 
         override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
 

@@ -1,6 +1,7 @@
 package com.example.phoneagent.interaction
 
 import com.example.phoneagent.domain.interaction.ApprovalRequest
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import kotlinx.coroutines.async
@@ -8,7 +9,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,12 +28,12 @@ class UserInteractionBridgeQueueTest {
             val head = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:00"), head.request)
             head.deferred.complete(true)
-            assertTrue(first.await())
+            assertTrue(first.await() is ConfirmResult.Approved)
 
             val next = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:15"), next.request)
             next.deferred.complete(false)
-            assertFalse(second.await())
+            assertEquals(ConfirmResult.Rejected, second.await())
             assertNull(bridge.pending.value)
         }
 
@@ -52,7 +52,7 @@ class UserInteractionBridgeQueueTest {
             val head = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:00"), head.request)
             head.deferred.complete(true)
-            assertTrue(first.await())
+            assertTrue(first.await() is ConfirmResult.Approved)
             assertNull(bridge.pending.value)
         }
 
@@ -66,8 +66,8 @@ class UserInteractionBridgeQueueTest {
 
             bridge.resolvePendingAsDeclined()
 
-            assertFalse(first.await())
-            assertFalse(second.await())
+            assertEquals(ConfirmResult.Rejected, first.await())
+            assertEquals(ConfirmResult.Rejected, second.await())
             assertNull(bridge.pending.value)
         }
 

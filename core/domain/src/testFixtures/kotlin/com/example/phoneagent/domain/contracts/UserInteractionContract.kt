@@ -3,6 +3,7 @@ package com.example.phoneagent.domain.contracts
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
@@ -10,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,8 +52,20 @@ public abstract class UserInteractionContract {
             val second = async { interaction.confirm(request("второй")) }
             advanceUntilIdle()
 
-            assertTrue(first.await())
-            assertFalse(second.await())
+            assertTrue(first.await() is ConfirmResult.Approved)
+            assertEquals(ConfirmResult.Rejected, second.await())
+        }
+
+    @Test
+    public fun `an approval carries the exact arguments shown in its request`() =
+        runTest {
+            offer(approved = true)
+            val interaction = subject()
+            setUp(interaction)
+            val arguments = buildJsonObject { put("minute", 45) }
+            val request = ApprovalRequest(CallDescription("будильник", "07:45"), Risk.CONFIRM, arguments)
+
+            assertEquals(ConfirmResult.Approved(arguments), interaction.confirm(request))
         }
 
     @Test
@@ -68,13 +82,13 @@ public abstract class UserInteractionContract {
             second.cancel()
             advanceUntilIdle()
 
-            assertTrue(first.await())
+            assertTrue(first.await() is ConfirmResult.Approved)
 
             // A caller submitted after the cancelled one still gets its own offered answer.
             offer(approved = false)
             val third = async { interaction.confirm(request("третий")) }
             advanceUntilIdle()
-            assertFalse(third.await())
+            assertEquals(ConfirmResult.Rejected, third.await())
         }
 
     @Test

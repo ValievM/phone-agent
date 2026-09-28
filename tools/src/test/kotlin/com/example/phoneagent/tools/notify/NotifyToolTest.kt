@@ -144,7 +144,9 @@ private class RecordingNotifier : Notifier {
 private class DelayedPermissionInteraction : UserInteraction {
     val requestedCapabilities = mutableListOf<Capability>()
 
-    override suspend fun confirm(request: ApprovalRequest): Boolean = true
+    override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult =
+        com.example.phoneagent.domain.interaction.ConfirmResult
+            .Approved(request.arguments)
 
     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = true
 

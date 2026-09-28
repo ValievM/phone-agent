@@ -1,8 +1,12 @@
 package com.example.phoneagent.tools.alarm
 
+import com.example.phoneagent.domain.tools.ArgumentReview
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.EditableField
+import com.example.phoneagent.domain.tools.EditableFieldKind
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolArgumentEditor
 import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolResult
@@ -52,6 +56,33 @@ internal class AlarmTool
                 summary = AlarmCopy.cardSummary(alarmArgs.hour, alarmArgs.minute, alarmArgs.message),
             )
         }
+
+        override fun argumentEditor(args: JsonObject): ToolArgumentEditor =
+            object : ToolArgumentEditor {
+                override val fields: List<EditableField> =
+                    listOf(
+                        EditableField("hour", "Час", EditableFieldKind.INTEGER),
+                        EditableField("minute", "Минуты", EditableFieldKind.INTEGER),
+                        EditableField("message", "Название", EditableFieldKind.TEXT),
+                    )
+
+                override fun review(args: JsonObject): ArgumentReview {
+                    val validationError =
+                        when (val decoded = decodeArgs(args)) {
+                            null -> {
+                                AlarmCopy.RESULT_INVALID_ARGS
+                            }
+
+                            else -> {
+                                when (val validation = validateAlarmArgs(decoded)) {
+                                    AlarmValidationResult.Valid -> null
+                                    is AlarmValidationResult.Invalid -> validation.reason
+                                }
+                            }
+                        }
+                    return ArgumentReview(description = describe(args), validationError = validationError)
+                }
+            }
 
         override suspend fun execute(
             args: JsonObject,

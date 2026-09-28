@@ -222,7 +222,8 @@ class AgentLoopBatchApprovalTest {
             val asked = CompletableDeferred<Unit>()
             val hanging =
                 object : UserInteraction {
-                    override suspend fun confirm(request: ApprovalRequest): Boolean = awaitCancellation()
+                    override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult =
+                        awaitCancellation()
 
                     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
                         asked.complete(Unit)

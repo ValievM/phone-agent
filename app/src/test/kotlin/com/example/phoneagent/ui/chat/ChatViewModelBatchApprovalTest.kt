@@ -141,7 +141,13 @@ class ChatViewModelBatchApprovalTest {
     private class GatedInteraction(
         private val gate: CompletableDeferred<Boolean>,
     ) : UserInteraction {
-        override suspend fun confirm(request: ApprovalRequest): Boolean = gate.await()
+        override suspend fun confirm(request: ApprovalRequest): com.example.phoneagent.domain.interaction.ConfirmResult =
+            if (gate.await()) {
+                com.example.phoneagent.domain.interaction.ConfirmResult
+                    .Approved(request.arguments)
+            } else {
+                com.example.phoneagent.domain.interaction.ConfirmResult.Rejected
+            }
 
         override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean = gate.await()
 

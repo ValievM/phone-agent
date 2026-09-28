@@ -4,6 +4,7 @@ import com.example.phoneagent.domain.conversation.ToolCall
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.platform.AppLogger
 import com.example.phoneagent.domain.platform.Clock
@@ -128,80 +129,60 @@ public class ToolPipeline(
         approval: Approval = Approval.ASK,
         requireConfirmation: Boolean = false,
         onApprovalResolved: suspend () -> Unit = {},
+        onArgumentsResolved: suspend (JsonObject) -> Unit = {},
     ): ToolOutcome {
         val tool = registry.find(name)
         val outcome =
             if (tool == null) {
                 ToolOutcome.Failed("unknown tool: $name")
             } else {
-                runKnownTool(tool, args, approval, requireConfirmation, onApprovalResolved)
+                runKnownTool(RunContext(tool, args, approval, requireConfirmation, onApprovalResolved, onArgumentsResolved))
             }
         logger.info(TAG, "tool call finished", fields = mapOf("name" to name, "outcome" to outcome.kind()))
         return outcome
     }
 
-    private suspend fun runKnownTool(
-        tool: Tool,
-        args: JsonObject,
-        approval: Approval,
-        requireConfirmation: Boolean,
-        onApprovalResolved: suspend () -> Unit,
-    ): ToolOutcome {
-        val missing = missingRequiredFields(tool.spec.inputSchema, args)
-        // A confirmation request needs a usable description; SAFE tools reach this path only when explicitly repeated.
-        val needsDescription =
-            (tool.spec.risk != Risk.SAFE || requireConfirmation) &&
-                approval != Approval.DECLINED &&
-                approval != Approval.NOT_PRESENTED
-        val description = if (needsDescription) describeSafely(tool, args) else null
-        val refusedByDescribe = needsDescription && description == null
-        val approvalRequest = description?.let { ApprovalRequest(it, tool.spec.risk, args) }
-        return if (missing.isNotEmpty()) {
-            ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
-        } else if (approval == Approval.NOT_PRESENTED) {
-            ToolOutcome.NotShown(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
-        } else if (refusedByDescribe) {
-            ToolOutcome.Failed("the tool could not describe its action, so it was not run")
-        } else if (!approve(tool, approval, requireConfirmation, approvalRequest, onApprovalResolved)) {
-            ToolOutcome.Rejected("user declined")
-        } else {
-            deniedCapability(tool)?.let { ToolOutcome.Failed(tool.deniedMessage(it)) } ?: execute(tool, args)
+    private suspend fun runKnownTool(context: RunContext): ToolOutcome {
+        val missing = missingRequiredFields(context.tool.spec.inputSchema, context.args)
+        return when {
+            missing.isNotEmpty() -> ToolOutcome.Failed("missing required fields: ${missing.joinToString()}")
+            context.approval == Approval.NOT_PRESENTED -> ToolOutcome.NotShown(BATCH_DESCRIPTION_UNAVAILABLE_REASON)
+            else -> confirmAndRun(context)
         }
     }
 
-    /**
-     * The first required permission the user denies. Asked before [execute] so that the time the user
-     * spends on a system permission dialog does not count against the tool's timeout.
-     */
-    private suspend fun deniedCapability(tool: Tool): Capability? =
-        tool.spec.requiredCapabilities.firstOrNull { userInteraction.ensure(it) is CapabilityResult.Denied }
-
-    private suspend fun approve(
-        tool: Tool,
-        approval: Approval,
-        requireConfirmation: Boolean,
-        request: ApprovalRequest?,
-        onApprovalResolved: suspend () -> Unit,
-    ): Boolean =
-        when {
-            approval == Approval.GRANTED -> {
-                true
-            }
-
-            approval == Approval.DECLINED || approval == Approval.NOT_PRESENTED -> {
-                false
-            }
-
-            tool.spec.risk == Risk.SAFE && !requireConfirmation -> {
-                true
-            }
-
-            else -> {
-                val approved = userInteraction.confirm(checkNotNull(request))
-                onApprovalResolved()
-                approved
-            }
+    private suspend fun confirmAndRun(context: RunContext): ToolOutcome {
+        // A confirmation request needs a usable description; SAFE tools reach this path only when explicitly repeated.
+        val needsDescription =
+            (context.tool.spec.risk != Risk.SAFE || context.requireConfirmation) && context.approval != Approval.DECLINED
+        val description = if (needsDescription) describeSafely(context.tool, context.args) else null
+        if (needsDescription && description == null) {
+            return ToolOutcome.Failed("the tool could not describe its action, so it was not run")
         }
+        val editor =
+            if (context.tool.spec.risk == Risk.CONFIRM && context.approval == Approval.ASK) {
+                context.tool.argumentEditor(context.args)
+            } else {
+                null
+            }
+        val request = description?.let { ApprovalRequest(it, context.tool.spec.risk, context.args, editor) }
+        return when (val answer = approve(userInteraction, context, request)) {
+            ConfirmResult.Rejected -> ToolOutcome.Rejected("user declined")
+            is ConfirmResult.Approved -> runApproved(context, editor, answer.arguments)
+        }
+    }
+
+    private suspend fun runApproved(
+        context: RunContext,
+        editor: ToolArgumentEditor?,
+        finalArgs: JsonObject,
+    ): ToolOutcome {
+        val validationError = approvalError(context, editor, finalArgs)
+        if (validationError != null) return ToolOutcome.Failed(validationError)
+        context.onArgumentsResolved(finalArgs)
+        return deniedCapability(userInteraction, context.tool)?.let { ToolOutcome.Failed(context.tool.deniedMessage(it)) }
+            ?: execute(context.tool, finalArgs)
+    }
 
     private suspend fun execute(
         tool: Tool,
@@ -244,16 +225,6 @@ public class ToolPipeline(
     }
 
     private companion object {
-        private fun missingRequiredFields(
-            schema: JsonObject,
-            args: JsonObject,
-        ): List<String> {
-            val required = (schema["required"] as? JsonArray) ?: return emptyList()
-            return required
-                .mapNotNull { (it as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.jsonPrimitive?.content }
-                .filterNot(args::containsKey)
-        }
-
         private fun ToolOutcome.kind(): String =
             when (this) {
                 is ToolOutcome.Success -> "success"
@@ -262,6 +233,69 @@ public class ToolPipeline(
                 is ToolOutcome.Failed -> "failed"
             }
     }
+}
+
+private data class RunContext(
+    val tool: Tool,
+    val args: JsonObject,
+    val approval: Approval,
+    val requireConfirmation: Boolean,
+    val onApprovalResolved: suspend () -> Unit,
+    val onArgumentsResolved: suspend (JsonObject) -> Unit,
+)
+
+/** Asked before execution so a system permission dialog does not consume the tool's timeout. */
+private suspend fun deniedCapability(
+    userInteraction: UserInteraction,
+    tool: Tool,
+): Capability? = tool.spec.requiredCapabilities.firstOrNull { userInteraction.ensure(it) is CapabilityResult.Denied }
+
+private suspend fun approve(
+    userInteraction: UserInteraction,
+    context: RunContext,
+    request: ApprovalRequest?,
+): ConfirmResult =
+    when {
+        context.approval == Approval.GRANTED -> {
+            ConfirmResult.Approved(context.args)
+        }
+
+        context.approval == Approval.DECLINED || context.approval == Approval.NOT_PRESENTED -> {
+            ConfirmResult.Rejected
+        }
+
+        context.tool.spec.risk == Risk.SAFE && !context.requireConfirmation -> {
+            ConfirmResult.Approved(context.args)
+        }
+
+        else -> {
+            val approved = userInteraction.confirm(checkNotNull(request))
+            context.onApprovalResolved()
+            approved
+        }
+    }
+
+private fun approvalError(
+    context: RunContext,
+    editor: ToolArgumentEditor?,
+    finalArgs: JsonObject,
+): String? {
+    val missing = missingRequiredFields(context.tool.spec.inputSchema, finalArgs)
+    return when {
+        finalArgs != context.args && editor == null -> "edited arguments are not allowed"
+        missing.isNotEmpty() -> "missing required fields: ${missing.joinToString()}"
+        else -> editor?.review(finalArgs)?.validationError
+    }
+}
+
+private fun missingRequiredFields(
+    schema: JsonObject,
+    args: JsonObject,
+): List<String> {
+    val required = (schema["required"] as? JsonArray) ?: return emptyList()
+    return required
+        .mapNotNull { (it as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.jsonPrimitive?.content }
+        .filterNot(args::containsKey)
 }
 
 /** The one shared question of a batch whose every description was built; kept outside the class to keep it small. */

@@ -8,6 +8,7 @@ import com.example.phoneagent.domain.conversation.ItemId
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
@@ -127,12 +128,18 @@ public class FakeUserInteraction : UserInteraction {
      * single [approvalResult]/[batchApprovalResult], which is what every existing test relies on.
      */
     public val scriptedApprovals: ArrayDeque<Boolean> = ArrayDeque()
+    public val scriptedConfirmResults: ArrayDeque<ConfirmResult> = ArrayDeque()
     public val scriptedBatchApprovals: ArrayDeque<Boolean> = ArrayDeque()
     public val scriptedCapabilities: ArrayDeque<CapabilityResult> = ArrayDeque()
 
-    override suspend fun confirm(request: ApprovalRequest): Boolean {
+    override suspend fun confirm(request: ApprovalRequest): ConfirmResult {
         approvalRequests += request
-        return scriptedApprovals.removeFirstOrNull() ?: approvalResult
+        scriptedConfirmResults.removeFirstOrNull()?.let { return it }
+        return if (scriptedApprovals.removeFirstOrNull() ?: approvalResult) {
+            ConfirmResult.Approved(request.arguments)
+        } else {
+            ConfirmResult.Rejected
+        }
     }
 
     override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {

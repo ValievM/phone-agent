@@ -3,6 +3,7 @@ package com.example.phoneagent.interaction
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,9 +59,13 @@ public class UserInteractionBridge
         private val mutablePending = MutableStateFlow<PendingInteraction?>(null)
         public val pending: StateFlow<PendingInteraction?> = mutablePending.asStateFlow()
 
-        override suspend fun confirm(request: ApprovalRequest): Boolean {
+        override suspend fun confirm(request: ApprovalRequest): ConfirmResult {
             val entry = PendingInteraction.Approval(request, CompletableDeferred())
-            return awaitEntry(entry) { entry.deferred.await() }
+            return if (awaitEntry(entry) { entry.deferred.await() }) {
+                ConfirmResult.Approved(request.arguments)
+            } else {
+                ConfirmResult.Rejected
+            }
         }
 
         override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {

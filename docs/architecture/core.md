@@ -32,6 +32,7 @@ public sealed interface ModelEvent {
 public interface Tool {
     public val spec: ToolSpec                     // имя, описание для модели, JSON-схема, Risk
     public fun describe(args: JsonObject): CallDescription   // человеческое описание вызова: заголовок, суть, детали
+    public fun argumentEditor(args: JsonObject): ToolArgumentEditor? // необязательные типизированные поля для одного CONFIRM
     public suspend fun execute(args: JsonObject, ctx: ToolContext): ToolResult
 }
 // CallDescription(title, summary, details) нужен для карточки в ленте и текста подтверждения (ApprovalRequest = CallDescription + Risk).
@@ -39,7 +40,7 @@ public interface Tool {
 // и подтверждение рисуется из структурированных данных, а не из текста модели.
 
 public interface UserInteraction {
-    public suspend fun confirm(request: ApprovalRequest): Boolean
+    public suspend fun confirm(request: ApprovalRequest): ConfirmResult // Approved(аргументы) | Rejected
     public suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean   // один вопрос на пачку вызовов одного ответа (ADR 0004)
     public suspend fun ensure(capability: Capability): CapabilityResult   // Capability: Notifications и т.п.
 }
@@ -64,8 +65,7 @@ public interface CredentialsProvider {        // то, что нужно кли�
 - отмена собирающего — обычная отмена корутины: сеть и инструмент прерываются, `CancellationException` не глотается.
 
 - Ответ модели может содержать **несколько вызовов**: выполняем по порядку, все результаты добавляем в историю, только потом следующий запрос. Параллелить можно только `SAFE`-инструменты, и не в MVP.
-- Перезапуск: история хранит пары `ToolCallItem`/`ToolOutput`; `ToolOutcome.toOutputText()` пишет успех как есть, остальное — с метками `Rejected: …`, `Not shown: …`, `Failed: …` (старый `Rejected: not shown to user: …` читается как `Rejected`). Чат разбирает текст через `toolOutcomeFromOutputText`, связывает по `callId`, описание берёт у `AgentLoop.describe`. `ToolContent` (`FilesFound`/`HandedOff`) идёт из `ToolResult` в событие, но не в историю и не модели. При восстановлении инструмент восстанавливает содержимое из текста; `AlarmTool` возвращает `HandedOff("Часы")` только для точного `AlarmCopy.RESULT_SUCCESS`. UI не знает имён инструментов и не читает JSON; форматы `ToolOutput` и Room не меняются. Без результата — «Прервано».
-- Тесты цикла — на `AgentLoop` с фейковым `ModelGateway`, без сети; логика шагов и лимитов та же, что задумывалась для автомата.
+- Перезапуск: история хранит пары `ToolCallItem`/`ToolOutput` по `callId`. `toOutputText()` пишет успех как есть, остальные исходы — с метками `Rejected:`, `Not shown:`, `Failed:`. Старый `Rejected: not shown to user:` читается как `Rejected`. Чат восстанавливает исход через `toolOutcomeFromOutputText`, описание — через `AgentLoop.describe`; без результата показывает «Прервано». `ToolContent` идёт в событие, не в историю и не модели; инструмент восстанавливает его из текста (будильник даёт `HandedOff("Часы")` только при точном `AlarmCopy.RESULT_SUCCESS`). UI не разбирает JSON инструментов; форматы Room и `ToolOutput` прежние.
 - `AgentEvent` (для UI): `TextDelta`, `ToolCallStarted`, `ApprovalRequested`, `ToolCallFinished`, `TurnCompleted(newItems)`, `TurnFailed(error)`.
 - История между запросами передаётся целиком (`store=false`); сколько отправлять, решает `ContextWindowPolicy` (стратегия, заменяемая: «последние N», «по размеру», позже «с суммаризацией»).
 
@@ -78,8 +78,9 @@ public interface CredentialsProvider {        // то, что нужно кли�
 - Обязательные аргументы (`required` в схеме) проверяет `ToolPipeline`; остальную валидацию (диапазоны, лимиты длин) делают сами инструменты через sealed-результаты валидации.
 - Разрешения: `ToolPipeline` запрашивает `ToolSpec.requiredCapabilities` **до** таймаута; ожидание пользователя не считается. Таймаут из `ToolSpec.executionTimeoutMillis` (по умолчанию 5 с, `find_files`/`search_files` — 30 с); таймаут даёт `Failed("tool execution timed out")`, лог содержит тип и миллисекунды, UI показывает русскую строку. Отказ — `Failed(Tool.deniedMessage)`. Исключение из `Tool.execute` (кроме отмены) превращается в `Failed("tool failed: <тип>")`.
 - `ApprovalPolicy` по `Risk` инструмента: `SAFE` (без вопроса: `find_files`, `notify`), `CONFIRM` (разовое подтверждение: `set_alarm`; несколько `CONFIRM`-вызовов одного ответа модели подтверждаются одним вопросом «всё или ничего», до 15 за раз: `ToolPipeline.batchGroups` и `confirmBatch`, [ADR 0004](../adr/0004-batch-approval.md)), `SENSITIVE` (подтверждение с деталями, «запомнить» запрещено; на будущее: SMS, звонки).
+- Одиночный `CONFIRM`: `ToolArgumentEditor` даёт поля и `review(args)` (описание, ошибка); UI не знает имя инструмента. `confirm` возвращает `Approved(arguments)` или `Rejected`. Конвейер проверяет правки; `AgentLoop` сохраняет и отправляет модели реальные аргументы. Отказ сохраняет исходные. `SAFE`, `SENSITIVE` и пачка не редактируются.
 - Тот же вызов (имя, равный `JsonObject`) после `ToolOutput` в ходе требует подтверждения и для `SAFE`; прошлые ходы исключены. Ошибка описания блокирует запуск.
-- Результат: `ToolOutcome = Success(text, content?) | Rejected(reason) | NotShown(reason) | Failed(reason)`. Это итог конвейера: отказ, непоказанное подтверждение или таймаут. `Rejected` с причиной `user declined` означает отказ пользователя; `NotShown` — экран подтверждения не показывался и инструмент не запускался. Старую запись `Rejected: not shown to user: …` читаем как `Rejected`. `ToolResult` — только то, что вернул сам инструмент. Дополнительный `ToolContent` — типизированные метаданные для клиентов, не замена и не изменение текста для модели. Любой исход превращается в `function_call_output` для модели.
+- `ToolOutcome = Success(text, content?) | Rejected(reason) | NotShown(reason) | Failed(reason)` — итог конвейера. `Rejected("user declined")` — отказ пользователя; `NotShown` — подтверждение не показывали и инструмент не запускали. `ToolResult` — ответ самого инструмента. `ToolContent` — типизированные метаданные для клиентов, текст для модели он не меняет. Любой исход становится `function_call_output`.
 
 Так безопасность, лимиты и логирование живут в одном месте и применяются ко **всем** инструментам, включая будущие.
 

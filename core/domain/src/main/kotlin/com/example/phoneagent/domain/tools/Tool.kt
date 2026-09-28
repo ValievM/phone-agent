@@ -56,6 +56,9 @@ public interface Tool {
 
     public fun describe(args: JsonObject): CallDescription
 
+    /** Optional editor for a single CONFIRM call. Other risks are never offered one by the pipeline. */
+    public fun argumentEditor(args: JsonObject): ToolArgumentEditor? = null
+
     /** What the model is told when the user denies [capability]. */
     public fun deniedMessage(capability: Capability): String = "permission denied: ${capability.name}"
 
