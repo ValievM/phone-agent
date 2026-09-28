@@ -131,7 +131,7 @@ class SensitiveApprovalSheetUiTest {
                 ApprovalSheet(
                     request = request(Risk.SENSITIVE),
                     arguments = buildJsonObject { put("phone", "model-secret-phone") },
-                    onApprove = onApprove,
+                    onApprove = { onApprove() },
                     onReject = onReject,
                 )
             }

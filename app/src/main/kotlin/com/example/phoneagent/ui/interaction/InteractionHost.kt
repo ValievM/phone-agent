@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.interaction.PendingInteraction
 import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.components.ApprovalSheet
@@ -34,8 +35,8 @@ fun InteractionHost(bridge: UserInteractionBridge) {
             ApprovalSheet(
                 request = current.request,
                 arguments = current.request.arguments,
-                onApprove = { current.deferred.complete(true) },
-                onReject = { current.deferred.complete(false) },
+                onApprove = { arguments -> current.deferred.complete(ConfirmResult.Approved(arguments)) },
+                onReject = { current.deferred.complete(ConfirmResult.Rejected) },
             )
         }
 

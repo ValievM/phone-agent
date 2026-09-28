@@ -467,7 +467,8 @@ class ChatViewModel
             approvalRequestByCallId.remove(event.call.callId)
             val fileHits = event.outcome.toFileHits()
             val status = event.outcome.toCardStatus(fileHits.size)
-            mutableState.update { it.withToolCallStatus(id, status, fileHits) }
+            val description = agentLoop.describe(event.call)
+            mutableState.update { it.withToolCallResult(id, status, description, event.call.arguments, fileHits) }
         }
 
         private fun nextId(): String = (++nextMessageId).toString()

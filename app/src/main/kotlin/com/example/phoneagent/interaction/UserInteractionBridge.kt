@@ -18,7 +18,7 @@ public sealed interface PendingInteraction {
 
     public data class Approval(
         public val request: ApprovalRequest,
-        public val deferred: CompletableDeferred<Boolean>,
+        public val deferred: CompletableDeferred<ConfirmResult>,
     ) : PendingInteraction {
         override val deferredAny: CompletableDeferred<*> get() = deferred
     }
@@ -61,11 +61,7 @@ public class UserInteractionBridge
 
         override suspend fun confirm(request: ApprovalRequest): ConfirmResult {
             val entry = PendingInteraction.Approval(request, CompletableDeferred())
-            return if (awaitEntry(entry) { entry.deferred.await() }) {
-                ConfirmResult.Approved(request.arguments)
-            } else {
-                ConfirmResult.Rejected
-            }
+            return awaitEntry(entry) { entry.deferred.await() }
         }
 
         override suspend fun confirmBatch(requests: List<ApprovalRequest>): Boolean {
@@ -86,7 +82,7 @@ public class UserInteractionBridge
                 }
             for (entry in snapshot) {
                 when (entry) {
-                    is PendingInteraction.Approval -> entry.deferred.complete(false)
+                    is PendingInteraction.Approval -> entry.deferred.complete(ConfirmResult.Rejected)
                     is PendingInteraction.BatchApproval -> entry.deferred.complete(false)
                     is PendingInteraction.Permission -> entry.deferred.complete(CapabilityResult.Denied)
                 }

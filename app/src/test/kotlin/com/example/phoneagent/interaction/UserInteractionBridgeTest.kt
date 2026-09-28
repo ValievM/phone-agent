@@ -3,6 +3,7 @@ package com.example.phoneagent.interaction
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
 import kotlinx.coroutines.async
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -20,6 +22,19 @@ import org.junit.Test
 
 class UserInteractionBridgeTest {
     private val bridge = UserInteractionBridge()
+
+    @Test
+    fun `single confirmation returns the exact approved arguments`() =
+        runTest {
+            val editedArguments = buildJsonObject { put("minute", 45) }
+            val answer = async { bridge.confirm(request("06:30")) }
+            advanceUntilIdle()
+
+            val pending = bridge.pending.value as PendingInteraction.Approval
+            pending.deferred.complete(ConfirmResult.Approved(editedArguments))
+
+            assertEquals(ConfirmResult.Approved(editedArguments), answer.await())
+        }
 
     @Test
     fun `a batch question stays pending until answered and returns the answer`() =

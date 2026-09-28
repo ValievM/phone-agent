@@ -12,13 +12,18 @@ import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
 import com.example.phoneagent.domain.fakes.FakeModelGateway
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.storage.ConversationRepository
+import com.example.phoneagent.domain.tools.ArgumentReview
 import com.example.phoneagent.domain.tools.CallDescription
+import com.example.phoneagent.domain.tools.EditableField
+import com.example.phoneagent.domain.tools.EditableFieldKind
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.Tool
+import com.example.phoneagent.domain.tools.ToolArgumentEditor
 import com.example.phoneagent.domain.tools.ToolContent
 import com.example.phoneagent.domain.tools.ToolContext
 import com.example.phoneagent.domain.tools.ToolFile
@@ -48,6 +53,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -423,6 +430,67 @@ class ChatViewModelTest {
                     .toolCall
                     ?.status
             assertEquals(ToolCallStatus.HandedOff("Часы"), status)
+        }
+
+    @Test
+    fun `completed tool card shows the approved arguments and matching description`() =
+        runTest(dispatcher.scheduler) {
+            val originalArguments =
+                buildJsonObject {
+                    put("hour", 7)
+                    put("minute", 30)
+                }
+            val editedArguments =
+                buildJsonObject {
+                    put("hour", 7)
+                    put("minute", 45)
+                }
+            interaction.scriptedConfirmResults.addLast(ConfirmResult.Approved(editedArguments))
+            val executedArguments = mutableListOf<JsonObject>()
+            val tool =
+                object : Tool {
+                    override val spec = ToolSpec("set_alarm", "sets an alarm", buildJsonObject {}, Risk.CONFIRM)
+
+                    override fun describe(args: JsonObject): CallDescription =
+                        CallDescription("Будильник", "На 07:${args.getValue("minute").jsonPrimitive.content}")
+
+                    override fun argumentEditor(args: JsonObject): ToolArgumentEditor =
+                        object : ToolArgumentEditor {
+                            override val fields =
+                                listOf(
+                                    EditableField("hour", "Час", EditableFieldKind.INTEGER),
+                                    EditableField("minute", "Минуты", EditableFieldKind.INTEGER),
+                                )
+
+                            override fun review(args: JsonObject) = ArgumentReview(describe(args), null)
+                        }
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult {
+                        executedArguments += args
+                        return ToolResult.Success("set")
+                    }
+                }
+            val call = ToolCall(CallId("call-1"), "set_alarm", originalArguments)
+            val gateway =
+                FakeModelGateway().apply {
+                    responseQueue.addLast(listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()))
+                    responseQueue.addLast(listOf(ModelEvent.TextDelta("Будильник поставлен"), ModelEvent.Completed()))
+                }
+            val viewModel = createChatViewModel(agentLoop(gateway, ToolRegistry(setOf(tool))))
+
+            viewModel.onEvent(ChatUiEvent.Submit("поставь будильник"))
+            advanceUntilIdle()
+
+            val card =
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+            assertEquals(listOf(editedArguments), executedArguments)
+            assertEquals(editedArguments, card?.arguments)
+            assertEquals("На 07:45", card?.description?.summary)
         }
 
     @Test

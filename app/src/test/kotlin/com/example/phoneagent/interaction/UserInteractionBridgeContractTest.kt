@@ -2,6 +2,7 @@ package com.example.phoneagent.interaction
 
 import com.example.phoneagent.domain.contracts.UserInteractionContract
 import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.ConfirmResult
 import com.example.phoneagent.domain.interaction.UserInteraction
 import kotlinx.coroutines.launch
 
@@ -23,7 +24,9 @@ class UserInteractionBridgeContractTest : UserInteractionContract() {
                     }
 
                     is PendingInteraction.Approval -> {
-                        if (!pending.deferred.isCompleted) watcher.armed.removeFirstOrNull()?.let(pending.deferred::complete)
+                        if (!pending.deferred.isCompleted) {
+                            watcher.armed.removeFirstOrNull()?.let { approved -> pending.deferred.complete(pending.answer(approved)) }
+                        }
                     }
 
                     is PendingInteraction.BatchApproval -> {
@@ -41,7 +44,7 @@ class UserInteractionBridgeContractTest : UserInteractionContract() {
     override fun offer(approved: Boolean) {
         val current = harness.bridge.pending.value
         if (current is PendingInteraction.Approval && !current.deferred.isCompleted) {
-            current.deferred.complete(approved)
+            current.deferred.complete(current.answer(approved))
         } else {
             harness.armed += approved
         }
@@ -71,4 +74,7 @@ class UserInteractionBridgeContractTest : UserInteractionContract() {
         val armedBatch = ArrayDeque<Boolean>()
         val armedCapabilities = ArrayDeque<CapabilityResult>()
     }
+
+    private fun PendingInteraction.Approval.answer(approved: Boolean): ConfirmResult =
+        if (approved) ConfirmResult.Approved(request.arguments) else ConfirmResult.Rejected
 }

@@ -27,12 +27,12 @@ class UserInteractionBridgeQueueTest {
 
             val head = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:00"), head.request)
-            head.deferred.complete(true)
+            head.deferred.complete(ConfirmResult.Approved(head.request.arguments))
             assertTrue(first.await() is ConfirmResult.Approved)
 
             val next = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:15"), next.request)
-            next.deferred.complete(false)
+            next.deferred.complete(ConfirmResult.Rejected)
             assertEquals(ConfirmResult.Rejected, second.await())
             assertNull(bridge.pending.value)
         }
@@ -51,7 +51,7 @@ class UserInteractionBridgeQueueTest {
             assertTrue(bridge.pending.value is PendingInteraction.Approval)
             val head = bridge.pending.value as PendingInteraction.Approval
             assertEquals(request("06:00"), head.request)
-            head.deferred.complete(true)
+            head.deferred.complete(ConfirmResult.Approved(head.request.arguments))
             assertTrue(first.await() is ConfirmResult.Approved)
             assertNull(bridge.pending.value)
         }

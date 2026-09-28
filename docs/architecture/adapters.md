@@ -41,10 +41,10 @@ tools/
 
 ## `UserInteractionBridge` (`:app`) — самое хитрое место
 Инструментам и циклу нужно спросить пользователя (подтверждение, разрешение), а они работают вне UI. Решение — мост:
-1. Ядро вызывает `suspend fun confirm(request)`.
-2. Мост кладёт запрос в `StateFlow<PendingInteraction?>` и ждёт `CompletableDeferred`.
+1. Ядро вызывает `suspend fun confirm(request)` и ждёт `ConfirmResult`.
+2. Мост кладёт запрос в `StateFlow<PendingInteraction?>` и ждёт `CompletableDeferred<ConfirmResult>`.
 3. Корневой composable (`InteractionHost`) показывает шторку подтверждения или запускает системный запрос разрешения (`rememberLauncherForActivityResult`), завершает `deferred`.
-4. Если экран ушёл или пользователь отменил: `false` / `Denied`, ожидание отменяется вместе с корутиной.
+4. Для обычного `CONFIRM` шторка возвращает подтверждённые аргументы; для `SENSITIVE` редактора нет. Если экран ушёл или пользователь отменил: `Rejected` / `Denied`, ожидание отменяется вместе с корутиной.
 
 Ядро и инструменты ничего не знают про Activity и Compose.
 
