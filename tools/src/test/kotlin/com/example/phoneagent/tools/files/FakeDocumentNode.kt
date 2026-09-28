@@ -11,6 +11,7 @@ internal open class FakeDocumentNode(
     private val childNodes: List<FakeDocumentNode> = emptyList(),
     private val childrenError: RuntimeException? = null,
     override val mimeType: String? = null,
+    override val dateModifiedEpochMillis: Long? = null,
 ) : DocumentNode {
     var childrenCalls: Int = 0
         private set
@@ -30,4 +31,5 @@ internal fun dir(
 internal fun file(
     name: String,
     mimeType: String? = null,
-): FakeDocumentNode = FakeDocumentNode(name, mimeType = mimeType)
+    dateModifiedEpochMillis: Long? = null,
+): FakeDocumentNode = FakeDocumentNode(name, mimeType = mimeType, dateModifiedEpochMillis = dateModifiedEpochMillis)
