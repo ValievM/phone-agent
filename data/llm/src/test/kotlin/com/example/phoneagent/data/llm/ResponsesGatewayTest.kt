@@ -14,22 +14,25 @@ import com.example.phoneagent.domain.model.ModelRequest
 import com.example.phoneagent.domain.storage.AppSettings
 import com.example.phoneagent.domain.storage.SettingsRepository
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.SocketHandler
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.Buffer
+import okio.Socket
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -306,18 +309,26 @@ class ResponsesGatewayTest {
             assertEquals(listOf(ModelEvent.Failed(AgentError.Offline)), events)
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `cancelling the collecting coroutine cancels the underlying call`() =
         runTest {
             withServer { server ->
+                val socketHandlerEntered = CompletableDeferred<Unit>()
                 server.enqueue(
                     MockResponse
                         .Builder()
-                        .body(sampleSse())
-                        .bodyDelay(5, TimeUnit.SECONDS)
-                        .build(),
+                        .clearHeaders()
+                        .socketHandler(
+                            object : SocketHandler {
+                                override fun handle(socket: Socket) {
+                                    socketHandlerEntered.complete(Unit)
+                                    socket.source.read(Buffer(), 1L)
+                                }
+                            },
+                        ).build(),
                 )
-                val capturingFactory = CapturingCallFactory(cancellableClient())
+                val capturingFactory = CapturingCallFactory(OkHttpClient())
                 val gateway =
                     ResponsesGateway(
                         profile = profile(server),
@@ -328,16 +339,11 @@ class ResponsesGatewayTest {
                         callFactory = capturingFactory,
                     )
 
-                // withTimeout on the test dispatcher measures virtual time, which never advances
-                // while we're waiting on a real background thread; move to a real dispatcher.
-                withContext(Dispatchers.Default) {
-                    withTimeout(5_000) {
-                        val collecting = async { gateway.stream(request()).toList() }
-                        capturingFactory.callCreated.await()
-                        collecting.cancel()
-                        collecting.join()
-                    }
-                }
+                val collecting = async { gateway.stream(request()).toList() }
+                runCurrent()
+                assertTrue(capturingFactory.callCreated.isCompleted)
+                socketHandlerEntered.await()
+                collecting.cancelAndJoin()
 
                 assertTrue(capturingFactory.call.isCanceled())
             }
@@ -347,13 +353,6 @@ class ResponsesGatewayTest {
 
     private fun profile(server: MockWebServer): BackendProfile =
         BackendProfile(baseUrl = server.url("/backend-api/codex").toString().removeSuffix("/"))
-
-    // Long enough that only the explicit cancel() below can end the call, not a read timeout.
-    private fun cancellableClient(): OkHttpClient =
-        OkHttpClient
-            .Builder()
-            .readTimeout(10, TimeUnit.SECONDS)
-            .build()
 
     @Test
     fun `the request runs on the dispatcher provided by the port`() =
