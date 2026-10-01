@@ -8,6 +8,18 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.example.phoneagent.R
 
 @PreviewLightDark
+@Composable
+private fun ToolCallCardWaitingPermissionPreview() {
+    ToolCallCardPreviewFrame(ToolCallStatus.WaitingPermission)
+}
+
+@Preview(name = "Permission · 320dp · 200%", widthDp = 320, heightDp = 640, fontScale = 2f)
+@Composable
+private fun ToolCallCardWaitingPermissionNarrowPreview() {
+    ToolCallCardPreviewFrame(ToolCallStatus.WaitingPermission)
+}
+
+@PreviewLightDark
 @PreviewFontScale
 @Composable
 private fun ToolCallCardHandedOffPreview() {

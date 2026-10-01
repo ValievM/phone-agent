@@ -99,6 +99,7 @@
     <string name="sign_out">Выйти</string>
     <string name="tool_call_status_awaiting">Нужно подтверждение</string>
     <string name="tool_call_status_running">Выполняется</string>
+    <string name="tool_call_status_waiting_permission">Ждёт разрешения</string>
     <string name="tool_call_status_handed_off">Отправлено в «%1$s»</string>
     <string name="tool_call_status_not_shown">Не показано: не удалось описать действие</string>
     <string name="tool_call_status_rejected">Отклонено</string>

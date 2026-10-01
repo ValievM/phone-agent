@@ -24,6 +24,7 @@ import com.example.phoneagent.domain.platform.warn
 import com.example.phoneagent.domain.storage.ConversationRepository
 import com.example.phoneagent.domain.tools.Risk
 import com.example.phoneagent.domain.tools.ToolOutcome
+import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,6 +46,7 @@ class ChatViewModel
         private val agentLoop: AgentLoop,
         private val conversationRepository: ConversationRepository,
         private val logger: AppLogger,
+        private val userInteractionBridge: UserInteractionBridge = UserInteractionBridge(),
         // The default keeps tests focused on the input they exercise; DI always passes the bound generator.
         private val idGenerator: IdGenerator = RandomIdGenerator,
     ) : ViewModel() {
@@ -81,6 +83,30 @@ class ChatViewModel
         val state: StateFlow<ChatUiState> = mutableState.asStateFlow()
 
         init {
+            viewModelScope.launch {
+                userInteractionBridge.permissionDialogVisible.collect { visible ->
+                    // Tool execution is sequential; the sole Running card belongs to this request.
+                    // When CallId arrives in events, replace this temporary association with an exact match.
+                    mutableState.update { state ->
+                        val runningCards = state.messages.count { it.toolCall?.status == ToolCallStatus.Running }
+                        if (visible && runningCards != 1) return@update state
+                        state.copy(
+                            messages =
+                                state.messages.map { message ->
+                                    val card = message.toolCall ?: return@map message
+                                    val nextStatus =
+                                        when {
+                                            visible && card.status == ToolCallStatus.Running -> ToolCallStatus.WaitingPermission
+                                            !visible && card.status == ToolCallStatus.WaitingPermission -> ToolCallStatus.Running
+                                            else -> card.status
+                                        }
+                                    if (nextStatus == card.status) message else message.copy(toolCall = card.copy(status = nextStatus))
+                                },
+                        )
+                    }
+                }
+            }
+
             viewModelScope.launch {
                 try {
                     conversationRepository.observe().collect { loadedHistory ->
