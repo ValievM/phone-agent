@@ -1,3 +1,4 @@
+
 @file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 
 package com.example.phoneagent.domain.contracts
@@ -15,10 +16,24 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /** Shared behavioral contract for speech input implementations. */
 public abstract class SpeechInputContract {
+    /**
+     * Whether this implementation can emit intermediate hypotheses while recognition is active.
+     * Implementations without partial results, such as a system dialog that returns one result at
+     * the end, set this to false; partial-result contract tests are then skipped for that adapter.
+     */
+    protected open val supportsPartialResults: Boolean = true
+
+    /** Holds delivery of an offered result until the active session is allowed to finish. */
+    protected open fun holdCompletion() {}
+
+    /** Releases a previously held offered result. */
+    protected open fun releaseCompletion() {}
+
     protected abstract fun subject(): SpeechInput
 
     protected abstract fun offer(vararg events: SpeechEvent)
@@ -40,6 +55,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `partial results retain order after listening`() =
         runTest {
+            assumeTrue("Partial results are not supported by this implementation", supportsPartialResults)
             offer(SpeechEvent.Partial("при"), SpeechEvent.Partial("приве"), SpeechEvent.Final("привет"))
 
             val events = subject().listen(request()).toList()
@@ -58,6 +74,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `events after the first terminal event are not emitted`() =
         runTest {
+            assumeTrue("Partial results are not supported by this implementation", supportsPartialResults)
             offer(SpeechEvent.Final("готово"), SpeechEvent.Partial("лишнее"), SpeechEvent.Failed(SpeechFailure.NETWORK))
 
             val events = subject().listen(request()).toList()
@@ -82,6 +99,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `cancelling a collector stops events and releases its session`() =
         runTest {
+            assumeTrue("Partial results are not supported by this implementation", supportsPartialResults)
             offer(SpeechEvent.Partial("при"), SpeechEvent.Final("привет"))
             val listening = CompletableDeferred<Unit>()
             val continueCollection = CompletableDeferred<Unit>()
@@ -110,6 +128,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `a concurrent session is busy without interrupting the active session`() =
         runTest {
+            holdCompletion()
             offer(SpeechEvent.Final("первый"))
             val listening = CompletableDeferred<Unit>()
             val continueFirst = CompletableDeferred<Unit>()
@@ -128,6 +147,7 @@ public abstract class SpeechInputContract {
             listening.await()
 
             val second = subject().listen(request()).toList()
+            releaseCompletion()
             continueFirst.complete(Unit)
             advanceUntilIdle()
 
