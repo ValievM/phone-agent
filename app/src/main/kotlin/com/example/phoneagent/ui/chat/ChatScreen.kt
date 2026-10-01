@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.conversation.TurnState
 import com.example.phoneagent.domain.speech.SpeechFailure
+import com.example.phoneagent.ui.chat.voice.VoiceInputViewModel
 import com.example.phoneagent.ui.chat.voice.VoiceUiEvent
 import com.example.phoneagent.ui.chat.voice.VoiceUiState
 import com.example.phoneagent.ui.chat.voice.appendDictation
@@ -65,8 +66,10 @@ fun ChatRoute(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = hiltViewModel(),
+    voiceViewModel: VoiceInputViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val voice by voiceViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     ChatScreen(
         state = state,
@@ -75,7 +78,8 @@ fun ChatRoute(
         onOpenFile = { fileHit -> openFileHit(context, fileHit) },
         onOpenLink = { url -> openLink(context, url) },
         modifier = modifier,
-        voice = null,
+        voice = voice,
+        onVoiceEvent = voiceViewModel::onEvent,
     )
 }
 
