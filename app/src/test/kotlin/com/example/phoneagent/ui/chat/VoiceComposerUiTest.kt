@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.phoneagent.domain.speech.SpeechFailure
@@ -101,6 +102,7 @@ class VoiceComposerUiTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("привет").assertIsDisplayed()
+        composeRule.onNodeWithText("Текст распознан").assertIsDisplayed()
         assertEquals(listOf(VoiceUiEvent.ResultConsumed(1)), voiceEvents)
         assertEquals(emptyList<ChatUiEvent>(), events)
 
@@ -113,7 +115,35 @@ class VoiceComposerUiTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("привет мир").assertIsDisplayed()
         assertEquals(listOf(VoiceUiEvent.ResultConsumed(1), VoiceUiEvent.ResultConsumed(2)), voiceEvents)
-        assertEquals(emptyList<ChatUiEvent>(), events)
+        composeRule.onNodeWithText("привет мир").performTextReplacement("!")
+        composeRule.onAllNodesWithText("Текст распознан").assertCountEquals(0)
+        composeRule.onNodeWithText("!").assertExists()
+
+        composeRule.runOnIdle { voice.value = VoiceUiState.Result("ещё", 3) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Текст распознан").assertIsDisplayed()
+        composeRule.onNodeWithText("! ещё").assertExists()
+
+        composeRule.onNodeWithContentDescription("Отправить сообщение").performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(ChatUiEvent.Submit("! ещё")), events)
+        composeRule.onAllNodesWithText("Текст распознан").assertCountEquals(0)
+        composeRule.onNodeWithText("Сообщение").assertExists()
+
+        composeRule.runOnIdle { voice.value = VoiceUiState.Result("снова", 4) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Текст распознан").assertIsDisplayed()
+        composeRule.onNodeWithText("снова").assertExists()
+        assertEquals(
+            listOf(
+                VoiceUiEvent.ResultConsumed(1),
+                VoiceUiEvent.ResultConsumed(2),
+                VoiceUiEvent.ResultConsumed(3),
+                VoiceUiEvent.ResultConsumed(4),
+            ),
+            voiceEvents,
+        )
+        assertEquals(listOf(ChatUiEvent.Submit("! ещё")), events)
     }
 
     @Test

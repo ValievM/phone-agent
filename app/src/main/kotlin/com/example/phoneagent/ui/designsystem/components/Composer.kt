@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.phoneagent.R
 import com.example.phoneagent.ui.designsystem.icons.AppIcons
@@ -95,7 +96,7 @@ fun Composer(
                 enabled = enabled,
                 shape = AppTheme.shapeTokens.composer,
                 colors = composerFieldColors(),
-                placeholder = { Text(stringResource(R.string.message_hint)) },
+                placeholder = { ComposerPlaceholder() },
                 maxLines = COMPOSER_MAX_LINES,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submit() }),
@@ -135,6 +136,16 @@ private fun ComposerVoiceButton(voice: ComposerVoice) {
                 ),
         )
     }
+}
+
+@Composable
+private fun ComposerPlaceholder() {
+    Text(
+        text = stringResource(R.string.message_hint),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

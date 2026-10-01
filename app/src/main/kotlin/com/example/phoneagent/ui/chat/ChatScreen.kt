@@ -160,7 +160,9 @@ private fun ChatBody(
             onEvent = onEvent,
             onOpenFile = onOpenFile,
             onOpenLink = onOpenLink,
-            onSuggestionClick = { draft = it },
+            onSuggestionClick = { suggestion ->
+                draft = suggestion.also { showResultAnnouncement = false }
+            },
             preparing = state.isPreparingAnswer(),
             modifier = Modifier.weight(1f).imeNestedScroll(),
             inlineError =
@@ -178,7 +180,7 @@ private fun ChatBody(
         ChatErrorStatusBanner(error, onEvent, retry)
         ChatComposer(
             draft = draft,
-            onDraftChange = { draft = it },
+            onDraftChange = { newDraft -> draft = newDraft.also { showResultAnnouncement = false } },
             state = state,
             onEvent = onEvent,
             voice = composerVoice,
