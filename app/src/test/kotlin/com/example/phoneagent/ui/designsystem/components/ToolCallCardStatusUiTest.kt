@@ -144,12 +144,10 @@ class ToolCallCardStatusUiTest {
     }
 
     @Test
-    fun `handoff and not shown map to exact send and warning icons`() {
-        assertEquals(
-            AppIcons.send,
-            ToolCallStatus.HandedOff("Часы").iconResourceId(),
-        )
+    fun `handoff not shown and permission waiting map to exact icons`() {
+        assertEquals(AppIcons.send, ToolCallStatus.HandedOff("Часы").iconResourceId())
         assertEquals(AppIcons.warning, ToolCallStatus.NotShown.iconResourceId())
+        assertEquals(AppIcons.key, ToolCallStatus.WaitingPermission.iconResourceId())
     }
 
     @Test
@@ -216,6 +214,11 @@ class ToolCallCardStatusUiTest {
             StatusCase(
                 status = ToolCallStatus.AwaitingApproval,
                 label = context.getString(R.string.tool_call_status_awaiting),
+                role = StatusColorRole.Warning,
+            ),
+            StatusCase(
+                status = ToolCallStatus.WaitingPermission,
+                label = context.getString(R.string.tool_call_status_waiting_permission),
                 role = StatusColorRole.Warning,
             ),
             StatusCase(

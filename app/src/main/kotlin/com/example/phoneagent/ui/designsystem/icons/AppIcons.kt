@@ -33,6 +33,9 @@ object AppIcons {
     val warning: Int = R.drawable.ic_warning
 
     @get:DrawableRes
+    val key: Int = R.drawable.ic_key
+
+    @get:DrawableRes
     val block: Int = R.drawable.ic_block
 
     @get:DrawableRes

@@ -58,6 +58,13 @@ public class UserInteractionBridge
         private val queue = ArrayDeque<PendingInteraction>()
         private val mutablePending = MutableStateFlow<PendingInteraction?>(null)
         public val pending: StateFlow<PendingInteraction?> = mutablePending.asStateFlow()
+        private val mutablePermissionDialogVisible = MutableStateFlow(false)
+        public val permissionDialogVisible: StateFlow<Boolean> = mutablePermissionDialogVisible.asStateFlow()
+
+        /** Set only while a system permission dialog is visible. */
+        public fun setPermissionDialogVisible(visible: Boolean) {
+            mutablePermissionDialogVisible.value = visible
+        }
 
         override suspend fun confirm(request: ApprovalRequest): ConfirmResult {
             val entry = PendingInteraction.Approval(request, CompletableDeferred())
@@ -87,6 +94,7 @@ public class UserInteractionBridge
                     is PendingInteraction.Permission -> entry.deferred.complete(CapabilityResult.Denied)
                 }
             }
+            mutablePermissionDialogVisible.value = false
         }
 
         private suspend fun <T> awaitEntry(
@@ -116,6 +124,9 @@ public class UserInteractionBridge
                 queue.remove(entry)
                 if (mutablePending.value === entry) {
                     mutablePending.value = queue.firstOrNull()
+                }
+                if (queue.none { it is PendingInteraction.Permission }) {
+                    mutablePermissionDialogVisible.value = false
                 }
             }
         }

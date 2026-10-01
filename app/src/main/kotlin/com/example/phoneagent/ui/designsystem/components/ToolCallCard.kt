@@ -268,6 +268,7 @@ internal fun ToolCallStatus.look(): StatusLook {
     val extended = AppTheme.extendedColors
     return when (this) {
         ToolCallStatus.AwaitingApproval -> StatusLook(extended.warningContainer, extended.onWarningContainer)
+        ToolCallStatus.WaitingPermission -> StatusLook(extended.warningContainer, extended.onWarningContainer)
         ToolCallStatus.Running -> StatusLook(colors.primaryContainer, colors.onPrimaryContainer)
         is ToolCallStatus.HandedOff -> StatusLook(colors.primaryContainer, colors.onPrimaryContainer)
         ToolCallStatus.NotShown -> StatusLook(extended.warningContainer, extended.onWarningContainer)
@@ -282,6 +283,10 @@ private fun ToolCallStatus.label(): String =
     when (this) {
         ToolCallStatus.AwaitingApproval -> {
             stringResource(R.string.tool_call_status_awaiting)
+        }
+
+        ToolCallStatus.WaitingPermission -> {
+            stringResource(R.string.tool_call_status_waiting_permission)
         }
 
         ToolCallStatus.Running -> {
