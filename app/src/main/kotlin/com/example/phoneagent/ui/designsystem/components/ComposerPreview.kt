@@ -14,7 +14,14 @@ import com.example.phoneagent.ui.designsystem.theme.AppTheme
 private fun IdleComposerPreview() {
     AppTheme(useDynamicColor = false) {
         Surface {
-            Composer(draft = "", onDraftChange = {}, mode = ComposerMode.Ready, onSubmit = {}, onStop = {})
+            Composer(
+                draft = "",
+                onDraftChange = {},
+                mode = ComposerMode.Ready,
+                onSubmit = {},
+                onStop = {},
+                voice = ComposerVoice(listening = false, onStart = {}, onStop = {}),
+            )
         }
     }
 }
@@ -31,6 +38,40 @@ private fun TypedComposerPreview() {
                 mode = ComposerMode.Ready,
                 onSubmit = {},
                 onStop = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ListeningComposerPreview() {
+    AppTheme(useDynamicColor = false) {
+        Surface {
+            Composer(
+                draft = "",
+                onDraftChange = {},
+                mode = ComposerMode.Ready,
+                onSubmit = {},
+                onStop = {},
+                voice = ComposerVoice(listening = true, onStart = {}, onStop = {}),
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ErrorComposerPreview() {
+    AppTheme(useDynamicColor = false) {
+        Surface {
+            Composer(
+                draft = "",
+                onDraftChange = {},
+                mode = ComposerMode.Ready,
+                onSubmit = {},
+                onStop = {},
+                voice = ComposerVoice(listening = false, onStart = {}, onStop = {}),
             )
         }
     }

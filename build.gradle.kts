@@ -7,7 +7,7 @@ plugins {
 fun sources(pattern: String) =
     fileTree(rootDir) {
         include(pattern)
-        exclude("**/build/**", "**/.gradle/**", "**/.kotlin/**")
+        exclude("**/build/**", "**/bin/**", "**/.gradle/**", "**/.kotlin/**")
     }
 
 spotless {

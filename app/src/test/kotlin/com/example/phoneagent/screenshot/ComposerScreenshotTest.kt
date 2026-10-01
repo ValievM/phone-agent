@@ -46,6 +46,36 @@ class ComposerScreenshotTest {
         composeRule.snapshot("composer_unavailable") {
             Composer(draft = "", onDraftChange = {}, mode = ComposerMode.Unavailable, onSubmit = {}, onStop = {})
         }
+
+    @Test
+    fun `voice ready is captured in light and dark themes`() =
+        composeRule.snapshot("composer_voice_ready", listOf(Variant.Light, Variant.Dark)) {
+            Composer(
+                draft = "",
+                onDraftChange = {},
+                mode = ComposerMode.Ready,
+                onSubmit = {},
+                onStop = {},
+                voice =
+                    com.example.phoneagent.ui.designsystem.components
+                        .ComposerVoice(false, {}, {}),
+            )
+        }
+
+    @Test
+    fun `voice listening state is captured`() =
+        composeRule.snapshot("composer_voice_listening") {
+            Composer(
+                draft = "",
+                onDraftChange = {},
+                mode = ComposerMode.Ready,
+                onSubmit = {},
+                onStop = {},
+                voice =
+                    com.example.phoneagent.ui.designsystem.components
+                        .ComposerVoice(true, {}, {}),
+            )
+        }
 }
 
 internal const val PHONE_QUALIFIERS = "w411dp-h891dp-port-xxhdpi"
