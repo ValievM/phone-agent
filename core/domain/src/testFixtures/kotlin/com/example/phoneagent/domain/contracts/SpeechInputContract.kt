@@ -131,7 +131,9 @@ public abstract class SpeechInputContract {
             continueFirst.complete(Unit)
             advanceUntilIdle()
 
-            assertEquals(listOf(SpeechEvent.Failed(SpeechFailure.BUSY)), second)
+            // A rejected session may omit Listening (an adapter learns about the clash only after announcing it).
+            assertEquals(SpeechEvent.Failed(SpeechFailure.BUSY), second.last())
+            assertTrue(second.none { it is SpeechEvent.Final })
             assertEquals(listOf(SpeechEvent.Listening, SpeechEvent.Final("первый")), firstEvents)
             first.await()
         }

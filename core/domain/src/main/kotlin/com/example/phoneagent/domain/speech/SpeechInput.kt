@@ -8,6 +8,7 @@ public interface SpeechInput {
      * Emits [SpeechEvent.Listening] first, then any [SpeechEvent.Partial], then exactly one terminal event
      * ([SpeechEvent.Final] or [SpeechEvent.Failed]) and completes. Never throws for expected failures.
      * [SpeechEvent.Final.text] is never blank.
+     * A session rejected because another one is active ends with [SpeechFailure.BUSY] and may omit [SpeechEvent.Listening].
      */
     public fun listen(request: SpeechRequest): Flow<SpeechEvent>
 }
