@@ -80,9 +80,10 @@ class FakeActivityResultRegistryTest {
         registry.launchFailure = failure
         showLauncher(registry, Intent("example.ACTION"))
 
-        val thrown = assertThrows(ActivityNotFoundException::class.java) {
-            composeRule.onNodeWithText("Launch").performClick()
-        }
+        val thrown =
+            assertThrows(ActivityNotFoundException::class.java) {
+                composeRule.onNodeWithText("Launch").performClick()
+            }
 
         assertSame(failure, thrown)
         assertThrows(IllegalStateException::class.java) {
@@ -98,9 +99,10 @@ class FakeActivityResultRegistryTest {
         val intent = Intent("example.ACTION")
         restoration.setContent {
             ProvideFakeActivityResultRegistry(registry) {
-                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    received += it
-                }
+                val launcher =
+                    rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                        received += it
+                    }
                 Button(onClick = { launcher.launch(intent) }) { Text("Launch") }
             }
         }
@@ -117,9 +119,10 @@ class FakeActivityResultRegistryTest {
     fun `respondWith without a pending launch fails clearly`() {
         val registry = FakeActivityResultRegistry()
 
-        val failure = assertThrows(IllegalStateException::class.java) {
-            registry.respondWith(Activity.RESULT_OK, null)
-        }
+        val failure =
+            assertThrows(IllegalStateException::class.java) {
+                registry.respondWith(Activity.RESULT_OK, null)
+            }
 
         assertEquals("No pending activity result launch to respond to", failure.message)
     }
@@ -131,12 +134,14 @@ class FakeActivityResultRegistryTest {
         val lastReceived = mutableListOf<ActivityResult>()
         composeRule.setContent {
             ProvideFakeActivityResultRegistry(registry) {
-                val firstLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    firstReceived += it
-                }
-                val lastLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    lastReceived += it
-                }
+                val firstLauncher =
+                    rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                        firstReceived += it
+                    }
+                val lastLauncher =
+                    rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                        lastReceived += it
+                    }
                 Column {
                     Button(onClick = { firstLauncher.launch(Intent("example.FIRST")) }) { Text("Launch first") }
                     Button(onClick = { lastLauncher.launch(Intent("example.LAST")) }) { Text("Launch last") }
@@ -151,7 +156,6 @@ class FakeActivityResultRegistryTest {
         assertEquals(2, registry.launches.size)
         assertEquals(0, firstReceived.size)
         assertEquals(1, lastReceived.size)
-
     }
 
     private fun showLauncher(
@@ -161,9 +165,10 @@ class FakeActivityResultRegistryTest {
     ) {
         composeRule.setContent {
             ProvideFakeActivityResultRegistry(registry) {
-                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    received += it
-                }
+                val launcher =
+                    rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                        received += it
+                    }
                 Button(onClick = { launcher.launch(intent) }) { Text("Launch") }
             }
         }

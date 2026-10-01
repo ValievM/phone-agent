@@ -11,8 +11,9 @@ public fun ProvideFakeActivityResultRegistry(
     registry: ActivityResultRegistry,
     content: @Composable () -> Unit,
 ) {
-    val owner = object : ActivityResultRegistryOwner {
-        override val activityResultRegistry: ActivityResultRegistry = registry
-    }
+    val owner =
+        object : ActivityResultRegistryOwner {
+            override val activityResultRegistry: ActivityResultRegistry = registry
+        }
     CompositionLocalProvider(LocalActivityResultRegistryOwner provides owner, content = content)
 }

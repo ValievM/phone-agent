@@ -63,7 +63,7 @@ android {
 // ui-test-manifest, which only the debug variant carries; what they check does not depend on the
 // build type.
 tasks.withType<Test>().configureEach {
-    if (name.contains("Release")) exclude("**/screenshot/**", "**/*UiTest*")
+    if (name.contains("Release")) exclude("**/screenshot/**", "**/*UiTest*", "**/FakeActivityResultRegistryTest*")
 }
 
 roborazzi {
