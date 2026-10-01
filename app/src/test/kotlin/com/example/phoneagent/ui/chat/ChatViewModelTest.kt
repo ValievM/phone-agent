@@ -12,6 +12,9 @@ import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
 import com.example.phoneagent.domain.fakes.FakeModelGateway
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
+import com.example.phoneagent.domain.interaction.Capability
+import com.example.phoneagent.domain.interaction.CapabilityResult
+import com.example.phoneagent.domain.interaction.UserInteraction
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
@@ -26,6 +29,8 @@ import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
 import com.example.phoneagent.domain.tools.ToolResult
 import com.example.phoneagent.domain.tools.ToolSpec
+import com.example.phoneagent.interaction.PendingInteraction
+import com.example.phoneagent.interaction.UserInteractionBridge
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.ToolCallStatus
 import kotlinx.coroutines.CancellationException
@@ -462,6 +467,133 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `permission denial leaves the waiting status and reports the tool failure`() =
+        runTest(dispatcher.scheduler) {
+            val bridge = UserInteractionBridge()
+            val call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {})
+            val gateway = FakeModelGateway().apply { events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed()) }
+            val tool =
+                object : Tool {
+                    override val spec =
+                        ToolSpec(
+                            "search_files",
+                            "search files",
+                            buildJsonObject {},
+                            Risk.SAFE,
+                            requiredCapabilities = setOf(Capability.FILES),
+                        )
+
+                    override fun describe(args: JsonObject) = CallDescription("Search files", "Search")
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ) = ToolResult.Success("done")
+                }
+            val viewModel =
+                ChatViewModel(
+                    agentLoop(gateway, ToolRegistry(setOf(tool)), userInteraction = bridge),
+                    FakeConversationRepository(emptyList()),
+                    logger = FakeAppLogger(),
+                    userInteractionBridge = bridge,
+                )
+
+            viewModel.onEvent(ChatUiEvent.Submit("Find a file"))
+            runCurrent()
+            val permission = bridge.pending.value as PendingInteraction.Permission
+            bridge.setPermissionDialogVisible(true)
+            runCurrent()
+            assertEquals(
+                ToolCallStatus.WaitingPermission,
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+                    ?.status,
+            )
+
+            permission.deferred.complete(CapabilityResult.Denied)
+            advanceUntilIdle()
+
+            assertEquals(
+                ToolCallStatus.Failed("permission denied: FILES"),
+                viewModel.state.value.messages
+                    .first {
+                        it.role == ChatRole.TOOL
+                    }.toolCall
+                    ?.status,
+            )
+        }
+
+    @Test
+    fun `visible permission dialog changes the running card and resolution restores normal outcome`() =
+        runTest(dispatcher.scheduler) {
+            val bridge = UserInteractionBridge()
+            val call = ToolCall(CallId("call-1"), "search_files", buildJsonObject {})
+            val gateway =
+                FakeModelGateway().apply {
+                    events = listOf(ModelEvent.ToolCallRequested(call), ModelEvent.Completed())
+                }
+            val tool =
+                object : Tool {
+                    override val spec =
+                        ToolSpec(
+                            "search_files",
+                            "search files",
+                            buildJsonObject {},
+                            Risk.SAFE,
+                            requiredCapabilities = setOf(Capability.FILES),
+                        )
+
+                    override fun describe(args: JsonObject): CallDescription = CallDescription("Search files", "Search")
+
+                    override suspend fun execute(
+                        args: JsonObject,
+                        context: ToolContext,
+                    ): ToolResult = ToolResult.Success("done")
+                }
+            val viewModel =
+                ChatViewModel(
+                    agentLoop(gateway, ToolRegistry(setOf(tool)), userInteraction = bridge),
+                    FakeConversationRepository(emptyList()),
+                    logger = FakeAppLogger(),
+                    userInteractionBridge = bridge,
+                )
+
+            viewModel.onEvent(ChatUiEvent.Submit("Find a file"))
+            runCurrent()
+            val permission = bridge.pending.value as PendingInteraction.Permission
+            bridge.setPermissionDialogVisible(true)
+            runCurrent()
+            assertEquals(
+                ToolCallStatus.WaitingPermission,
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+                    ?.status,
+            )
+
+            bridge.setPermissionDialogVisible(false)
+            runCurrent()
+            assertEquals(
+                ToolCallStatus.Running,
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+                    ?.status,
+            )
+
+            permission.deferred.complete(CapabilityResult.Available)
+            advanceUntilIdle()
+            assertEquals(
+                ToolCallStatus.Done("done"),
+                viewModel.state.value.messages
+                    .first { it.role == ChatRole.TOOL }
+                    .toolCall
+                    ?.status,
+            )
+        }
+
+    @Test
     fun `a CONFIRM tool call shows awaiting approval before the user decides`() =
         runTest(dispatcher.scheduler) {
             interaction.approvalResult = false
@@ -534,13 +666,14 @@ class ChatViewModelTest {
     private fun agentLoop(
         gateway: ModelGateway,
         registry: ToolRegistry = ToolRegistry(emptySet()),
+        userInteraction: UserInteraction = interaction,
     ): AgentLoop =
         AgentLoop(
             modelGateway = gateway,
             toolPipeline =
                 ToolPipeline(
                     registry = registry,
-                    userInteraction = interaction,
+                    userInteraction = userInteraction,
                     clock = FakeClock(),
                     logger = FakeAppLogger(),
                 ),

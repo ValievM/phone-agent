@@ -1,6 +1,7 @@
 package com.example.phoneagent.ui.interaction
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -8,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.domain.interaction.Capability
 import com.example.phoneagent.domain.interaction.CapabilityResult
@@ -48,7 +51,11 @@ fun InteractionHost(bridge: UserInteractionBridge) {
         }
 
         is PendingInteraction.Permission -> {
-            PermissionRequest(capability = current.capability, onResult = current.deferred::complete)
+            PermissionRequest(
+                capability = current.capability,
+                bridge = bridge,
+                onResult = current.deferred::complete,
+            )
         }
 
         null -> {
@@ -60,22 +67,31 @@ fun InteractionHost(bridge: UserInteractionBridge) {
 @Composable
 private fun PermissionRequest(
     capability: Capability,
+    bridge: UserInteractionBridge,
     onResult: (CapabilityResult) -> Unit,
 ) {
+    val context = LocalContext.current
     val currentOnResult by rememberUpdatedState(onResult)
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            bridge.setPermissionDialogVisible(false)
             currentOnResult(if (grants.values.any { it }) CapabilityResult.Available else CapabilityResult.Denied)
         }
-    DisposableEffect(capability) {
+    DisposableEffect(capability, bridge) {
         val permissions = capability.androidPermissions()
-        if (permissions.isEmpty()) {
-            // No runtime permission needed for this capability on this OS version.
+        val alreadyGranted =
+            permissions.isEmpty() ||
+                permissions.all { permission ->
+                    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+                }
+        if (alreadyGranted) {
+            bridge.setPermissionDialogVisible(false)
             currentOnResult(CapabilityResult.Available)
         } else {
+            bridge.setPermissionDialogVisible(true)
             launcher.launch(permissions.toTypedArray())
         }
-        onDispose {}
+        onDispose { bridge.setPermissionDialogVisible(false) }
     }
 }
 

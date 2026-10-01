@@ -11,6 +11,9 @@ import com.example.phoneagent.ui.designsystem.icons.AppIcons
 sealed interface ToolCallStatus {
     data object AwaitingApproval : ToolCallStatus
 
+    /** The Android system permission dialog is visible; the tool has not started yet. */
+    data object WaitingPermission : ToolCallStatus
+
     data object Running : ToolCallStatus
 
     data class Done(
@@ -39,6 +42,7 @@ sealed interface ToolCallStatus {
 internal fun ToolCallStatus.iconResourceId(): Int =
     when (this) {
         ToolCallStatus.AwaitingApproval -> AppIcons.hourglassEmpty
+        ToolCallStatus.WaitingPermission -> AppIcons.key
         ToolCallStatus.Running, ToolCallStatus.Cancelled -> AppIcons.stop
         is ToolCallStatus.Done, is ToolCallStatus.FilesFound -> AppIcons.checkCircle
         is ToolCallStatus.HandedOff -> AppIcons.send

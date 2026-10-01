@@ -43,6 +43,7 @@
 | Статус | Роль | Иконка, текст |
 |---|---|---|
 | Ждёт решения | `warningContainer` / `onWarningContainer` | `hourglass_empty`, «Нужно подтверждение» |
+| Ждёт разрешения | `warningContainer` / `onWarningContainer` | `key`, «Ждёт разрешения» |
 | Выполняется | `primaryContainer` / `onPrimaryContainer` | незамкнутое кольцо, «Выполняется» |
 | Передано приложению | `primaryContainer` / `onPrimaryContainer` | `send`, «Отправлено в «%1$s»»; это не подтверждение успеха |
 | Не показано | `warningContainer` / `onWarningContainer` | `warning`, «Не показано: не удалось описать действие» |

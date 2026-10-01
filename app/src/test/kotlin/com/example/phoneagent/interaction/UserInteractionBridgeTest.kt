@@ -49,16 +49,18 @@ class UserInteractionBridgeTest {
         }
 
     @Test
-    fun `closing a permission request resolves as denied`() =
+    fun `closing a permission request resolves as denied and clears dialog visibility`() =
         runTest {
             val answer = async { bridge.ensure(Capability.NOTIFICATIONS) }
             advanceUntilIdle()
             assertTrue(bridge.pending.value is PendingInteraction.Permission)
+            bridge.setPermissionDialogVisible(true)
 
             bridge.resolvePendingAsDeclined()
 
             assertEquals(CapabilityResult.Denied, withTimeout(1_000) { answer.await() })
             assertNull(bridge.pending.value)
+            assertFalse(bridge.permissionDialogVisible.value)
         }
 
     @Test
@@ -78,6 +80,21 @@ class UserInteractionBridgeTest {
 
             assertEquals(CapabilityResult.Available, second.await())
             assertNull(bridge.pending.value)
+        }
+
+    @Test
+    fun `cancelling a pending permission clears dialog visibility`() =
+        runTest {
+            val job = launch { bridge.ensure(Capability.FILES) }
+            advanceUntilIdle()
+            assertTrue(bridge.pending.value is PendingInteraction.Permission)
+            bridge.setPermissionDialogVisible(true)
+
+            job.cancel()
+            advanceUntilIdle()
+
+            assertNull(bridge.pending.value)
+            assertFalse(bridge.permissionDialogVisible.value)
         }
 
     @Test
