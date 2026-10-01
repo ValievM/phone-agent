@@ -1,7 +1,7 @@
 # CI и запуск Gradle
 
 ## CI на GitHub
-`.github/workflows/check.yml`: на каждый push в `main` и `dev` и на каждый pull request выполняет `./gradlew check` (сборка, spotless, detekt, lint, unit- и UI-тесты в Robolectric) и `python3 scripts/check_docs.py`. Права токена только на чтение.
+`.github/workflows/check.yml`: на каждый push в `main`, `dev` и `sprint/**` и на каждый pull request выполняет `./gradlew check` (сборка, spotless, detekt, lint, unit- и UI-тесты в Robolectric) и `python3 scripts/check_docs.py`. Права токена только на чтение.
 
 `scripts/check.sh` в CI не используется: в нём жёстко прописан путь к JDK 17 в Homebrew (macOS). На runner'е JDK 17 ставит `actions/setup-java@v5`; Android SDK уже есть в закреплённом образе `ubuntu-24.04` (не `ubuntu-latest`: он переедет на Ubuntu 26 с 2026-10-19; шаг `android-actions/setup-android` не используем, потому что на новом образе он падает на пакете `tools`), принимаются только лицензии. Кэш Gradle остаётся у `gradle/actions/setup-gradle`.
 
