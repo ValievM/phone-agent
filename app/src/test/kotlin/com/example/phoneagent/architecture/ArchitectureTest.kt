@@ -75,6 +75,16 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `android speech imports stay in voice package`() {
+        val violations =
+            productionFiles
+                .filter { "/com/example/phoneagent/voice/" !in it.path }
+                .filter { file -> file.imports.any { it.name.startsWith("android.speech.") } }
+
+        assertTrue("android.speech imports outside voice package in: ${violations.map { it.path }}", violations.isEmpty())
+    }
+
+    @Test
     fun `design system does not import screens`() {
         val violations =
             productionFiles
