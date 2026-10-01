@@ -23,43 +23,47 @@ public class FakeSpeechInput : SpeechInput {
         }
     }
 
-    override fun listen(request: SpeechRequest): Flow<SpeechEvent> = flow {
-        val acquired = synchronized(this@FakeSpeechInput) {
-            requests += request
-            if (active) {
-                false
-            } else {
-                active = true
-                started += 1
-                true
-            }
-        }
-        if (!acquired) {
-            emit(SpeechEvent.Failed(SpeechFailure.BUSY))
-            return@flow
-        }
-
-        try {
-            val events = synchronized(this@FakeSpeechInput) {
-                scenarios.removeFirstOrNull()
-            } ?: listOf(SpeechEvent.Failed(SpeechFailure.UNKNOWN))
-            emit(SpeechEvent.Listening)
-            for (event in events) {
-                val normalized = if (event is SpeechEvent.Final && event.text.isBlank()) {
-                    SpeechEvent.Failed(SpeechFailure.NO_MATCH)
-                } else {
-                    event
+    override fun listen(request: SpeechRequest): Flow<SpeechEvent> =
+        flow {
+            val acquired =
+                synchronized(this@FakeSpeechInput) {
+                    requests += request
+                    if (active) {
+                        false
+                    } else {
+                        active = true
+                        started += 1
+                        true
+                    }
                 }
-                emit(normalized)
-                if (normalized is SpeechEvent.Final || normalized is SpeechEvent.Failed) break
+            if (!acquired) {
+                emit(SpeechEvent.Failed(SpeechFailure.BUSY))
+                return@flow
             }
-        } finally {
-            synchronized(this@FakeSpeechInput) {
-                active = false
-                released += 1
+
+            try {
+                val events =
+                    synchronized(this@FakeSpeechInput) {
+                        scenarios.removeFirstOrNull()
+                    } ?: listOf(SpeechEvent.Failed(SpeechFailure.UNKNOWN))
+                emit(SpeechEvent.Listening)
+                for (event in events) {
+                    val normalized =
+                        if (event is SpeechEvent.Final && event.text.isBlank()) {
+                            SpeechEvent.Failed(SpeechFailure.NO_MATCH)
+                        } else {
+                            event
+                        }
+                    emit(normalized)
+                    if (normalized is SpeechEvent.Final || normalized is SpeechEvent.Failed) break
+                }
+            } finally {
+                synchronized(this@FakeSpeechInput) {
+                    active = false
+                    released += 1
+                }
             }
         }
-    }
 
     public fun assertReleased() {
         check(!active && released == started) {
