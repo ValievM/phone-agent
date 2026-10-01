@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -61,6 +62,7 @@ fun Composer(
     onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    voice: ComposerVoice? = null,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val enabled = mode == ComposerMode.Ready
@@ -97,6 +99,9 @@ fun Composer(
                 maxLines = COMPOSER_MAX_LINES,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submit() }),
+                trailingIcon = {
+                    if (enabled && voice != null) ComposerVoiceButton(voice)
+                },
             )
             FilledIconButton(
                 onClick = { if (isRunning) onStop() else submit() },
@@ -116,7 +121,22 @@ fun Composer(
     }
 }
 
-/** The field sits on `surfaceContainerHigh`; its border and focus ring are `outline` (1dp, 2dp when focused). */
+@Composable
+private fun ComposerVoiceButton(voice: ComposerVoice) {
+    IconButton(
+        onClick = if (voice.listening) voice.onStop else voice.onStart,
+        modifier = Modifier.size(ComposerMinHeight),
+    ) {
+        Icon(
+            painter = painterResource(if (voice.listening) AppIcons.stop else AppIcons.mic),
+            contentDescription =
+                stringResource(
+                    if (voice.listening) R.string.voice_stop else R.string.voice_input,
+                ),
+        )
+    }
+}
+
 @Composable
 private fun composerFieldColors() =
     MaterialTheme.colorScheme.let { colors ->

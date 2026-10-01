@@ -42,6 +42,9 @@ object AppIcons {
     val stop: Int = R.drawable.ic_stop
 
     @get:DrawableRes
+    val mic: Int = R.drawable.ic_mic
+
+    @get:DrawableRes
     val close: Int = R.drawable.ic_close
 
     @get:DrawableRes

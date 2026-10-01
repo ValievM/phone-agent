@@ -22,8 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,9 +41,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.phoneagent.R
 import com.example.phoneagent.domain.conversation.TurnState
+import com.example.phoneagent.domain.speech.SpeechFailure
+import com.example.phoneagent.ui.chat.voice.VoiceUiEvent
+import com.example.phoneagent.ui.chat.voice.VoiceUiState
+import com.example.phoneagent.ui.chat.voice.appendDictation
+import com.example.phoneagent.ui.chat.voice.messageRes
 import com.example.phoneagent.ui.designsystem.components.AppTopAppBar
 import com.example.phoneagent.ui.designsystem.components.Composer
 import com.example.phoneagent.ui.designsystem.components.ComposerMode
+import com.example.phoneagent.ui.designsystem.components.ComposerVoice
 import com.example.phoneagent.ui.designsystem.components.FileHit
 import com.example.phoneagent.ui.designsystem.components.InlineError
 import com.example.phoneagent.ui.designsystem.components.StatusBanner
@@ -67,6 +75,7 @@ fun ChatRoute(
         onOpenFile = { fileHit -> openFileHit(context, fileHit) },
         onOpenLink = { url -> openLink(context, url) },
         modifier = modifier,
+        voice = null,
     )
 }
 
@@ -78,6 +87,8 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     onOpenFile: (FileHit) -> Unit = {},
     onOpenLink: (String) -> Unit = {},
+    voice: VoiceUiState? = null,
+    onVoiceEvent: (VoiceUiEvent) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -103,6 +114,7 @@ fun ChatScreen(
             onOpenFile = onOpenFile,
             onOpenLink = onOpenLink,
             modifier = Modifier.padding(contentPadding),
+            voiceControls = voice?.let { ChatVoiceControls(it, onVoiceEvent) },
         )
     }
 }
@@ -114,10 +126,33 @@ private fun ChatBody(
     onEvent: (ChatUiEvent) -> Unit,
     onOpenFile: (FileHit) -> Unit,
     onOpenLink: (String) -> Unit,
+    voiceControls: ChatVoiceControls?,
     modifier: Modifier = Modifier,
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
+    var showResultAnnouncement by rememberSaveable { mutableStateOf(false) }
+    val voice = voiceControls?.state
+    val currentOnVoiceEvent by rememberUpdatedState(voiceControls?.onEvent ?: {})
+    val result = voice as? VoiceUiState.Result
+    LaunchedEffect(result?.id) {
+        if (result != null) {
+            showResultAnnouncement = true
+            draft = appendDictation(draft, result.text)
+            currentOnVoiceEvent(VoiceUiEvent.ResultConsumed(result.id))
+        }
+    }
     val error = state.errorForDisplay()?.toPresentation()
+    val composerVoice =
+        voiceControls?.let { controls ->
+            ComposerVoice(
+                listening = controls.state is VoiceUiState.Listening,
+                onStart = {
+                    showResultAnnouncement = false
+                    controls.onEvent(VoiceUiEvent.Start)
+                },
+                onStop = { controls.onEvent(VoiceUiEvent.Stop) },
+            )
+        }
     val retry = if (state.turn.hasRetryAction()) ({ onEvent(ChatUiEvent.Retry) }) else null
     Column(modifier = modifier.fillMaxSize()) {
         MessageList(
@@ -139,23 +174,94 @@ private fun ChatBody(
                     }
                 },
         )
-        error?.takeIf { it.placement == ErrorPlacement.StatusBanner }?.let { presentation ->
-            StatusBanner(
-                message = presentation.text(),
-                onDismiss = { onEvent(ChatUiEvent.DismissError) },
-                onRetry = retry,
-                modifier = Modifier.contentColumn().padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
-            )
-        }
-        Composer(
+        ChatVoiceStatus(voice, showResultAnnouncement, currentOnVoiceEvent)
+        ChatErrorStatusBanner(error, onEvent, retry)
+        ChatComposer(
             draft = draft,
             onDraftChange = { draft = it },
-            mode = if (state.turn.isInProgress()) ComposerMode.Running else ComposerMode.Ready,
-            onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
-            onStop = { onEvent(ChatUiEvent.Stop) },
+            state = state,
+            onEvent = onEvent,
+            voice = composerVoice,
         )
     }
 }
+
+@Composable
+private fun ChatVoiceStatus(
+    voice: VoiceUiState?,
+    showResultAnnouncement: Boolean,
+    onVoiceEvent: (VoiceUiEvent) -> Unit,
+) {
+    Column {
+        if (voice is VoiceUiState.Listening) {
+            Text(
+                text = stringResource(R.string.voice_listening),
+                modifier =
+                    Modifier
+                        .contentColumn()
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                        .padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
+            )
+        }
+        if (showResultAnnouncement) {
+            Text(
+                text = stringResource(R.string.voice_result_recognized),
+                modifier =
+                    Modifier
+                        .contentColumn()
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                        .padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
+            )
+        }
+        val voiceError = (voice as? VoiceUiState.Error)?.reason
+        voiceError?.takeIf { it != SpeechFailure.CANCELLED }?.messageRes()?.let { messageRes ->
+            StatusBanner(
+                message = stringResource(messageRes),
+                onDismiss = { onVoiceEvent(VoiceUiEvent.DismissError) },
+                modifier = Modifier.contentColumn().padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatErrorStatusBanner(
+    error: ErrorPresentation?,
+    onEvent: (ChatUiEvent) -> Unit,
+    retry: (() -> Unit)?,
+) {
+    error?.takeIf { it.placement == ErrorPlacement.StatusBanner }?.let { presentation ->
+        StatusBanner(
+            message = presentation.text(),
+            onDismiss = { onEvent(ChatUiEvent.DismissError) },
+            onRetry = retry,
+            modifier = Modifier.contentColumn().padding(horizontal = screenMargin(), vertical = AppTheme.spacing.small),
+        )
+    }
+}
+
+@Composable
+private fun ChatComposer(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    state: ChatUiState,
+    onEvent: (ChatUiEvent) -> Unit,
+    voice: ComposerVoice?,
+) {
+    Composer(
+        draft = draft,
+        onDraftChange = onDraftChange,
+        mode = if (state.turn.isInProgress()) ComposerMode.Running else ComposerMode.Ready,
+        onSubmit = { onEvent(ChatUiEvent.Submit(it)) },
+        onStop = { onEvent(ChatUiEvent.Stop) },
+        voice = voice,
+    )
+}
+
+private data class ChatVoiceControls(
+    val state: VoiceUiState,
+    val onEvent: (VoiceUiEvent) -> Unit,
+)
 
 /**
  * "Готовлю ответ" is shown while the model is preparing or writing its text. While a tool call waits for
