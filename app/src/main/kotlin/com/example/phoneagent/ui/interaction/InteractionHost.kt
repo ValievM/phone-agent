@@ -96,7 +96,7 @@ private fun PermissionRequest(
     }
 }
 
-private fun Capability.androidPermissions(): List<String> =
+internal fun Capability.androidPermissions(): List<String> =
     when (this) {
         Capability.NOTIFICATIONS -> {
             listOfNotNull(Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU })
@@ -115,5 +115,9 @@ private fun Capability.androidPermissions(): List<String> =
             } else {
                 listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
+        }
+
+        Capability.MICROPHONE -> {
+            listOf(Manifest.permission.RECORD_AUDIO)
         }
     }

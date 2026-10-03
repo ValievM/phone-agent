@@ -113,6 +113,7 @@ public abstract class UserInteractionContract {
         runTest {
             offerCapability(CapabilityResult.Denied)
             offerCapability(CapabilityResult.Available)
+            offerCapability(CapabilityResult.Denied)
             val interaction = subject()
             setUp(interaction)
 
@@ -120,9 +121,12 @@ public abstract class UserInteractionContract {
             advanceUntilIdle()
             val files = async { interaction.ensure(Capability.FILES) }
             advanceUntilIdle()
+            val microphone = async { interaction.ensure(Capability.MICROPHONE) }
+            advanceUntilIdle()
 
             assertEquals(CapabilityResult.Denied, notifications.await())
             assertEquals(CapabilityResult.Available, files.await())
+            assertEquals(CapabilityResult.Denied, microphone.await())
         }
 
     @Test

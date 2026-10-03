@@ -55,8 +55,9 @@
 - Экран входа: кнопка «Войти через OpenAI», ссылка «Использовать API-ключ».
 
 ## Разрешения и манифест
-- `com.android.alarm.permission.SET_ALARM`, `POST_NOTIFICATIONS`, `INTERNET`.
+- `com.android.alarm.permission.SET_ALARM`, `POST_NOTIFICATIONS`, `INTERNET`, `RECORD_AUDIO`.
+- `RECORD_AUDIO` запрашивается при первом нажатии на микрофон; запись идёт только пока идёт диктовка.
 - `<queries>` для `android.intent.action.SET_ALARM`.
 - `find_files` работает только в папке, выбранной через SAF. `search_files` использует доступные приложению строки MediaStore и не читает содержимое. На Android 10+ такой поиск не охватывает все файлы: часть загрузок других приложений доступна только через SAF; запасной обход SAF-корней для `search_files` не выполняется. `MANAGE_EXTERNAL_STORAGE` не используется.
 - Для `search_files`: `READ_EXTERNAL_STORAGE` до API 33; `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` с API 33; `READ_MEDIA_VISUAL_USER_SELECTED` с API 34 для частичного доступа к выбранным фото и видео.
-- Разрешения запрашиваются в момент первого использования с объяснением.
+- Разрешения запрашиваются в момент первого использования. Там, где причина неочевидна (файлы, уведомления), с объяснением; для микрофона причина понятна из нажатия на значок микрофона, достаточно системного диалога Android.
