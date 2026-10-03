@@ -26,6 +26,8 @@ import com.example.phoneagent.ui.root.ThemeState
 import com.example.phoneagent.ui.root.ThemeViewModel
 import com.example.phoneagent.ui.root.ThemedRoot
 import com.example.phoneagent.ui.root.settings
+import com.example.phoneagent.ui.voice.VoiceHost
+import com.example.phoneagent.voice.SpeechRequestBridge
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -33,6 +35,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var userInteractionBridge: UserInteractionBridge
+
+    @Inject
+    lateinit var speechRequestBridge: SpeechRequestBridge
 
     @Inject
     lateinit var dispatcherProvider: DispatcherProvider
@@ -78,6 +83,7 @@ class MainActivity : ComponentActivity() {
                 ThemedRoot(state = themeState, onRetry = themeViewModel::retry) {
                     LoginRoute(authenticatedContent = { AppNavigation(dispatcherProvider = dispatcherProvider) })
                     InteractionHost(bridge = userInteractionBridge)
+                    VoiceHost(bridge = speechRequestBridge)
                 }
             }
         }
