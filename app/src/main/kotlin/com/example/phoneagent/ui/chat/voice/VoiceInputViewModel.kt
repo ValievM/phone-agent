@@ -38,7 +38,8 @@ class VoiceInputViewModel
         private fun start() {
             if (_state.value !is VoiceUiState.Idle && _state.value !is VoiceUiState.Error) return
 
-            _state.value = VoiceUiState.Listening("")
+            var level = 0f
+            _state.value = VoiceUiState.Listening("", level)
             sessionJob =
                 viewModelScope.launch {
                     speechInput.listen(SpeechRequest(SPEECH_LANGUAGE_TAG)).collect { event ->
@@ -48,7 +49,13 @@ class VoiceInputViewModel
                             }
 
                             is SpeechEvent.Partial -> {
-                                _state.value = VoiceUiState.Listening(event.text)
+                                _state.value = VoiceUiState.Listening(event.text, level)
+                            }
+
+                            is SpeechEvent.Level -> {
+                                level = if (event.normalized.isNaN()) 0f else event.normalized.coerceIn(0f, 1f)
+                                val partial = (_state.value as? VoiceUiState.Listening)?.partial.orEmpty()
+                                _state.value = VoiceUiState.Listening(partial, level)
                             }
 
                             is SpeechEvent.Final -> {

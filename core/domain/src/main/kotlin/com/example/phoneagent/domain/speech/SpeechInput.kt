@@ -5,8 +5,9 @@ import kotlinx.coroutines.flow.Flow
 public interface SpeechInput {
     /**
      * One recognition session. Cold: collecting starts it, cancelling the collector stops it and releases resources.
-     * Emits [SpeechEvent.Listening] first, then any [SpeechEvent.Partial], then exactly one terminal event
+     * Emits [SpeechEvent.Listening] first, then any [SpeechEvent.Partial] and [SpeechEvent.Level], then exactly one terminal event
      * ([SpeechEvent.Final] or [SpeechEvent.Failed]) and completes. Never throws for expected failures.
+     * [SpeechEvent.Level.normalized] is normalized to the range 0..1.
      * [SpeechEvent.Final.text] is never blank.
      * A session rejected because another one is active ends with [SpeechFailure.BUSY] and may omit [SpeechEvent.Listening].
      */
@@ -32,6 +33,11 @@ public sealed interface SpeechEvent {
     /** The final recognized text; never blank. */
     public data class Final(
         public val text: String,
+    ) : SpeechEvent
+
+    /** Normalized voice level, in the inclusive range 0..1. */
+    public data class Level(
+        public val normalized: Float,
     ) : SpeechEvent
 
     public data class Failed(

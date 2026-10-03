@@ -7,6 +7,7 @@ sealed interface VoiceUiState {
 
     data class Listening(
         val partial: String,
+        val level: Float = 0f,
     ) : VoiceUiState
 
     data class Result(

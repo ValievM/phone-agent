@@ -62,6 +62,109 @@ class VoiceInputViewModelTest {
         }
 
     @Test
+    fun `voice level updates listening state`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput = FakeSpeechInput().apply { script(SpeechEvent.Level(0.4f)) }
+            val viewModel = VoiceInputViewModel(speechInput)
+
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+
+            assertEquals(VoiceUiState.Listening("", 0.4f), viewModel.state.value)
+        }
+
+    @Test
+    fun `partial result preserves the current voice level`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput =
+                FakeSpeechInput().apply {
+                    script(SpeechEvent.Level(0.4f), SpeechEvent.Partial("при"))
+                }
+            val viewModel = VoiceInputViewModel(speechInput)
+
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+
+            assertEquals(VoiceUiState.Listening("при", 0.4f), viewModel.state.value)
+        }
+
+    @Test
+    fun `voice levels are clamped to the normalized range`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput = FakeSpeechInput().apply { script(SpeechEvent.Level(1.7f)) }
+            val viewModel = VoiceInputViewModel(speechInput)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+            assertEquals(VoiceUiState.Listening("", 1f), viewModel.state.value)
+
+            speechInput.script(SpeechEvent.Level(-0.3f))
+            viewModel.onEvent(VoiceUiEvent.Stop)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+            assertEquals(VoiceUiState.Listening("", 0f), viewModel.state.value)
+
+            speechInput.script(SpeechEvent.Level(Float.NaN))
+            viewModel.onEvent(VoiceUiEvent.Stop)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+            assertEquals(VoiceUiState.Listening("", 0f), viewModel.state.value)
+        }
+
+    @Test
+    fun `stop returns level-bearing listening state to idle`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput = FakeSpeechInput().apply { script(SpeechEvent.Level(0.4f)) }
+            val viewModel = VoiceInputViewModel(speechInput)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+
+            viewModel.onEvent(VoiceUiEvent.Stop)
+
+            assertEquals(VoiceUiState.Idle, viewModel.state.value)
+        }
+
+    @Test
+    fun `a new session starts with zero voice level`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput =
+                FakeSpeechInput().apply {
+                    script(SpeechEvent.Level(0.7f), SpeechEvent.Final("готово"))
+                    script(SpeechEvent.Partial("при"))
+                }
+            val viewModel = VoiceInputViewModel(speechInput)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+            val result = viewModel.state.value as VoiceUiState.Result
+            viewModel.onEvent(VoiceUiEvent.ResultConsumed(result.id))
+
+            viewModel.onEvent(VoiceUiEvent.Start)
+            assertEquals(VoiceUiState.Listening("", 0f), viewModel.state.value)
+            advanceUntilIdle()
+
+            assertEquals(VoiceUiState.Listening("при", 0f), viewModel.state.value)
+        }
+
+    @Test
+    fun `a new session after stop starts with zero voice level`() =
+        runTest(dispatcher.scheduler) {
+            val speechInput =
+                FakeSpeechInput().apply {
+                    script(SpeechEvent.Level(0.7f))
+                    script(SpeechEvent.Partial("при"))
+                }
+            val viewModel = VoiceInputViewModel(speechInput)
+            viewModel.onEvent(VoiceUiEvent.Start)
+            advanceUntilIdle()
+            viewModel.onEvent(VoiceUiEvent.Stop)
+
+            viewModel.onEvent(VoiceUiEvent.Start)
+            assertEquals(VoiceUiState.Listening("", 0f), viewModel.state.value)
+            advanceUntilIdle()
+
+            assertEquals(VoiceUiState.Listening("при", 0f), viewModel.state.value)
+        }
+
+    @Test
     fun `cancelled speech failure returns to idle`() =
         runTest(dispatcher.scheduler) {
             val speechInput = FakeSpeechInput().apply { script(SpeechEvent.Failed(SpeechFailure.CANCELLED)) }

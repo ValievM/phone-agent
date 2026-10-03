@@ -178,6 +178,10 @@ class SystemDialogSpeechInputContractTest : SpeechInputContract() {
                 error("The system dialog does not support partial results")
             }
 
+            is SpeechEvent.Level -> {
+                error("The system dialog does not support voice levels")
+            }
+
             is SpeechEvent.Final -> {
                 RecognizerOutcome.Returned(
                     Activity.RESULT_OK,

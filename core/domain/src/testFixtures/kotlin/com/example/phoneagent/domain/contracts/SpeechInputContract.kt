@@ -22,9 +22,9 @@ import org.junit.Test
 /** Shared behavioral contract for speech input implementations. */
 public abstract class SpeechInputContract {
     /**
-     * Whether this implementation can emit intermediate hypotheses while recognition is active.
-     * Implementations without partial results, such as a system dialog that returns one result at
-     * the end, set this to false; partial-result contract tests are then skipped for that adapter.
+     * Whether this implementation can emit intermediate live events (partial hypotheses and voice levels) while recognition is active.
+     * Implementations without live events, such as a system dialog that returns one result at
+     * the end, set this to false; live-event contract tests are then skipped for that adapter.
      */
     protected open val supportsPartialResults: Boolean = true
 
@@ -43,6 +43,28 @@ public abstract class SpeechInputContract {
     protected abstract fun assertReleased()
 
     @Test
+    public fun `voice levels retain order after listening and before final`() =
+        runTest {
+            assumeTrue("Live speech events are not supported by this implementation", supportsPartialResults)
+            offer(SpeechEvent.Level(0.4f), SpeechEvent.Final("готово"))
+
+            val events = subject().listen(request()).toList()
+
+            assertEquals(listOf(SpeechEvent.Listening, SpeechEvent.Level(0.4f), SpeechEvent.Final("готово")), events)
+        }
+
+    @Test
+    public fun `voice levels after the first terminal event are not emitted`() =
+        runTest {
+            assumeTrue("Live speech events are not supported by this implementation", supportsPartialResults)
+            offer(SpeechEvent.Final("готово"), SpeechEvent.Level(0.8f))
+
+            val events = subject().listen(request()).toList()
+
+            assertEquals(listOf(SpeechEvent.Listening, SpeechEvent.Final("готово")), events)
+        }
+
+    @Test
     public fun `a final result follows listening and completes`() =
         runTest {
             offer(SpeechEvent.Final("привет"))
@@ -55,7 +77,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `partial results retain order after listening`() =
         runTest {
-            assumeTrue("Partial results are not supported by this implementation", supportsPartialResults)
+            assumeTrue("Live speech events are not supported by this implementation", supportsPartialResults)
             offer(SpeechEvent.Partial("при"), SpeechEvent.Partial("приве"), SpeechEvent.Final("привет"))
 
             val events = subject().listen(request()).toList()
@@ -74,7 +96,7 @@ public abstract class SpeechInputContract {
     @Test
     public fun `events after the first terminal event are not emitted`() =
         runTest {
-            assumeTrue("Partial results are not supported by this implementation", supportsPartialResults)
+            assumeTrue("Live speech events are not supported by this implementation", supportsPartialResults)
             offer(SpeechEvent.Final("готово"), SpeechEvent.Partial("лишнее"), SpeechEvent.Failed(SpeechFailure.NETWORK))
 
             val events = subject().listen(request()).toList()
