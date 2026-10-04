@@ -15,6 +15,8 @@ ResponsesGateway (public, реализует ModelGateway)
 - Ретрай 401 — не OkHttp `Authenticator`, а обычный suspend-цикл в `ResponsesGateway` (не больше двух попыток): после сбоя вызывается `CredentialsProvider.refreshAfterUnauthorized()` и запрос собирается заново. Результат различает `Ready`, `SignedOut` (сессия потеряна: «Сессия завершилась») и `Unavailable` (обновить сейчас нельзя, например нет сети: ошибка сети с «Повторить», токен цел). Причина: `Authenticator` требует `runBlocking` на suspend-обновлении, что правилами запрещено; single-flight обновления токена живёт в `:data:auth`.
 - Если бэкенд поменял формат: правим `dto/` и `sse/` + обновляем записанный образец ответа в тестах. Остальной код не трогаем.
 
+Каждый запрос `AgentLoop` получает локальные дату и время (`Clock` и `TimeZoneProvider`, системная зона); клиент добавляет заметку к `instructions`, не в историю.
+
 ## `:data:auth`
 ```
 AuthProvider (стратегия):  ChatGptBrowserAuth · ChatGptDeviceCodeAuth · ApiKeyAuth

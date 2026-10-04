@@ -41,6 +41,19 @@ class ResponsesRequestBuilderTest {
     }
 
     @Test
+    fun `a context note is appended as its own instructions paragraph`() {
+        val body =
+            buildResponsesRequestBody(
+                request(contextNote = "Сейчас: воскресенье."),
+                profile(instructions = "be nice"),
+                "gpt-test",
+                "session-1",
+            )
+
+        assertEquals("be nice\n\nСейчас: воскресенье.", body.getValue("instructions").jsonPrimitive.content)
+    }
+
+    @Test
     fun `the model and session id are carried from their explicit arguments`() {
         val body =
             buildResponsesRequestBody(
@@ -208,7 +221,8 @@ class ResponsesRequestBuilderTest {
     private fun request(
         history: List<HistoryItem> = emptyList(),
         tools: List<ToolSpec> = emptyList(),
-    ): ModelRequest = ModelRequest(history, tools)
+        contextNote: String? = null,
+    ): ModelRequest = ModelRequest(history, tools, contextNote)
 
     private fun profile(instructions: String = "instructions"): BackendProfile =
         BackendProfile(baseUrl = "https://example.test", instructions = instructions)
