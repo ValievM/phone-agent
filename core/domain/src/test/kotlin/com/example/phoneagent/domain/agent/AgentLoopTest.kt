@@ -9,6 +9,7 @@ import com.example.phoneagent.domain.fakes.FakeAppLogger
 import com.example.phoneagent.domain.fakes.FakeClock
 import com.example.phoneagent.domain.fakes.FakeIdGenerator
 import com.example.phoneagent.domain.fakes.FakeModelGateway
+import com.example.phoneagent.domain.fakes.FakeTimeZoneProvider
 import com.example.phoneagent.domain.fakes.FakeUserInteraction
 import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.model.ModelEvent
@@ -39,6 +40,8 @@ import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
+import java.time.ZoneId
 
 class AgentLoopTest {
     private val gateway = FakeModelGateway()
@@ -93,6 +96,45 @@ class AgentLoopTest {
             assertEquals(2, gateway.requests.size)
             val secondRequestHistory = gateway.requests[1].history
             assertTrue(secondRequestHistory.any { it is HistoryItem.ToolOutput && it.output == "noon" })
+        }
+
+    @Test
+    fun `each model request gets current time and note stays out of conversation history`() =
+        runTest {
+            val clock = FakeClock(Instant.parse("2026-10-04T00:57:00Z").toEpochMilli())
+            val zone = ZoneId.of("Europe/Moscow")
+            gateway.responseQueue.addLast(
+                listOf(
+                    ModelEvent.ToolCallRequested(ToolCall(CallId("call-time"), "advance_clock", buildJsonObject {})),
+                    ModelEvent.Completed(),
+                ),
+            )
+            gateway.responseQueue.addLast(listOf(ModelEvent.TextDelta("done"), ModelEvent.Completed()))
+            val registry =
+                ToolRegistry(
+                    setOf(
+                        fakeTool("advance_clock") {
+                            clock.epochMillis += 5 * 60_000L
+                            ToolResult.Success("advanced")
+                        },
+                    ),
+                )
+
+            val events = loop(registry, clock = clock, zone = zone).run(emptyList(), "what time is it").toList()
+
+            val firstNote =
+                "Сейчас: воскресенье, 4 октября 2026, 03:57 " +
+                    "(часовой пояс Europe/Moscow, UTC+03:00). " +
+                    "ISO: 2026-10-04T03:57:00+03:00."
+            val secondNote =
+                "Сейчас: воскресенье, 4 октября 2026, 04:02 " +
+                    "(часовой пояс Europe/Moscow, UTC+03:00). " +
+                    "ISO: 2026-10-04T04:02:00+03:00."
+            assertEquals(firstNote, gateway.requests[0].contextNote)
+            assertEquals(secondNote, gateway.requests[1].contextNote)
+            assertTrue(gateway.requests.all { request -> request.history.none { it.toString().contains("Сейчас:") } })
+            val savedItems = events.filterIsInstance<AgentEvent.TurnCompleted>().single().newItems
+            assertTrue(savedItems.none { it.toString().contains("Сейчас:") })
         }
 
     @Test
@@ -368,6 +410,8 @@ class AgentLoopTest {
     private fun loop(
         registry: ToolRegistry = ToolRegistry(emptySet()),
         config: AgentConfig = AgentConfig(),
+        clock: FakeClock = FakeClock(),
+        zone: ZoneId = ZoneId.of("UTC"),
     ): AgentLoop =
         AgentLoop(
             modelGateway = gateway,
@@ -375,6 +419,8 @@ class AgentLoopTest {
             contextWindowPolicy = ContextWindowPolicy { it },
             idGenerator = FakeIdGenerator(),
             config = config,
+            clock = clock,
+            timeZoneProvider = FakeTimeZoneProvider(zone),
         )
 
     private fun pipeline(registry: ToolRegistry): ToolPipeline =

@@ -33,7 +33,7 @@ internal fun buildResponsesRequestBody(
 ): JsonObject =
     buildJsonObject {
         put("model", model)
-        put("instructions", profile.instructions)
+        put("instructions", profile.instructions + (request.contextNote?.let { "\n\n$it" } ?: ""))
         putJsonArray("input") { request.history.forEach { add(it.toInputItem()) } }
         putJsonArray("tools") { request.tools.forEach { add(it.toToolJson()) } }
         put("tool_choice", "auto")

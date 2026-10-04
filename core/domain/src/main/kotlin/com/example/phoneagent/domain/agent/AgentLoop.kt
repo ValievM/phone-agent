@@ -8,7 +8,9 @@ import com.example.phoneagent.domain.interaction.ApprovalRequest
 import com.example.phoneagent.domain.model.ModelEvent
 import com.example.phoneagent.domain.model.ModelGateway
 import com.example.phoneagent.domain.model.ModelRequest
+import com.example.phoneagent.domain.platform.Clock
 import com.example.phoneagent.domain.platform.IdGenerator
+import com.example.phoneagent.domain.platform.TimeZoneProvider
 import com.example.phoneagent.domain.tools.Approval
 import com.example.phoneagent.domain.tools.CallDescription
 import com.example.phoneagent.domain.tools.Risk
@@ -19,6 +21,7 @@ import com.example.phoneagent.domain.tools.toOutputText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import java.time.ZoneId
 
 private data class ToolInvocation(
     val name: String,
@@ -56,6 +59,8 @@ public class AgentLoop(
     private val contextWindowPolicy: ContextWindowPolicy,
     private val idGenerator: IdGenerator,
     private val config: AgentConfig = AgentConfig(),
+    private val clock: Clock = Clock { 0L },
+    private val timeZoneProvider: TimeZoneProvider = TimeZoneProvider { ZoneId.of("UTC") },
 ) {
     public fun run(
         history: List<HistoryItem>,
@@ -91,7 +96,12 @@ public class AgentLoop(
         val text = StringBuilder()
         val toolCalls = mutableListOf<ToolCall>()
         var failure: AgentError? = null
-        val request = ModelRequest(contextWindowPolicy.apply(history), toolPipeline.specs)
+        val request =
+            ModelRequest(
+                history = contextWindowPolicy.apply(history),
+                tools = toolPipeline.specs,
+                contextNote = CurrentTimeNote.render(clock.nowEpochMillis(), timeZoneProvider.zone()),
+            )
         modelGateway.stream(request).collect { event ->
             when (event) {
                 is ModelEvent.TextDelta -> {

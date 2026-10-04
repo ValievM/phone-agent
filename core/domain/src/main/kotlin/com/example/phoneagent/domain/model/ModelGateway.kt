@@ -14,6 +14,7 @@ public interface ModelGateway {
 public data class ModelRequest(
     public val history: List<HistoryItem>,
     public val tools: List<ToolSpec> = emptyList(),
+    public val contextNote: String? = null,
 )
 
 public sealed interface ModelEvent {

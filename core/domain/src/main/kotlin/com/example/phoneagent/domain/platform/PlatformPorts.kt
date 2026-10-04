@@ -9,6 +9,10 @@ public fun interface Clock {
     public fun nowEpochMillis(): Long
 }
 
+public fun interface TimeZoneProvider {
+    public fun zone(): java.time.ZoneId
+}
+
 public interface DispatcherProvider {
     public val main: CoroutineDispatcher
     public val io: CoroutineDispatcher
