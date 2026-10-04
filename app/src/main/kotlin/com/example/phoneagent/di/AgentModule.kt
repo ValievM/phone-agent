@@ -11,6 +11,7 @@ import com.example.phoneagent.domain.platform.DefaultDispatcherProvider
 import com.example.phoneagent.domain.platform.DispatcherProvider
 import com.example.phoneagent.domain.platform.IdGenerator
 import com.example.phoneagent.domain.platform.RandomIdGenerator
+import com.example.phoneagent.domain.platform.TimeZoneProvider
 import com.example.phoneagent.domain.tools.Tool
 import com.example.phoneagent.domain.tools.ToolPipeline
 import com.example.phoneagent.domain.tools.ToolRegistry
@@ -20,6 +21,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import java.time.ZoneId
 import javax.inject.Singleton
 
 @Module
@@ -38,6 +40,9 @@ internal object AgentModule {
 
     @Provides
     fun provideDispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider
+
+    @Provides
+    fun provideTimeZoneProvider(): TimeZoneProvider = TimeZoneProvider { ZoneId.systemDefault() }
 
     // Every Tool registered anywhere (Hilt @IntoSet, see AlarmBindings/FilesBindings/NotifyBindings)
     // is aggregated into this one Set<Tool> automatically; ToolRegistry never knows the concrete types.
@@ -59,6 +64,16 @@ internal object AgentModule {
         modelGateway: ModelGateway,
         toolPipeline: ToolPipeline,
         contextWindowPolicy: ContextWindowPolicy,
-        idGenerator: IdGenerator,
-    ): AgentLoop = AgentLoop(modelGateway, toolPipeline, contextWindowPolicy, idGenerator, AgentConfig())
+        clock: Clock,
+        timeZoneProvider: TimeZoneProvider,
+    ): AgentLoop =
+        AgentLoop(
+            modelGateway,
+            toolPipeline,
+            contextWindowPolicy,
+            RandomIdGenerator,
+            AgentConfig(),
+            clock,
+            timeZoneProvider,
+        )
 }
