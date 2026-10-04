@@ -13,6 +13,9 @@
     <string name="scroll_to_new_messages">К новым</string>
     <string name="scroll_to_new_messages_description">Прокрутить к новым сообщениям</string>
     <string name="model_working">Готовлю ответ</string>
+    <string name="copy_answer">Скопировать ответ</string>
+    <string name="share_answer">Поделиться ответом</string>
+    <string name="answer_copied">Скопировано</string>
     <string name="error_offline">Нет сети. Проверьте подключение и повторите запрос</string>
     <string name="error_generic">Не удалось получить ответ</string>
     <string name="error_session_expired">Сессия завершилась. Войдите снова</string>

@@ -49,6 +49,19 @@ private fun LongWordPreview() {
 }
 
 @PreviewLightDark
+@PreviewFontScale
+@Composable
+private fun CopiedAnswerActionsPreview() {
+    AppTheme(useDynamicColor = false) {
+        Surface {
+            Column(modifier = Modifier.padding(AppTheme.spacing.medium)) {
+                AssistantMessageActions(copied = true, onCopy = {}, onShare = {})
+            }
+        }
+    }
+}
+
+@PreviewLightDark
 @Composable
 private fun LinkConfirmationPreview() {
     AppTheme(useDynamicColor = false) {

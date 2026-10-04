@@ -61,6 +61,8 @@ internal fun MessageList(
     modifier: Modifier = Modifier,
     onOpenLink: (String) -> Unit = {},
     preparing: Boolean = false,
+    turnInProgress: Boolean = false,
+    hasError: Boolean = false,
     inlineError: (@Composable () -> Unit)? = null,
 ) {
     if (messages.isEmpty()) {
@@ -81,12 +83,17 @@ internal fun MessageList(
             inlineError?.invoke()
         }
     } else {
-        FollowingFeed(messages, FeedActions(onEvent, onOpenFile, onOpenLink), preparing, inlineError, modifier)
+        FollowingFeed(
+            messages,
+            FeedActions(onEvent, onOpenFile, onOpenLink, turnInProgress, hasError),
+            preparing,
+            inlineError,
+            modifier,
+        )
     }
 }
 
-/**
- * The feed follows new messages only if the reader is at the bottom (or just sent one themselves);
+/** The feed follows new messages only if the reader is at the bottom (or just sent one themselves);
  * when they are reading older messages it stays put and shows [ScrollToBottomChip] instead.
  */
 @Composable
@@ -151,6 +158,8 @@ private class FeedActions(
     val onEvent: (ChatUiEvent) -> Unit,
     val onOpenFile: (FileHit) -> Unit,
     val onOpenLink: (String) -> Unit,
+    val turnInProgress: Boolean,
+    val hasError: Boolean,
 )
 
 /**
@@ -165,6 +174,7 @@ private fun FeedColumn(
     inlineError: (@Composable () -> Unit)?,
     listState: LazyListState,
 ) {
+    val lastAssistantMessageId = messages.lastOrNull { it.role == ChatRole.ASSISTANT }?.id
     LazyColumn(
         modifier = Modifier.contentColumn().fillMaxHeight().testTag(ChatTestTags.MESSAGE_LIST),
         state = listState,
@@ -182,7 +192,9 @@ private fun FeedColumn(
             key = ChatMessage::id,
             contentType = ChatMessage::role,
         ) { message ->
-            Message(message, actions, Modifier.animateItem())
+            val showActions =
+                message.id != lastAssistantMessageId || (!actions.turnInProgress && !actions.hasError)
+            Message(message, actions, showActions, Modifier.animateItem())
         }
     }
 }
@@ -193,6 +205,7 @@ private val AT_BOTTOM_TOLERANCE = 4.dp
 private fun Message(
     message: ChatMessage,
     actions: FeedActions,
+    showActions: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val toolCall = message.toolCall
@@ -215,7 +228,7 @@ private fun Message(
         }
 
         else -> {
-            AssistantMessage(message.text, modifier, actions.onOpenLink)
+            AssistantMessage(message.text, modifier, actions.onOpenLink, showActions)
         }
     }
 }

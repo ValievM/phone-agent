@@ -38,6 +38,7 @@ app/src/test/screenshots/*
 !app/src/test/screenshots/settings_*.png
 !app/src/test/screenshots/about_screen*.png
 !app/src/test/screenshots/composer_voice_*.png
+!app/src/test/screenshots/assistant_copy_share_*.png
 !app/src/test/screenshots/chat_*.png
 
 # Local state of agents and editors (each person and tool keeps its own; nothing here belongs to the project)

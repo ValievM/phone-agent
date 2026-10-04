@@ -164,10 +164,10 @@ private fun ChatBody(
             onEvent = onEvent,
             onOpenFile = onOpenFile,
             onOpenLink = onOpenLink,
-            onSuggestionClick = { suggestion ->
-                draft = suggestion.also { showResultAnnouncement = false }
-            },
+            onSuggestionClick = { suggestion -> draft = suggestion.also { showResultAnnouncement = false } },
             preparing = state.isPreparingAnswer(),
+            turnInProgress = state.turn.isInProgress(),
+            hasError = error != null,
             modifier = Modifier.weight(1f).imeNestedScroll(),
             inlineError =
                 error?.takeIf { it.placement == ErrorPlacement.Inline }?.let { presentation ->
