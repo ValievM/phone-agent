@@ -25,10 +25,15 @@ class SearchFilesTool {
   <<internal>>
   search_files SAFE
 }
+class DeviceStatusTool {
+  <<internal>>
+  get_device_status SAFE
+}
 AlarmTool ..|> Tool
 NotifyTool ..|> Tool
 FindFilesTool ..|> Tool
 SearchFilesTool ..|> Tool
+DeviceStatusTool ..|> Tool
 AlarmTool --> AlarmIntentLauncher
 AlarmTool ..> AlarmIntentFactory
 NotifyTool --> UserInteraction
@@ -46,6 +51,8 @@ SearchFilesTool --> UserInteraction
 SearchFilesTool --> MediaStoreSearch
 SearchFilesTool ..> SearchFilesPolicy
 AndroidMediaStoreSearch ..|> MediaStoreSearch
+DeviceStatusTool --> DeviceStatusPort
+AndroidDeviceStatus ..|> DeviceStatusPort
 ```
 
 | Инструмент | `Risk` | Логика без Android | Android-обёртка | Заметки |
@@ -54,8 +61,9 @@ AndroidMediaStoreSearch ..|> MediaStoreSearch
 | `NotifyTool` `notify` | `SAFE` | `validateNotifyArgs` (заголовок до 100, текст до 500) | `AndroidNotifier`: канал `phone_agent_notifications`, `NOTIFICATION_ID=1` | Право проверяет `ToolPipeline`; новое уведомление заменяет прежнее |
 | `FindFilesTool` `find_files` | `SAFE` | `SafTreeWalker` + `FileSearchCriteria`: все слова имени, любой порядок, нормализация; `alternatives`/`types`, известное расширение как тип; `FindFilesArgs` | `RealSelectedFolder` (папка из `AppSettings.searchFolderUri`), `SafDocumentNode`, `SafDocuments` | Обход в ширину: глубина 6, 5000 узлов, 30 с, 20 совпадений; имена и относительные пути; нет папки = `Failed` |
 | `SearchFilesTool` `search_files` | `SAFE` | `SearchFilesPolicy`: дедуп по имени и размеру, 20 записей, JSON до 3500 байт; `SearchFilesArgs` + `FileSearchCriteria` | `AndroidMediaStoreSearch`: доступные метаданные `Files` и `Downloads`, сортировка `DATE_MODIFIED DESC`, Kotlin matching вместо `LIKE` | Имя файла и непосредственной папки; дата изменения только для сортировки и дедупликации; стемы/слова, OR-альтернативы, MIME/расширение; `types` без запроса, `.pdf` как тип; отдаёт `content://` URI и метаданные (ADR 0003); бюджет выполнения 30 с |
+| `DeviceStatusTool` `get_device_status` | `SAFE` | Форматирует доступные значения для текста и `CallDescription` | `AndroidDeviceStatus`: sticky `ACTION_BATTERY_CHANGED`, `PowerManager`, `StatFs` для data-раздела | Читает только заряд, зарядку, экономный режим и свободное/общее место; разрешений не требует, не логирует значения |
 
-Общее: каждый инструмент строит схему вручную, декодирует аргументы `kotlinx.serialization`, `describe()` даёт `CallDescription` для карточки и шторки. Русские тексты лежат в `*Copy.kt` (не в `strings.xml`). Регистрация: `@Binds @IntoSet` в `AlarmBindings`, `NotifyBindings`, `FilesBindings` (все `internal`).
+Общее: каждый инструмент строит схему вручную, декодирует аргументы `kotlinx.serialization`, `describe()` даёт `CallDescription` для карточки и шторки. Русские тексты лежат в `*Copy.kt` (не в `strings.xml`). Регистрация: `@Binds @IntoSet` в `AlarmBindings`, `NotifyBindings`, `FilesBindings`, `DeviceStatusBindings` (все `internal`).
 
 ## `:app`: UI чата
 
