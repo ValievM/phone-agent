@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 public enum class Capability {
     NOTIFICATIONS,
     FILES,
+    MICROPHONE,
 }
 
 public sealed interface CapabilityResult {
