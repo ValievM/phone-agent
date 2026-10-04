@@ -9,7 +9,9 @@ public interface SpeechInput {
      * ([SpeechEvent.Final] or [SpeechEvent.Failed]) and completes. Never throws for expected failures.
      * [SpeechEvent.Level.normalized] is normalized to the range 0..1.
      * [SpeechEvent.Final.text] is never blank.
-     * A session rejected because another one is active ends with [SpeechFailure.BUSY] and may omit [SpeechEvent.Listening].
+     * A session rejected before it starts because another one is active, microphone permission is denied, or the
+     * recognizer is unavailable ends with [SpeechFailure.BUSY], [SpeechFailure.PERMISSION_DENIED], or
+     * [SpeechFailure.UNAVAILABLE] and may omit [SpeechEvent.Listening].
      */
     public fun listen(request: SpeechRequest): Flow<SpeechEvent>
 }
