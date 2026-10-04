@@ -49,4 +49,13 @@ object AppIcons {
 
     @get:DrawableRes
     val arrowDownward: Int = R.drawable.ic_arrow_downward
+
+    @get:DrawableRes
+    val copy: Int = R.drawable.ic_copy
+
+    @get:DrawableRes
+    val share: Int = R.drawable.ic_share
+
+    @get:DrawableRes
+    val check: Int = R.drawable.ic_check
 }
