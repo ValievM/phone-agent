@@ -75,6 +75,11 @@ dependencies {
     implementation(project(":data:llm"))
     implementation(project(":data:auth"))
     implementation(project(":tools"))
+    implementation(project(":shared"))
+    implementation(project(":entities"))
+    implementation(project(":features"))
+    implementation(project(":widgets"))
+    implementation(project(":screens"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
