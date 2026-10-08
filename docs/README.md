@@ -60,7 +60,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 - `tooling/`: инструменты агента. [context7](tooling/context7.md), [build-performance](tooling/build-performance.md), [ci](tooling/ci.md), [tracker](tooling/tracker.md), [swarm](tooling/swarm.md), [swarm-prompt-gpt](tooling/swarm-prompt-gpt.md).
 - [manual-verification.md](manual-verification.md): что из сделанного реально потрогал пользователь на своём телефоне, а что нет. [log-audit.md](log-audit.md): аудит логов на токены и данные чата.
 - [measurements.md](measurements.md): замеры этапа 6 и проверка отсутствия фоновой работы.
-- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md), [0004-batch-approval](adr/0004-batch-approval.md), [0005-conversation-domain](adr/0005-conversation-domain.md; принято), [детали эпика](architecture/conversation-domain-design.md), [0006-brand-joint](adr/0006-brand-joint.md), [0007-voice-input](adr/0007-voice-input.md).
+- `adr/`: принятые решения. [0001-baseline](adr/0001-baseline.md), [0002-subscription-login-go](adr/0002-subscription-login-go.md), [0003-global-file-search](adr/0003-global-file-search.md), [0004-batch-approval](adr/0004-batch-approval.md), [0005-conversation-domain](adr/0005-conversation-domain.md; принято), [детали эпика](architecture/conversation-domain-design.md), [0006-brand-joint](adr/0006-brand-joint.md), [0007-voice-input](adr/0007-voice-input.md), [0008-kmp-fsd](adr/0008-kmp-fsd.md).
 
 ## Правила ведения
 - Новый документ создаём в `docs/`, не в корне и не рядом с кодом. Язык русский, имена файлов латиницей.
@@ -69,3 +69,4 @@ Android-приложение: чат с Codex + узкие инструмент�
 - Решение изменилось: документ обновляем **в том же коммите**, что и код.
 - При расхождении приоритет такой: `backend-notes.md` (значения бэкенда) → `architecture/` (устройство) → `product/` (требования). Расхождение называем вслух и исправляем.
 - Проверка ссылок, размеров и структуры: `python3 scripts/check_docs.py` (запускаем после любой правки документов).
+- `architecture/kmp-fsd-migration.md`: план перехода на KMP и FSD (этапы, оценка, целевые слои).
