@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APK="$ROOT_DIR/app/build/outputs/apk/release/app-release.apk"
+APK="${APK:-$ROOT_DIR/app/build/outputs/apk/release/app-release.apk}"
 
 cd "$ROOT_DIR"
 ~/.gradle-agents/gw gpt2 assembleRelease
