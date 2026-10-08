@@ -41,6 +41,7 @@ Android-приложение: чат с Codex + узкие инструмент�
 | Задачи и решения владельца одним экраном | [OWNER-TASKS.md](../OWNER-TASKS.md) (корень репозитория) |
 | Установка и первый вход для пользователя | [INSTALL.md](INSTALL.md) |
 | Что из сделанного пользователь ещё не проверил на своём телефоне | [manual-verification.md](manual-verification.md) (чат и ход агента), [manual-verification-tools-build.md](manual-verification-tools-build.md) (инструменты, вход, сборка, CI, логи), [manual-verification-brand.md](manual-verification-brand.md) (вид, размеры, движение «Стыка») |
+| Сборка и ручная проверка релиза | [release.md](release.md) |
 | Что пишется в логи и как это проверять | [log-audit.md](log-audit.md) |
 | Context7 (документация библиотек) | [tooling/context7.md](tooling/context7.md) |
 | Оптимизация сборки (замечания на будущее) | [tooling/build-performance.md](tooling/build-performance.md) |
