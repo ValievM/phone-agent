@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APK="${APK:-$ROOT_DIR/app/build/outputs/apk/release/app-release.apk}"
 
 cd "$ROOT_DIR"
-~/.gradle-agents/gw gpt2 assembleRelease
+~/.gradle-agents/gw "${GW_WHO:-owner}" assembleRelease
 
 if [[ ! -f "$APK" ]]; then
     echo "Release APK not found: $APK" >&2
