@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / 'docs'
 AGENTS = REPO / 'AGENTS.md'
-ROOT_ALLOWED = {'AGENTS.md', 'OWNER-TASKS.md'}  # the owner's one-screen task list lives in the root on purpose
+LAYOUT_ALLOWED = {'AGENTS.md', 'OWNER-TASKS.md', 'probe/ktor/README.md'}  # module-local README required by the temporary Ktor probe
 
 AGENTS_BUDGET = 8 * 1024      # always loaded by Codex, keep it lean (hard limit of Codex is 32 KiB)
 DOC_BUDGET = 14 * 1024        # one topic per file, roughly up to ~5k tokens
@@ -136,8 +136,8 @@ def check_layout():
         if any(part in SKIP_DIRS for part in p.relative_to(REPO).parts):
             continue
         r = p.relative_to(REPO)
-        if r.parts[0] != 'docs' and r.as_posix() not in ROOT_ALLOWED:
-            errors.append(f'{r}: documentation must live in docs/ (the root allows only {sorted(ROOT_ALLOWED)})')
+        if r.parts[0] != 'docs' and r.as_posix() not in LAYOUT_ALLOWED:
+            errors.append(f'{r}: documentation must live in docs/ (allowlisted exceptions: {sorted(LAYOUT_ALLOWED)})')
 
 
 def check_index():
