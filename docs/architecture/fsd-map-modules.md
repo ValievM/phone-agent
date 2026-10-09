@@ -1,0 +1,26 @@
+# FSD-карта: модули домена, данных и инструментов
+
+Продолжение [инвентаря app](fsd-map-files.md). Пути короче с префиксами: `tools`, `domain`, `llm`, `data-auth` указывают на соответствующий `src/main/kotlin/com/example/phoneagent/` корень (`domain` — `.../domain/`). Все перечисленные файлы входят в набор 208 production Kotlin-файлов из [карты](fsd-map.md).
+
+| Файлы (корень модуля указан префиксом) | Целевой слой · слайс · сегмент | Причина назначения |
+|---|---|---|
+
+| `data-auth:ApiKeyAuth.kt`, `data-auth:AuthConfig.kt`, `data-auth:AuthContracts.kt`, `data-auth:ChatGptBrowserAuth.kt`, `data-auth:ChatGptDeviceCodeAuth.kt`, `data-auth:EncryptedTokenStore.kt`, `data-auth:JwtClaimsExtractor.kt`, `data-auth:OkHttpTokenRefreshGateway.kt`, `data-auth:Pkce.kt`, `data-auth:SessionManager.kt`, `data-auth:TokenRefresher.kt` | `features` · `auth` · `api/model` | Auth adapter, protocol and secure persistence. |
+| `domain:agent/AgentError.kt`, `domain:agent/AgentEvent.kt`, `domain:agent/AgentLoop.kt`, `domain:agent/CurrentTimeNote.kt` | `entities` · `agent_run` · `model` | Agent behavior and public outcome/event model. |
+| `domain:auth/ApiKeyValidationGateway.kt`, `domain:auth/CredentialsProvider.kt` | `entities` · `auth` · `model` | Auth ports and credential types, independent of implementations. |
+| `domain:conversation/ContextWindowPolicy.kt`, `domain:conversation/HistoryItem.kt`, `domain:conversation/RetryPlan.kt`, `domain:conversation/TurnState.kt` | `entities` · `conversation` · `model` | Conversation/history types and policies form a single shared domain boundary. |
+| `domain:interaction/UserInteraction.kt` | `entities` · `interaction` · `model` | Port/types for confirmations and capabilities. |
+| `domain:model/ModelCatalog.kt`, `domain:model/ModelGateway.kt` | `entities` · `model_access` · `model` | Backend-neutral model gateway and catalog contracts. |
+| `domain:platform/LogRedaction.kt`, `domain:platform/PlatformPorts.kt`, `domain:platform/RedactingAppLogger.kt`, `domain:platform/RingLog.kt`, `domain:platform/SanitizedThrowable.kt` | `entities` · `platform_services` · `model/lib` | Portable ports/policies; Android log sink is mapped separately. |
+| `domain:speech/SpeechInput.kt` | `entities` · `speech` · `model` | Cross-layer speech contract and result types. |
+| `domain:storage/Repositories.kt` | `entities` · `settings` · `model` | Storage ports and settings/history contracts. |
+| `domain:tools/Tool.kt`, `domain:tools/ToolArgumentEditor.kt`, `domain:tools/ToolContent.kt`, `domain:tools/ToolOutcome.kt`, `domain:tools/ToolPipeline.kt`, `domain:tools/ToolRegistry.kt` | `entities` · `tool_call` · `model` | Shared tool protocol and invocation/approval contracts. |
+| `llm:BackendProfile.kt`, `llm:ErrorBodySummary.kt`, `llm:OkHttpApiKeyValidationGateway.kt`, `llm:OkHttpModelCatalog.kt`, `llm:ResponsesGateway.kt`, `llm:SystemPrompt.kt`, `llm:dto/ResponseEventDto.kt`, `llm:request/ResponsesRequestBuilder.kt`, `llm:sse/ResponsesEventMapper.kt`, `llm:sse/SseParser.kt` | `features` · `model_backend` · `api` | Backend-specific HTTP, SSE and DTO adapter; port remains in entities. |
+| `tools:alarm/AlarmArgs.kt`, `tools:alarm/AlarmBindings.kt`, `tools:alarm/AlarmCopy.kt`, `tools:alarm/AlarmIntentFactory.kt`, `tools:alarm/AlarmIntentSpec.kt`, `tools:alarm/AlarmValidationResult.kt` | `features` · `tool_alarm` · `model` | Alarm argument model, validation, intent spec and registration. |
+| `tools:alarm/AlarmIntentLauncher.kt`, `tools:alarm/AlarmTool.kt` | `features` · `tool_alarm` · `api` | Tool adapter and Android intent launching. |
+| `tools:files/DocumentNode.kt`, `tools:files/FileSearchCriteria.kt`, `tools:files/FileSearchTimeouts.kt`, `tools:files/FilesBindings.kt`, `tools:files/FindFilesArgs.kt`, `tools:files/FindFilesCopy.kt`, `tools:files/SafDocumentNode.kt`, `tools:files/SearchFilesArgs.kt`, `tools:files/SearchFilesContentCodec.kt`, `tools:files/SearchFilesCopy.kt`, `tools:files/SearchFilesPolicy.kt` | `features` · `tool_files` · `model` | Search criteria, data/codec and labels shared by SAF and MediaStore operations. |
+| `tools:files/FindFilesTool.kt`, `tools:files/MediaStoreSearch.kt`, `tools:files/RealSelectedFolder.kt`, `tools:files/SafTreeWalker.kt`, `tools:files/SearchFilesTool.kt`, `tools:files/SelectedFolder.kt` | `features` · `tool_files` · `api` | Tool orchestration and Android SAF/MediaStore adapters. |
+| `tools:notify/AndroidNotifier.kt`, `tools:notify/NotificationIds.kt`, `tools:notify/Notifier.kt`, `tools:notify/NotifyTool.kt` | `features` · `tool_notify` · `api/model` | Notification port/adapter and tool implementation. |
+| `tools:notify/NotifyArgs.kt`, `tools:notify/NotifyBindings.kt`, `tools:notify/NotifyCopy.kt`, `tools:notify/NotifyValidationResult.kt` | `features` · `tool_notify` · `model` | Notification request/validation and registration. |
+| `tools:status/AndroidDeviceStatus.kt`, `tools:status/DeviceStatusTool.kt` | `features` · `tool_status` · `api` | Android status adapter and tool implementation. |
+| `tools:status/DeviceStatusBindings.kt`, `tools:status/DeviceStatusCopy.kt`, `tools:status/DeviceStatusPort.kt` | `features` · `tool_status` · `model` | Status port, labels and Hilt registration. |
